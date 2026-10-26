@@ -6,7 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Brick-SDR is a restyled fork of Thetis 2.10.3.x (WinForms, .NET Framework 4.8, x64) for HPSDR/ANAN radios, with official WDSP 2.11. There are no automated tests or linters; verification is building and running against a real radio (Hermes / ANAN-100D) or by screenshots of the running app.
 
-The upstream `ReadMe.md` is Thetis' (archived-project notice, licence pointers); it says nothing about building.
+GPL v2 (`LICENSE`); based on Thetis (MW0LGE) / PowerSDR, WDSP by NR0V. `README.md` is a short Brick-SDR intro (install, build); the upstream Thetis ReadMe was replaced.
+
+## Git / releases
+
+- Remote: `https://github.com/linoobs/Brick-SDR-Software` (public, branch `main`; owner account `linoobs`). Repo root is this folder (the one holding `Installer`, `Project Files`).
+- GitHub CLI is not on PATH: `/c/Users/linoobs/tools/gh/bin/gh.exe` (already authenticated, `gh auth setup-git` done). No `winget` on this machine.
+- `.gitignore` excludes `bin/obj/x64/Release`, `Project Files/build` and `BrickSDR-Setup*.exe/zip`: the installer is published only as a release asset (`gh release create vX.Y BrickSDR-Setup.exe --repo linoobs/Brick-SDR-Software`), never committed (repo file limit 100 MB, the installer is ~85 MB). v1.1 is released.
+- Publishing (push, release) is outward-facing: confirm with the user first. Commits end with the Co-Authored-By line from the session attribution.
 
 ## Build / run
 

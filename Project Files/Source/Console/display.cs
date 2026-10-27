@@ -3151,7 +3151,7 @@ namespace BrickSDR
         {
             int H = displayTargetHeight;
             H -= SplitY(H); // below the splitter
-            if (current_display_mode_bottom == DisplayMode.PANAFALL) H = (int)(H * (1f - m_fPanafallSplitPerc));
+            if (current_display_mode_bottom == DisplayMode.PANAFALL) H = (int)(H * (1f - m_fPanafallSplitPercRX2));
             int preservedRows = 0;
 
             lock (_objDX2Lock)
@@ -3746,13 +3746,34 @@ namespace BrickSDR
 
         // Brick-SDR: y of the spectrum / waterfall border of each receiver (RX2 running: both halves use the same share)
         public static int PanafallBarYRX1 { get { return _rx2_enabled ? (int)(SplitY(displayTargetHeight) * m_fPanafallSplitPerc) : PanafallSplitBarPos; } }
-        public static int PanafallBarYRX2 { get { int sy = SplitY(displayTargetHeight); return sy + (int)((displayTargetHeight - sy) * m_fPanafallSplitPerc); } }
+        public static int PanafallBarYRX2 { get { int sy = SplitY(displayTargetHeight); return sy + (int)((displayTargetHeight - sy) * m_fPanafallSplitPercRX2); } }
 
         public static int PanafallSplitBarPos
         {
             get { return (int)(displayTargetHeight * m_fPanafallSplitPerc); }
         }
         private static float m_fPanafallSplitPerc = 0.5f;
+        private static float m_fPanafallSplitPercRX2 = 0.5f;
+        // Brick-SDR: RX2 has its own spectrum / waterfall border
+        public static float PanafallSplitBarPercRX2
+        {
+            get { return m_fPanafallSplitPercRX2; }
+            set
+            {
+                bool resetBmp = false;
+                lock (_objDX2Lock)
+                {
+                    resetBmp = value != m_fPanafallSplitPercRX2;
+                    m_fPanafallSplitPercRX2 = value;
+                }
+                if (resetBmp)
+                {
+                    ResetWaterfallBmp2();
+                    _bRebuildRXLinearGradBrush = true;
+                    _bRebuildTXLinearGradBrush = true;
+                }
+            }
+        }
         public static float PanafallSplitBarPerc
         {
             get { return m_fPanafallSplitPerc; }
@@ -3769,7 +3790,6 @@ namespace BrickSDR
                 if (resetBmp)
                 {
                     ResetWaterfallBmp();
-                    if (_rx2_enabled) ResetWaterfallBmp2();
                     _bRebuildRXLinearGradBrush = true;
                     _bRebuildTXLinearGradBrush = true;
                 }
@@ -4013,7 +4033,7 @@ namespace BrickSDR
                             switch (current_display_mode_bottom)
                             {
                                 case DisplayMode.PANAFALL:
-                                    tmpHeightRX2 = (int)(tmpHeightRX2 * m_fPanafallSplitPerc);
+                                    tmpHeightRX2 = (int)(tmpHeightRX2 * m_fPanafallSplitPercRX2);
                                     break;
                                 case DisplayMode.PANASCOPE:
                                 case DisplayMode.SPECTRASCOPE:
@@ -4194,7 +4214,7 @@ namespace BrickSDR
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
                             case DisplayMode.PANAFALL:
-                                m_nRX2DisplayHeight = (int)((displayTargetHeight - splitTop) * m_fPanafallSplitPerc);
+                                m_nRX2DisplayHeight = (int)((displayTargetHeight - splitTop) * m_fPanafallSplitPercRX2);
                                 DrawPanadapterDX2D(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, false);
                                 DrawWaterfallDX2D(splitTop + m_nRX2DisplayHeight, displayTargetWidth, (displayTargetHeight - splitTop) - m_nRX2DisplayHeight, 2, true);
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);

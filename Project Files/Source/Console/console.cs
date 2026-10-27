@@ -3216,6 +3216,7 @@ namespace BrickSDR
 
             a.Add("IncludeWindowBorders/" + m_bIncludeWindowBorders);
             a.Add("PanafallSplitBarPerc/" + Display.PanafallSplitBarPerc.ToString());
+            a.Add("PanafallSplitBarPercRX2/" + Display.PanafallSplitBarPercRX2.ToString());
 
             a.Add("DumpCap_WireSharkPath/" + DumpCap.WireSharkPath);
             a.Add("DumpCap_Interface/" + DumpCap.Interface.ToString());
@@ -4096,6 +4097,9 @@ namespace BrickSDR
                         break;
                     case "IncludeWindowBorders":
                         IncludeWindowBorders = bool.Parse(val); // used for statusbar form resize calcs
+                        break;
+                    case "PanafallSplitBarPercRX2":
+                        Display.PanafallSplitBarPercRX2 = float.Parse(val);
                         break;
                     case "PanafallSplitBarPerc":
                         Display.PanafallSplitBarPerc = float.Parse(val); // used for the splitter percentage when rx1 only displayed in panafall mode
@@ -5757,8 +5761,10 @@ namespace BrickSDR
 
         private void DisableAllModes()
         {
-            foreach (RadioButtonTS r in panelMode.Controls)
+            foreach (Control mc in panelMode.Controls)
             {
+                RadioButtonTS r = mc as RadioButtonTS;
+                if (r == null) { mc.Enabled = false; continue; } // Brick-SDR: the mode pair buttons
                 r.Enabled = false;
                 if (r.BackColor == button_selected_color)
                     r.BackColor = vfo_text_dark_color;
@@ -5767,8 +5773,10 @@ namespace BrickSDR
 
         private void EnableAllModes()
         {
-            foreach (RadioButtonTS r in panelMode.Controls)
+            foreach (Control mc in panelMode.Controls)
             {
+                RadioButtonTS r = mc as RadioButtonTS;
+                if (r == null) { mc.Enabled = true; continue; } // Brick-SDR: the mode pair buttons
                 if (!string.IsNullOrEmpty(r.Text))
                     r.Enabled = true;
                 if (r.BackColor == vfo_text_dark_color)
@@ -49743,7 +49751,7 @@ namespace BrickSDR
                         int barRx2;
                         if (brickOverPanafallBar(e.Y, out barRx2))
                         {
-                            Display.PanafallSplitBarPerc = 0.5f;
+                            if (rx2_enabled && barRx2 == 2) Display.PanafallSplitBarPercRX2 = 0.5f; else Display.PanafallSplitBarPerc = 0.5f;
                             return;
                         }
                     }
@@ -50248,7 +50256,7 @@ namespace BrickSDR
                         float f = !rx2_enabled ? (float)e.Y / (float)pnlDisplay.Height : (brickPanafallBarRx == 1 ? (float)e.Y / sy0 : (float)(e.Y - sy0) / (pnlDisplay.Height - sy0));
                         f = Math.Max(0.1f, f);
                         f = Math.Min(0.9f, f);
-                        Display.PanafallSplitBarPerc = f;
+                        if (rx2_enabled && brickPanafallBarRx == 2) Display.PanafallSplitBarPercRX2 = f; else Display.PanafallSplitBarPerc = f;
                     }
                 }
                 //END SPLITTER DRAG

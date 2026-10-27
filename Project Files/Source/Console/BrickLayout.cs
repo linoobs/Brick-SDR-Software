@@ -1249,12 +1249,11 @@ namespace BrickSDR
         {
             int gap = 5, cw = (w - gap) / 2, h = 26;
             RadioButton[][] pairs = { new[] { lsb, usb }, new[] { cwl, cwu }, new[] { am, sam }, new[] { digl, digu } };
-            string[][] names = { new[] { "LSB", "USB" }, new[] { "CW-L", "CW-U" }, new[] { "AM", "SAM" }, new[] { "DIGL", "DIGU" } };
+            string[][] names = { new[] { "LSB", "USB" }, new[] { "CW-L", "CW-U" }, new[] { "AM", "SAM" }, new[] { "DIG", "FT8" } };
             for (int i = 0; i < pairs.Length; i++)
             {
                 RadioButton ra = pairs[i][0], rb = pairs[i][1];
                 BrickModePair bp = new BrickModePair { NameA = names[i][0], NameB = names[i][1], Font = new Font("Segoe UI", 8.5f) };
-                if (i == 3) bp.Extra = "FT8";
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
                 bp.Pick = n => { if (n == 1) ra.Checked = true; else rb.Checked = true; };
@@ -1566,7 +1565,8 @@ namespace BrickSDR
         {
             float s = alex_swr;
             if (float.IsNaN(s) || float.IsInfinity(s) || s < 1.0f) return "1.0";
-            return s.ToString("0.0");
+            if (s > 9.9f) s = 9.9f;
+            return s.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private bool brickPureSignalOn()
@@ -1811,7 +1811,9 @@ namespace BrickSDR
                     {
                         string swrText = "SWR " + brickSwrText();
                         SizeF ss = g.MeasureString(swrText, fb);
-                        g.DrawString(swrText, fb, yellow, W - ss.Width - 2, -2);
+                        // fixed place: the text is as wide as the largest value (9.9), so it does not move
+                        SizeF sm = g.MeasureString("SWR 9.9", fb);
+                        g.DrawString(swrText, fb, yellow, W - sm.Width - 2, -2);
                     }
 
                     float max = brickPaMax();

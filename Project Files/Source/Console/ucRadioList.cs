@@ -141,6 +141,7 @@ public byte RadioProtocol2Supported;
         {
             public int RowIndex;
             public bool IsTrash;
+            public int Tool; // Brick-SDR: 1 = Program, 2 = IP Set
         }
 
         private readonly List<RowItem> _items;
@@ -151,6 +152,34 @@ public byte RadioProtocol2Supported;
         private bool _hover_trash;
 
         public event EventHandler SelectedRadioChanged;
+        // Brick-SDR: the Program (1) / IP Set (2) button of a discovered radio was pressed, with the key of the row
+        public event Action<string, int> ToolRequested;
+
+        // details of a row for the Program / IP Set windows
+        public bool TryGetRadio(string key, out string radioIp, out int radioPort, out string radioMac, out string nicIp, out string model)
+        {
+            radioIp = radioMac = nicIp = model = ""; radioPort = 1024;
+            foreach (RowItem it in _items)
+                if (string.Equals(it.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    radioIp = safe(it.RadioIp); radioMac = safe(it.RadioMac); nicIp = safe(it.NicIp); model = safe(it.RadioModel);
+                    radioPort = it.RadioPort > 0 ? it.RadioPort : 1024;
+                    return true;
+                }
+            return false;
+        }
+
+        // the two small buttons left of the trash can; only for radios found by Discover (they have a MAC)
+        private bool toolRects(Rectangle rowRect, RowItem item, bool canRemove, out Rectangle prog, out Rectangle ip)
+        {
+            prog = ip = Rectangle.Empty;
+            if (!canRemove || item.RadioIsCustom || string.IsNullOrWhiteSpace(item.RadioMac)) return false;
+            int pad = scale(10), trashHit = scale(28), bw = scale(62), bh = scale(22), gap = scale(6);
+            int right = rowRect.Right - pad - trashHit - scale(8);
+            ip = new Rectangle(right - bw, rowRect.Top + (rowRect.Height - bh) / 2, bw, bh);
+            prog = new Rectangle(ip.Left - gap - bw, ip.Top, bw, bh);
+            return true;
+        }
         public event EventHandler RadioListChanged;
 
         private int _trash_down_index;
@@ -618,6 +647,7 @@ HPSDRHW hw = (HPSDRHW)0;
             item.NicMtu = nic.Mtu;
 
             item.RadioModel = radio.DeviceType.ToString();
+            { string bn = BrickHardware.DisplayName(radio.MacAddress); if (bn.Length > 0) item.RadioModel = bn; } // Brick-SDR: Brick2 15W / Brick3 50W
             item.RadioIp = (radioIp != null) ? radioIp.ToString() : "";
             item.RadioPort = port;
             item.RadioProtocol = radio.Protocol;
@@ -1008,6 +1038,13 @@ if (!DoesRadioExist(item.Key))
                 return;
             }
 
+            if (hit.Tool != 0)
+            {
+                string tkey = _items[hit.RowIndex].Key;
+                if (ToolRequested != null) ToolRequested(tkey, hit.Tool);
+                return;
+            }
+
             setSelectedByIndex(hit.RowIndex, false);
         }
 
@@ -1157,6 +1194,14 @@ if (!DoesRadioExist(item.Key))
                 textRight = rowRect.Right - pad;
             }
 
+            Rectangle progRect, ipRect;
+            if (toolRects(rowRect, item, canRemove, out progRect, out ipRect))
+            {
+                drawMiniButton(g, progRect, "Program");
+                drawMiniButton(g, ipRect, "IP Set");
+                textRight = Math.Min(textRight, progRect.Left - scale(8));
+            }
+
             if (textRight < textLeft) return;
 
             Rectangle textRect = new Rectangle(textLeft, rowRect.Top + scale(6), textRight - textLeft, rowRect.Height - scale(12));
@@ -1229,6 +1274,21 @@ if (!DoesRadioExist(item.Key))
                     g.DrawString(line4, Font, t4, r4, sf);
                 }
             }
+        }
+
+        private void drawMiniButton(Graphics g, Rectangle r, string text)
+        {
+            using (GraphicsPath gp = new GraphicsPath())
+            {
+                int d = scale(8);
+                gp.AddArc(r.X, r.Y, d, d, 180, 90); gp.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+                gp.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); gp.AddArc(r.X, r.Bottom - d, d, d, 90, 90); gp.CloseFigure();
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(240, 242, 246))) g.FillPath(b, gp);
+                using (Pen pn = new Pen(Color.FromArgb(150, 156, 170))) g.DrawPath(pn, gp);
+            }
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            using (SolidBrush t = new SolidBrush(Color.FromArgb(40, 44, 56)))
+                g.DrawString(text, Font, t, r, sf);
         }
 
         private void drawRadioGlyph(Graphics g, Rectangle rect, bool selected)
@@ -1478,6 +1538,9 @@ if (!DoesRadioExist(item.Key))
 
             Rectangle trashRect = new Rectangle(rowRect.Right - pad - trashHit, rowRect.Top + (rowRect.Height - trashHit) / 2, trashHit, trashHit);
             r.IsTrash = trashRect.Contains(p);
+            Rectangle tp, ti;
+            if (!r.IsTrash && toolRects(rowRect, _items[idx], true, out tp, out ti))
+                r.Tool = tp.Contains(p) ? 1 : (ti.Contains(p) ? 2 : 0);
 
             return r;
         }
@@ -1927,6 +1990,7 @@ if (!DoesRadioExist(item.Key))
             item.NicMtu = nic.Mtu;
 
             item.RadioModel = radio.DeviceType.ToString();
+            { string bn = BrickHardware.DisplayName(radio.MacAddress); if (bn.Length > 0) item.RadioModel = bn; } // Brick-SDR: Brick2 15W / Brick3 50W
             item.RadioIp = (radioIp != null) ? radioIp.ToString() : "";
             item.RadioPort = port;
             item.RadioProtocol = radio.Protocol;

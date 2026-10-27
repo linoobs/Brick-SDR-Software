@@ -186,7 +186,7 @@ namespace BrickSDR
             // fixed pixel layout, do not let the old autoscale / resize code move things around
             this.AutoScaleMode = AutoScaleMode.None;
             this.BackColor = cBg;
-            this.MinimumSize = new Size(1420, 900);
+            this.MinimumSize = new Size(1360, 900);
             if (this.ClientSize.Width < 1480 || this.ClientSize.Height < 940)
                 this.ClientSize = new Size(Math.Max(this.ClientSize.Width, 1480), Math.Max(this.ClientSize.Height, 940));
 
@@ -224,14 +224,14 @@ namespace BrickSDR
             int chrome = this.Height - this.ClientSize.Height;
             // the window never gets smaller than the layout needs (VFO B must not run into the S-meter)
             int chromeW = this.Width - this.ClientSize.Width;
-            this.MinimumSize = new Size(1480 + chromeW, need + menuStrip1.Height + statusStripMain.Height + chrome);
+            this.MinimumSize = new Size(1360 + chromeW, need + menuStrip1.Height + statusStripMain.Height + chrome);
             if (this.Height < this.MinimumSize.Height) this.Height = this.MinimumSize.Height;
             if (this.Width < this.MinimumSize.Width) this.Width = this.MinimumSize.Width;
 
             brickApplyTheme(brickRoot);
             brickApplyTheme(statusStripMain);
             brickStyleMenu();
-            if (!IsSetupFormNull) { SetupForm.BrickSimplifyNR(); SetupForm.BrickAddLineColouring(); }
+            if (!IsSetupFormNull) { SetupForm.BrickSimplifyNR(); SetupForm.BrickAddLineColouring(); SetupForm.BrickHookRadioTools(); }
             Common.UseImmersiveDarkMode(this.Handle, true);
 
             VFOTextLightColor = cAccent;
@@ -276,6 +276,8 @@ namespace BrickSDR
             int idx = TuneStepLookup("500Hz");
             if (idx >= 0) TuneStepIndex = idx;
 
+            this.Resize += (s, e) => updateResolutionStatusBarText();
+            updateResolutionStatusBarText();
             brickTimer = new System.Windows.Forms.Timer();
             brickTimer.Interval = 200;
             brickTimer.Tick += brickTick;
@@ -595,11 +597,11 @@ namespace BrickSDR
             if (cardMeter == null) return;
             int w = pnlTop.ClientSize.Width;
             // the S-meter keeps its size at the right edge, the two VFO blocks share what is left
-            const int meterW = 372;
+            int meterW = Math.Max(300, Math.Min(372, w - 614 - 2 * 223));
             picMultiMeterDigital.MouseDown -= brickMeterMouseDown;
             picMultiMeterDigital.MouseDown += brickMeterMouseDown;
             cardMeter.SetBounds(Math.Max(900, w - 8 - meterW), 6, meterW, 154);
-            int aw = Math.Max(244, (cardMeter.Left - 8 - 356 - 226 - 16) / 2);
+            int aw = Math.Max(200, (cardMeter.Left - 8 - 356 - 226 - 16) / 2);
             boxA.SetBounds(356, 6, aw, 92);
             cardVfoFunc.SetBounds(boxA.Right + 8, 6, 226, 92);
             boxB.SetBounds(cardVfoFunc.Right + 8, 6, aw, 92);
@@ -613,6 +615,11 @@ namespace BrickSDR
             cardOptsA.SetBounds(356, 102, aw, 28);
             optsFunc.SetBounds(cardVfoFunc.Left, 102, 226, 28);
             cardOptsB.SetBounds(boxB.Left, 102, aw, 28);
+            {
+                int bw = (aw - 8) / 3;
+                Control[] ra = { chkDisplayPeak, chkDisplayAVG, chkFWCATU }, rb = { chkRX2DisplayPeak, chkRX2DisplayAVG, chkX2TR };
+                for (int k = 0; k < 3; k++) { ra[k].SetBounds(k * (bw + 4), 3, bw, 24); rb[k].SetBounds(k * (bw + 4), 3, bw, 24); }
+            }
             cardOptsRow3.SetBounds(356, 132, cardMeter.Left - 8 - 356, 28);
             int zs = 0;
             lblDisplayZoom.Left = 252 + zs; ptbDisplayZoom.Left = 294 + zs;
@@ -1113,6 +1120,7 @@ namespace BrickSDR
         {
             bool on = chkRX2.Checked;
             foreach (Control c in rx2OnlyControls) c.Enabled = on;
+            foreach (Control c in new Control[] { chkRX2DisplayPeak, chkRX2DisplayAVG, chkX2TR }) c.Enabled = on;
             layoutTop();
         }
 
@@ -1164,8 +1172,7 @@ namespace BrickSDR
             int my = brickSection(cardRx1Mode, "Mode", 6, cwd);
             panelMode.BackColor = cCard;
             Put(panelMode, cardRx1Mode, 0, my, cwd, cardRx1Mode.Height - my);
-            Grid(panelMode, 8, 0, cwd - 16, 3, 26, 5,
-                radModeLSB, radModeUSB, radModeDSB, radModeCWL, radModeCWU, radModeAM, radModeSAM, radModeFMN, radModeDIGL, radModeDIGU, radModeDRM, radModeSPEC);
+            brickModeGroups(panelMode, cwd - 16, 0, radModeLSB, radModeUSB, radModeCWL, radModeCWU, radModeAM, radModeSAM, radModeDIGL, radModeDIGU, radModeDSB, radModeFMN, radModeDRM, radModeSPEC);
             y = cardRx1Mode.Bottom + 6;
 
             cardRx1Filter = brickCard(pnlRight);
@@ -1211,8 +1218,7 @@ namespace BrickSDR
             cardRx2Mode = brickCard(pnlRight);
             cardRx2Mode.SetBounds(6, y, cwd, 148);
             int m2 = brickSection(cardRx2Mode, "Mode", 6, cwd);
-            Grid(cardRx2Mode, 8, m2, cwd - 16, 3, 26, 5,
-                radRX2ModeLSB, radRX2ModeUSB, radRX2ModeDSB, radRX2ModeCWL, radRX2ModeCWU, radRX2ModeAM, radRX2ModeSAM, radRX2ModeFMN, radRX2ModeDIGL, radRX2ModeDIGU, radRX2ModeDRM, radRX2ModeSPEC);
+            brickModeGroups(cardRx2Mode, cwd - 16, m2, radRX2ModeLSB, radRX2ModeUSB, radRX2ModeCWL, radRX2ModeCWU, radRX2ModeAM, radRX2ModeSAM, radRX2ModeDIGL, radRX2ModeDIGU, radRX2ModeDSB, radRX2ModeFMN, radRX2ModeDRM, radRX2ModeSPEC);
             y = cardRx2Mode.Bottom + 6;
 
             cardRx2Filter = brickCard(pnlRight);
@@ -1227,6 +1233,34 @@ namespace BrickSDR
             lblRX2FilterLow.Visible = false; udRX2FilterLow.Visible = false; lblRX2FilterHigh.Visible = false; udRX2FilterHigh.Visible = false;
             cardRx2Band.Visible = false; cardRx2Mode.Visible = false; cardRx2Filter.Visible = false;
             radRX2ModeSPEC.Visible = true;
+        }
+
+        // modes in pairs (LSB / USB, CWL / CWU, AM / SAM, DIGL / DIGU) that switch over on a click, then the single ones
+        private void brickModeGroups(Control parent, int w, int y0, RadioButton lsb, RadioButton usb, RadioButton cwl, RadioButton cwu, RadioButton am, RadioButton sam,
+            RadioButton digl, RadioButton digu, RadioButton dsb, RadioButton fm, RadioButton drm, RadioButton spec)
+        {
+            int gap = 5, cw = (w - gap) / 2, h = 26;
+            RadioButton[][] pairs = { new[] { lsb, usb }, new[] { cwl, cwu }, new[] { am, sam }, new[] { digl, digu } };
+            string[][] names = { new[] { "LSB", "USB" }, new[] { "CW-L", "CW-U" }, new[] { "AM", "SAM" }, new[] { "DIGL", "DIGU" } };
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                RadioButton ra = pairs[i][0], rb = pairs[i][1];
+                BrickModePair bp = new BrickModePair { NameA = names[i][0], NameB = names[i][1], Font = new Font("Segoe UI", 9f) };
+                bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
+                bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
+                bp.Pick = n => { if (n == 1) ra.Checked = true; else rb.Checked = true; };
+                ra.CheckedChanged += (s, e) => bp.Invalidate();
+                rb.CheckedChanged += (s, e) => bp.Invalidate();
+                parent.Controls.Add(bp);
+                foreach (RadioButton hid in pairs[i])
+                {
+                    RadioButton hh = hid;
+                    if (hh.Parent != parent) parent.Controls.Add(hh);
+                    hh.SetBounds(-3000, 0, 10, 10);
+                    hh.TabStop = false;
+                }
+            }
+            Grid(parent, 8, y0 + 2 * (h + gap), w, 2, h, gap, dsb, fm, drm, spec);
         }
 
         private void brickPickRx2Band(string key)
@@ -1252,6 +1286,7 @@ namespace BrickSDR
         private void brickShowRxView()
         {
             bool rx1 = radView1.Checked;
+            Display.BrickActiveRX = rx1 ? 1 : 2;
             cardRx1Band.Visible = rx1; cardRx1Mode.Visible = rx1; cardRx1Filter.Visible = rx1;
             cardRx2Band.Visible = !rx1; cardRx2Mode.Visible = !rx1; cardRx2Filter.Visible = !rx1;
         }
@@ -1572,9 +1607,9 @@ namespace BrickSDR
             switch (m.Substring(0, 6))
             {
                 case "02B201": return 25f;
-                case "02B203": return 120f;
+                case "02B203": return 60f;
                 case "02B301": return 25f;
-                case "02B303": return 150f;
+                case "02B303": return 60f;
             }
             return 0;
         }
@@ -1692,9 +1727,10 @@ namespace BrickSDR
                 System.Drawing.Drawing2D.ColorBlend cb;
                 if (rxScale)
                 {
-                    cb = new System.Drawing.Drawing2D.ColorBlend(4);
-                    cb.Colors = new Color[] { gr, gr, ye, re };
-                    cb.Positions = new float[] { 0f, 0.474f, 0.60f, 1f };
+                    // smooth: green at the left, yellow by S9, orange / red from S9+10 on
+                    cb = new System.Drawing.Drawing2D.ColorBlend(5);
+                    cb.Colors = new Color[] { gr, ye, ye, Color.FromArgb(245, 140, 40), re };
+                    cb.Positions = new float[] { 0f, 0.474f, 0.562f, 0.78f, 1f };
                 }
                 else
                 {

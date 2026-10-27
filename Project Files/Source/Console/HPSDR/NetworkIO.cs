@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -135,6 +135,10 @@ namespace BrickSDR
                 if (scan_result == null || scan_result.Radios == null || scan_result.Radios.Count != 1) return -1;
                 ri = scan_result.Radios[0]; // the one we found
                 protocol = ri.Protocol == RadioDiscoveryRadioProtocol.P1 ? 0 : 1; // update to the result (for auto)
+                // Brick-SDR: the radio that answered may not be the one in the list (e.g. list says ANAN-10, a Brick2 answers):
+                // select its model now, before connecting, otherwise the first attempt runs with the wrong model
+                BrickHardware.ApplyForRadio(c, ri);
+                model_id = (int)HardwareSpecific.Model;
 
                 if (ri.DeviceType == HPSDRHW.HermesII)
                 {

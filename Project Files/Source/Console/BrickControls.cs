@@ -8,6 +8,60 @@ namespace BrickSDR
     // owner drawn controls of the Brick-SDR main window
     public partial class Console
     {
+        // Two modes on one button (LSB / USB): a click switches to the other one, the active name is lit
+        private sealed class BrickModePair : Control
+        {
+            public string NameA, NameB;
+            public Func<int> GetState; // 0 neither, 1 first, 2 second
+            public Action<int> Pick;
+            private bool hover;
+
+            public BrickModePair()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+                Cursor = Cursors.Hand;
+            }
+            protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+            protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+            protected override void OnClick(EventArgs e)
+            {
+                base.OnClick(e);
+                int st = GetState == null ? 0 : GetState();
+                if (Pick != null) Pick(st == 1 ? 2 : 1);
+            }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                Graphics g = e.Graphics;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g.Clear(Parent != null ? Parent.BackColor : cCard);
+                int st = GetState == null ? 0 : GetState();
+                Color baseC = st > 0 ? cAccent : cBtn;
+                Rectangle r = new Rectangle(1, 1, Width - 3, Height - 3);
+                if (r.Width < 4 || r.Height < 4) return;
+                using (System.Drawing.Drawing2D.GraphicsPath gp = brickRoundPath(r, 6))
+                {
+                    using (System.Drawing.Drawing2D.LinearGradientBrush lg = new System.Drawing.Drawing2D.LinearGradientBrush(r, brickShade(baseC, hover ? 0.26 : 0.16), brickShade(baseC, -0.18), 90f))
+                        g.FillPath(lg, gp);
+                    using (Pen pen = new Pen(st > 0 ? brickShade(cAccent, -0.35) : Color.FromArgb(70, 76, 98), 1f)) g.DrawPath(pen, gp);
+                }
+                string sep = "  /  ";
+                Color on = Color.FromArgb(20, 20, 24), off = st > 0 ? Color.FromArgb(120, 70, 20) : cText;
+                Color ca = st == 1 ? on : (st == 2 ? off : cText), cb = st == 2 ? on : (st == 1 ? off : cText);
+                using (Font fa = new Font(Font.FontFamily, Font.Size, st == 1 ? FontStyle.Bold : FontStyle.Regular))
+                using (Font fb = new Font(Font.FontFamily, Font.Size, st == 2 ? FontStyle.Bold : FontStyle.Regular))
+                {
+                    TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter;
+                    Size sa = TextRenderer.MeasureText(g, NameA, fa, new Size(200, Height), fl);
+                    Size sb = TextRenderer.MeasureText(g, NameB, fb, new Size(200, Height), fl);
+                    Size ss = TextRenderer.MeasureText(g, sep, Font, new Size(200, Height), fl);
+                    int x = (Width - (sa.Width + ss.Width + sb.Width)) / 2;
+                    Rectangle rc = new Rectangle(0, 0, 200, Height - 1);
+                    TextRenderer.DrawText(g, NameA, fa, new Rectangle(x, 0, sa.Width + 4, Height - 1), ca, fl); x += sa.Width;
+                    TextRenderer.DrawText(g, sep, Font, new Rectangle(x, 0, ss.Width + 4, Height - 1), st > 0 ? off : cMuted, fl); x += ss.Width;
+                    TextRenderer.DrawText(g, NameB, fb, new Rectangle(x, 0, sb.Width + 4, Height - 1), cb, fl);
+                }
+            }
+        }
         // Frequency display of one VFO: big MHz.kHz digits, smaller Hz digits, wheel over a digit tunes it.
         private sealed class BrickVfoBox : Control
         {
@@ -154,6 +208,15 @@ namespace BrickSDR
                 string small = (hz % 1000).ToString("000");
 
                 float bigSize = 27f, smallSize = 18f;
+                // narrow box: the digits shrink to fit
+                using (Font f0 = new Font("Consolas", 27f, FontStyle.Bold))
+                using (Font f1 = new Font("Consolas", 18f, FontStyle.Bold))
+                {
+                    StringFormat s0 = StringFormat.GenericTypographic;
+                    float full = (mhz.Length + 3) * g.MeasureString("0", f0, 100, s0).Width + g.MeasureString(".", f0, 100, s0).Width + 3 * g.MeasureString("0", f1, 100, s0).Width + g.MeasureString(".", f1, 100, s0).Width;
+                    float room = Width - 46;
+                    if (full > room) { float k = Math.Max(0.55f, room / full); bigSize *= k; smallSize *= k; }
+                }
                 using (Font fbig = new Font("Consolas", bigSize, FontStyle.Bold))
                 using (Font fsm = new Font("Consolas", smallSize, FontStyle.Bold))
                 {

@@ -476,6 +476,7 @@
     </Content>
     <Compile Include="BrickLayout.cs" />
     <Compile Include="BrickModePanels.cs" />
+    <Compile Include="BrickProgrammer.cs" />
     <Compile Include="BrickSetupTweaks.cs" />
     <Compile Include="BrickControls.cs" />
     <Compile Include="clsBrickSkinService.cs" />

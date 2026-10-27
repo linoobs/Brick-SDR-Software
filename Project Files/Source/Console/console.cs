@@ -39415,7 +39415,11 @@ namespace BrickSDR
                     {
                     if (!is_for_rx1_vfo_b)
                     {
-                        RX2DSPMode = bse.Mode;
+                        // Brick-SDR: first visit of an amateur band gets the usual sideband (LSB below 10 MHz, USB above)
+                        DSPMode autoMode = bse.Mode;
+                        if (target > Band.GEN && target <= Band.B2M)
+                            autoMode = (target == Band.B60M || bse.Frequency >= 10.0) ? DSPMode.USB : DSPMode.LSB;
+                        RX2DSPMode = autoMode;
                         RX2Filter = bse.Filter;
                     }
                     VFOBFreq = bse.Frequency;

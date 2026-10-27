@@ -14,10 +14,28 @@ namespace BrickSDR
         // MAC of the connected radio, 12 hex digits without separators ("" when unknown)
         public static string Mac { get { return _mac; } }
 
-        // "Brick2" / "Brick3", or "" when the connected radio is not a Brick board
+        // "Brick2 15W" / "Brick3 50W", or "" when the connected radio is not a Brick board
         public static string Name
         {
             get { return _name; }
+        }
+
+        // third MAC byte: 01 = 15 W board, 03 = 50 W board (02:B2:01 Brick2 15W, 02:B2:03 Brick2 50W, 02:B3:01 Brick3 15W); anything else falls back to the usual power of the model
+        private static string PowerClass(string hex, string fallback)
+        {
+            switch (hex.Substring(4, 2))
+            {
+                case "01": return "15W";
+                case "03": return "50W";
+            }
+            return fallback;
+        }
+
+        // short display name of the board for a MAC address ("Brick2 15W"), or "" when it is not a Brick board
+        public static string DisplayName(string mac)
+        {
+            HPSDRModel m; string n;
+            return TryGetModel(mac, out m, out n) ? n : "";
         }
 
         public static bool TryGetModel(string mac, out HPSDRModel model, out string name)
@@ -36,11 +54,11 @@ namespace BrickSDR
             {
                 case "B2":
                     model = HPSDRModel.HERMES;
-                    name = "Brick2";
+                    name = "Brick2 " + PowerClass(hex, "15W");
                     return true;
                 case "B3":
                     model = HPSDRModel.ANAN100D;
-                    name = "Brick3";
+                    name = ("Brick3 " + PowerClass(hex, "")).TrimEnd();
                     return true;
             }
 

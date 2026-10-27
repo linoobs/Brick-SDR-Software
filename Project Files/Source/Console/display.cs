@@ -3072,6 +3072,8 @@ namespace BrickSDR
         private static float _RX2waterfallPreviousMinValue = WATERFALL_AGC_RESTART_FLOOR_DBM;
         // horizontal splitter between the two receivers (share of the height that RX1 gets)
         private static float _rx2SplitRatio = 0.5f;
+        // which receiver the user is working with (1 / 2); set by the Brick-SDR console
+        public static int BrickActiveRX = 1;
         public static float RX2SplitRatio
         {
             get { return _rx2SplitRatio; }
@@ -4185,7 +4187,19 @@ namespace BrickSDR
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
                         }
-                    }
+                        // Brick-SDR: outline both receivers (the selected one in the accent colour) and a bright divider between them
+                        {
+                            Color act = Color.FromArgb(255, 255, 140, 30), dim = Color.FromArgb(150, 90, 98, 120);
+                            SharpDX.Direct2D1.Brush bTop = getDXBrushForColour(BrickActiveRX == 1 ? act : dim);
+                            SharpDX.Direct2D1.Brush bBot = getDXBrushForColour(BrickActiveRX == 2 ? act : dim);
+                            if (bTop != null && bBot != null)
+                            {
+                                float w = displayTargetWidth;
+                                _d2dRenderTarget.DrawRectangle(new RectangleF(1, 1, w - 2, splitTop - 3), bTop, BrickActiveRX == 1 ? 2f : 1f);
+                                _d2dRenderTarget.DrawRectangle(new RectangleF(1, splitTop + 2, w - 2, displayTargetHeight - splitTop - 3), bBot, BrickActiveRX == 2 ? 2f : 1f);
+                                _d2dRenderTarget.FillRectangle(new RectangleF(0, splitTop - 1, w, 3), getDXBrushForColour(Color.FromArgb(230, 255, 140, 30)));
+                            }
+                        }                    }
 
                     // for linear grad brush rebuilding. Do these all the time, even if m_bUseLinearGradient=false, so we can rebuild if need be
                     if (m_nRX1DisplayHeight != _nOldHeightRX1)

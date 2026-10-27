@@ -3093,7 +3093,7 @@ namespace BrickSDR
         {
             int H = displayTargetHeight;
             if (_rx2_enabled) H = SplitY(H);
-            if (current_display_mode == DisplayMode.PANAFALL) H /= 2;
+            if (current_display_mode == DisplayMode.PANAFALL) H = _rx2_enabled ? (int)(H * (1f - m_fPanafallSplitPerc)) : H / 2;
             int preservedRows = 0;
 
             //override for splitter pos, when only one rx and it is panafall
@@ -3151,7 +3151,7 @@ namespace BrickSDR
         {
             int H = displayTargetHeight;
             H -= SplitY(H); // below the splitter
-            if (current_display_mode_bottom == DisplayMode.PANAFALL) H /= 2;
+            if (current_display_mode_bottom == DisplayMode.PANAFALL) H = (int)(H * (1f - m_fPanafallSplitPerc));
             int preservedRows = 0;
 
             lock (_objDX2Lock)
@@ -3744,6 +3744,10 @@ namespace BrickSDR
             }
         }
 
+        // Brick-SDR: y of the spectrum / waterfall border of each receiver (RX2 running: both halves use the same share)
+        public static int PanafallBarYRX1 { get { return _rx2_enabled ? (int)(SplitY(displayTargetHeight) * m_fPanafallSplitPerc) : PanafallSplitBarPos; } }
+        public static int PanafallBarYRX2 { get { int sy = SplitY(displayTargetHeight); return sy + (int)((displayTargetHeight - sy) * m_fPanafallSplitPerc); } }
+
         public static int PanafallSplitBarPos
         {
             get { return (int)(displayTargetHeight * m_fPanafallSplitPerc); }
@@ -3763,7 +3767,12 @@ namespace BrickSDR
                 }
 
                 if (resetBmp)
+                {
                     ResetWaterfallBmp();
+                    if (_rx2_enabled) ResetWaterfallBmp2();
+                    _bRebuildRXLinearGradBrush = true;
+                    _bRebuildTXLinearGradBrush = true;
+                }
             }
         }
         private static bool m_bAntiAlias = false;
@@ -3993,6 +4002,8 @@ namespace BrickSDR
                             switch (current_display_mode)
                             {
                                 case DisplayMode.PANAFALL:
+                                    tmpHeightRX1 = (int)(tmpHeightRX1 * m_fPanafallSplitPerc);
+                                    break;
                                 case DisplayMode.PANASCOPE:
                                 case DisplayMode.SPECTRASCOPE:
                                     tmpHeightRX1 /= 2;
@@ -4002,6 +4013,8 @@ namespace BrickSDR
                             switch (current_display_mode_bottom)
                             {
                                 case DisplayMode.PANAFALL:
+                                    tmpHeightRX2 = (int)(tmpHeightRX2 * m_fPanafallSplitPerc);
+                                    break;
                                 case DisplayMode.PANASCOPE:
                                 case DisplayMode.SPECTRASCOPE:
                                     tmpHeightRX2 /= 2;
@@ -4160,9 +4173,9 @@ namespace BrickSDR
                                 DrawHistogramDX2D(1, displayTargetWidth, m_nRX1DisplayHeight);
                                 break;
                             case DisplayMode.PANAFALL:
-                                m_nRX1DisplayHeight = splitTop / 2;
+                                m_nRX1DisplayHeight = (int)(splitTop * m_fPanafallSplitPerc);
                                 DrawPanadapterDX2D(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
-                                DrawWaterfallDX2D(m_nRX1DisplayHeight, displayTargetWidth, m_nRX1DisplayHeight, 1, true);
+                                DrawWaterfallDX2D(m_nRX1DisplayHeight, displayTargetWidth, splitTop - m_nRX1DisplayHeight, 1, true);
                                 if (_showTCISpots) drawSpots(1, 0, displayTargetWidth, false);
                                 break;
                         }
@@ -4181,9 +4194,9 @@ namespace BrickSDR
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
                             case DisplayMode.PANAFALL:
-                                m_nRX2DisplayHeight = (displayTargetHeight - splitTop) / 2;
+                                m_nRX2DisplayHeight = (int)((displayTargetHeight - splitTop) * m_fPanafallSplitPerc);
                                 DrawPanadapterDX2D(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, false);
-                                DrawWaterfallDX2D(splitTop + m_nRX2DisplayHeight, displayTargetWidth, m_nRX2DisplayHeight, 2, true);
+                                DrawWaterfallDX2D(splitTop + m_nRX2DisplayHeight, displayTargetWidth, (displayTargetHeight - splitTop) - m_nRX2DisplayHeight, 2, true);
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
                         }
@@ -4191,12 +4204,13 @@ namespace BrickSDR
                         {
                             Color act = Color.FromArgb(255, 255, 140, 30), dim = Color.FromArgb(150, 90, 98, 120);
                             SharpDX.Direct2D1.Brush bTop = getDXBrushForColour(BrickActiveRX == 1 ? act : dim);
-                            SharpDX.Direct2D1.Brush bBot = getDXBrushForColour(BrickActiveRX == 2 ? act : dim);
+                            Color grn = Color.FromArgb(255, 60, 200, 90), grnDim = Color.FromArgb(200, 40, 140, 70);
+                            SharpDX.Direct2D1.Brush bBot = getDXBrushForColour(BrickActiveRX == 2 ? grn : grnDim);
                             if (bTop != null && bBot != null)
                             {
                                 float w = displayTargetWidth;
                                 _d2dRenderTarget.DrawRectangle(new RectangleF(1, 1, w - 2, splitTop - 3), bTop, BrickActiveRX == 1 ? 2f : 1f);
-                                _d2dRenderTarget.DrawRectangle(new RectangleF(1, splitTop + 2, w - 2, displayTargetHeight - splitTop - 3), bBot, BrickActiveRX == 2 ? 2f : 1f);
+                                _d2dRenderTarget.DrawRectangle(new RectangleF(2, splitTop + 3, w - 4, displayTargetHeight - splitTop - 6), bBot, 2f);
                                 _d2dRenderTarget.FillRectangle(new RectangleF(0, splitTop - 1, w, 3), getDXBrushForColour(Color.FromArgb(230, 255, 140, 30)));
                             }
                         }                    }

@@ -182,6 +182,9 @@ namespace BrickSDR
                         break;
                 }
 
+                // Brick-SDR: Brick boards pick their model by MAC, the board byte they report does not matter
+                if (BrickHardware.Name != "") board_is_expected_for_model = true;
+
                 if (!board_is_expected_for_model)
                 {
                     // the board returned in the packet, does not match the expected board for the Model selected

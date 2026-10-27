@@ -187,8 +187,9 @@ namespace BrickSDR
             this.AutoScaleMode = AutoScaleMode.None;
             this.BackColor = cBg;
             this.MinimumSize = new Size(1360, 900);
-            if (this.ClientSize.Width < 1480 || this.ClientSize.Height < 940)
-                this.ClientSize = new Size(Math.Max(this.ClientSize.Width, 1480), Math.Max(this.ClientSize.Height, 940));
+            // first start after the installation: no saved window yet
+            bool brickFirstRun = true;
+            try { brickFirstRun = !(File.Exists(DB.FileName) && DB.GetVarsDictionary("State").ContainsKey("console_width")); } catch { }
 
             // not used any more
             foreach (Control c in new Control[] {
@@ -227,6 +228,13 @@ namespace BrickSDR
             this.MinimumSize = new Size(1360 + chromeW, need + menuStrip1.Height + statusStripMain.Height + chrome);
             if (this.Height < this.MinimumSize.Height) this.Height = this.MinimumSize.Height;
             if (this.Width < this.MinimumSize.Width) this.Width = this.MinimumSize.Width;
+            if (brickFirstRun)
+            {
+                // first start: the smallest size the layout allows, in the middle of the screen; afterwards the user's size and place are kept
+                this.Size = this.MinimumSize;
+                Rectangle wa = Screen.FromControl(this).WorkingArea;
+                this.Location = new Point(wa.Left + Math.Max(0, (wa.Width - this.Width) / 2), wa.Top + Math.Max(0, (wa.Height - this.Height) / 2));
+            }
 
             brickApplyTheme(brickRoot);
             brickApplyTheme(statusStripMain);
@@ -1245,7 +1253,8 @@ namespace BrickSDR
             for (int i = 0; i < pairs.Length; i++)
             {
                 RadioButton ra = pairs[i][0], rb = pairs[i][1];
-                BrickModePair bp = new BrickModePair { NameA = names[i][0], NameB = names[i][1], Font = new Font("Segoe UI", 9f) };
+                BrickModePair bp = new BrickModePair { NameA = names[i][0], NameB = names[i][1], Font = new Font("Segoe UI", 8.5f) };
+                if (i == 3) bp.Extra = "FT8";
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
                 bp.Pick = n => { if (n == 1) ra.Checked = true; else rb.Checked = true; };

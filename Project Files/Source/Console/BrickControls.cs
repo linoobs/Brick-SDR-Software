@@ -11,7 +11,7 @@ namespace BrickSDR
         // Two modes on one button (LSB / USB): a click switches to the other one, the active name is lit
         private sealed class BrickModePair : Control
         {
-            public string NameA, NameB;
+            public string NameA, NameB, Extra; // Extra: small tag at the left (FT8)
             public Func<int> GetState; // 0 neither, 1 first, 2 second
             public Action<int> Pick;
             private bool hover;
@@ -44,7 +44,7 @@ namespace BrickSDR
                         g.FillPath(lg, gp);
                     using (Pen pen = new Pen(st > 0 ? brickShade(cAccent, -0.35) : Color.FromArgb(70, 76, 98), 1f)) g.DrawPath(pen, gp);
                 }
-                string sep = "  /  ";
+                string sep = string.IsNullOrEmpty(Extra) ? "  /  " : " / ";
                 Color on = Color.FromArgb(20, 20, 24), off = st > 0 ? Color.FromArgb(120, 70, 20) : cText;
                 Color ca = st == 1 ? on : (st == 2 ? off : cText), cb = st == 2 ? on : (st == 1 ? off : cText);
                 using (Font fa = new Font(Font.FontFamily, Font.Size, st == 1 ? FontStyle.Bold : FontStyle.Regular))
@@ -54,7 +54,10 @@ namespace BrickSDR
                     Size sa = TextRenderer.MeasureText(g, NameA, fa, new Size(200, Height), fl);
                     Size sb = TextRenderer.MeasureText(g, NameB, fb, new Size(200, Height), fl);
                     Size ss = TextRenderer.MeasureText(g, sep, Font, new Size(200, Height), fl);
-                    int x = (Width - (sa.Width + ss.Width + sb.Width)) / 2;
+                    int x = (Width - (sa.Width + ss.Width + sb.Width)) / 2 + (string.IsNullOrEmpty(Extra) ? 0 : 7);
+                    if (!string.IsNullOrEmpty(Extra))
+                        using (Font fx = new Font("Segoe UI", 6.5f, FontStyle.Bold))
+                            TextRenderer.DrawText(g, Extra, fx, new Rectangle(4, 0, 30, Height - 1), st > 0 ? Color.FromArgb(120, 70, 20) : cAccent, TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
                     Rectangle rc = new Rectangle(0, 0, 200, Height - 1);
                     TextRenderer.DrawText(g, NameA, fa, new Rectangle(x, 0, sa.Width + 4, Height - 1), ca, fl); x += sa.Width;
                     TextRenderer.DrawText(g, sep, Font, new Rectangle(x, 0, ss.Width + 4, Height - 1), st > 0 ? off : cMuted, fl); x += ss.Width;

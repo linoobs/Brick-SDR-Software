@@ -232,7 +232,7 @@ namespace BrickSDR
                     if (!File.Exists(file.Text)) { log.AppendText("Choose a firmware file first.\r\n"); return; }
                     byte[] rbf = File.ReadAllBytes(file.Text);
                     if (rbf.Length < 1024) { log.AppendText("The file is too small for a firmware.\r\n"); return; }
-                    if (MessageBox.Show(f, "The flash of the radio is erased and written again with\r\n" + Path.GetFileName(file.Text) + " (" + rbf.Length + " bytes).\r\nA wrong file can leave the radio without firmware. Continue?",
+                    if (MessageBox.Show(f, "The flash of the radio is erased and written again with\r\n" + Path.GetFileName(file.Text) + " (" + rbf.Length + " bytes).\r\nA wrong file can leave the radio without firmware.\r\nThe process can also end with an error, so you must be able to restore\r\nthe firmware with a programmer (JTAG / USB Blaster).\r\n\r\nContinue?",
                         "Program", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
                     running = true; cancel = false; start.Enabled = false; bar.Value = 0;
                     ThreadPool.QueueUserWorkItem(o =>

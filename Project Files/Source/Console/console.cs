@@ -49000,6 +49000,24 @@ namespace BrickSDR
         }
 
         private bool brickVisorDrag = false;
+        private int brickPanafallBarRx = 1, brickBarTmp;
+        // spectrum / waterfall border of a receiver in PANAFALL mode (it can be dragged up and down)
+        private bool brickOverPanafallBar(int y, out int rxn)
+        {
+            rxn = 1;
+            int h = pnlDisplay.Height;
+            if (!rx2_enabled)
+                return Display.CurrentDisplayMode == DisplayMode.PANAFALL && y >= Display.PanafallSplitBarPos && y < Display.PanafallSplitBarPos + 20;
+            int sy = Display.SplitY(h);
+            if (y < sy)
+            {
+                int b = Display.PanafallBarYRX1;
+                return Display.CurrentDisplayMode == DisplayMode.PANAFALL && y >= b && y < b + 20;
+            }
+            rxn = 2;
+            int b2 = Display.PanafallBarYRX2;
+            return Display.CurrentDisplayModeBottom == DisplayMode.PANAFALL && y >= b2 && y < b2 + 20;
+        }
         private bool brickOverVisor(MouseEventArgs e)
         {
             if (e.Y < 15) return false;
@@ -49159,9 +49177,10 @@ namespace BrickSDR
                     //END NOTCH
 
                     //MIDDLE OF PANAFALL MOVEUPDOWN MW0LGE
-                    if (!rx2_enabled && Display.CurrentDisplayMode == DisplayMode.PANAFALL)
                     {
-                        m_bDraggingPanafallSplit = (e.Y >= Display.PanafallSplitBarPos && e.Y < Display.PanafallSplitBarPos + 20);
+                        int barRx;
+                        m_bDraggingPanafallSplit = brickOverPanafallBar(e.Y, out barRx);
+                        brickPanafallBarRx = barRx;
                         if (m_bDraggingPanafallSplit) return;
                     }
                     //END SPLITTER DRAG
@@ -49305,7 +49324,7 @@ namespace BrickSDR
                     {
                         if (Display.BandStackOverlays != null && Display.BandStackOverlays.Length > 0)
                         {
-                            bool panafall_check = Display.CurrentDisplayMode == DisplayMode.PANAFALL && ((!rx2_enabled && e.Y < Display.PanafallSplitBarPos) || (rx2_enabled && e.Y < Display.SplitY(pnlDisplay.Height) / 2)); //[2.10.3.6]MW0LGE fixes issue where you could try to qsy click on the waterfall
+                            bool panafall_check = Display.CurrentDisplayMode == DisplayMode.PANAFALL && ((!rx2_enabled && e.Y < Display.PanafallSplitBarPos) || (rx2_enabled && e.Y < Display.PanafallBarYRX1)); //[2.10.3.6]MW0LGE fixes issue where you could try to qsy click on the waterfall
                             if (bOverRX1 && (Display.CurrentDisplayMode == DisplayMode.PANADAPTER || panafall_check))                                                                                          //under a band stack entry that was shown on the panadaptor area in a panafall display
                             {                                                                                                                                                                                  //and it would not qsy             
                                 // convert mouse pos into HZ
@@ -49720,9 +49739,9 @@ namespace BrickSDR
                     if (SelectedNotch != null) return;
 
                     // right click in the middle splitter bar will recentre it
-                    if (!rx2_enabled && Display.CurrentDisplayMode == DisplayMode.PANAFALL)
                     {
-                        if (e.Y >= Display.PanafallSplitBarPos && e.Y < Display.PanafallSplitBarPos + 20)
+                        int barRx2;
+                        if (brickOverPanafallBar(e.Y, out barRx2))
                         {
                             Display.PanafallSplitBarPerc = 0.5f;
                             return;
@@ -50222,11 +50241,11 @@ namespace BrickSDR
                 Display.HighlightedBandStackEntryIndex = nHighlightedBandStackEntryIndex;
 
                 //MIDDLE OF PANAFALL MOVEUPDOWN MW0LGE
-                if (!rx2_enabled && Display.CurrentDisplayMode == DisplayMode.PANAFALL)
                 {
                     if (m_bDraggingPanafallSplit)
                     {
-                        float f = (float)e.Y / (float)pnlDisplay.Height;
+                        int sy0 = Display.SplitY(pnlDisplay.Height);
+                        float f = !rx2_enabled ? (float)e.Y / (float)pnlDisplay.Height : (brickPanafallBarRx == 1 ? (float)e.Y / sy0 : (float)(e.Y - sy0) / (pnlDisplay.Height - sy0));
                         f = Math.Max(0.1f, f);
                         f = Math.Min(0.9f, f);
                         Display.PanafallSplitBarPerc = f;
@@ -50908,8 +50927,8 @@ namespace BrickSDR
                                 bShowWaterfallSeconds = false;
                                 break;
                             case DisplayMode.PANAFALL:
-                                bShowDBM = e.Y > ((Display.SplitY(pnlDisplay.Height)) + 8) && e.Y < ((Display.SplitY(pnlDisplay.Height)) + ((pnlDisplay.Height - Display.SplitY(pnlDisplay.Height)) / 2)); // +8 for the splitter, which is normally 16 pixels, but is now half height as we are displaying rx1+rx2
-                                bShowWaterfallSeconds = e.Y >= ((Display.SplitY(pnlDisplay.Height)) + ((pnlDisplay.Height - Display.SplitY(pnlDisplay.Height)) / 2)) + 16;
+                                bShowDBM = e.Y > ((Display.SplitY(pnlDisplay.Height)) + 8) && e.Y < Display.PanafallBarYRX2; // +8 for the splitter, which is normally 16 pixels, but is now half height as we are displaying rx1+rx2
+                                bShowWaterfallSeconds = e.Y >= Display.PanafallBarYRX2 + 16;
                                 break;
                             case DisplayMode.WATERFALL:
                                 bShowDBM = false;
@@ -50944,8 +50963,8 @@ namespace BrickSDR
                                 bShowWaterfallSeconds = false;
                                 break;
                             case DisplayMode.PANAFALL:
-                                bShowDBM = !rx2_enabled ? e.Y < Display.PanafallSplitBarPos : e.Y < Display.SplitY(pnlDisplay.Height) / 2;
-                                bShowWaterfallSeconds = !rx2_enabled ? e.Y >= Display.PanafallSplitBarPos + 16 : e.Y < Display.SplitY(pnlDisplay.Height) && e.Y >= (Display.SplitY(pnlDisplay.Height) / 2) + 16;
+                                bShowDBM = !rx2_enabled ? e.Y < Display.PanafallSplitBarPos : e.Y < Display.PanafallBarYRX1;
+                                bShowWaterfallSeconds = !rx2_enabled ? e.Y >= Display.PanafallSplitBarPos + 16 : e.Y < Display.SplitY(pnlDisplay.Height) && e.Y >= Display.PanafallBarYRX1 + 16;
                                 break;
                             case DisplayMode.PANASCOPE:
                                 bShowDBM = e.Y < Display.SplitY(pnlDisplay.Height);
@@ -51118,7 +51137,7 @@ namespace BrickSDR
                     next_cursor = Cursors.SizeWE;
                 //
 
-                if ((!rx2_enabled && Display.CurrentDisplayMode == DisplayMode.PANAFALL) && m_bDraggingPanafallSplit) //MW0LGE_21k9c changes to this and below
+                if (m_bDraggingPanafallSplit) //MW0LGE_21k9c changes to this and below
                     next_cursor = Cursors.SizeNS; // down here so we catch moving out of the splitter bar, but is still enabled
                                                   // otherwise we get flickering
 
@@ -51128,7 +51147,7 @@ namespace BrickSDR
                     if (agc_knee_drag || agc_hang_drag) next_cursor = grabbing; // agc grab handles
                     else if (rx1_spectrum_drag || rx2_spectrum_drag || rx1_spectrum_tune_drag || rx2_spectrum_tune_drag) next_cursor = Cursors.SizeWE; // dragging the spectrum
                     else if (rx1_click_tune_drag || rx2_click_tune_drag) next_cursor = grabbing; // dragging the tune in CTUN on mode
-                    else if ((!rx2_enabled && Display.CurrentDisplayMode == DisplayMode.PANAFALL) && e.Y >= Display.PanafallSplitBarPos && e.Y < Display.PanafallSplitBarPos + 20) next_cursor = Cursors.SizeNS; // over the splitter
+                    else if (brickOverPanafallBar(e.Y, out brickBarTmp)) next_cursor = Cursors.SizeNS; // over the splitter
                 }
 
                 if (brickActive)

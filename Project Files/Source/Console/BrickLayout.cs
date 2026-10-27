@@ -179,7 +179,13 @@ namespace BrickSDR
         private const double BrickMinK = 0.72;
         private double brickK = 1.0;
         private int brickNeedH;
-        private readonly Dictionary<Control, int[]> brickYOrig = new Dictionary<Control, int[]>();
+        private readonly Dictionary<Control, int[]> brickYOrig = new Dictionary<Control, int[]>(); // top, height, left, width
+        private HashSet<Control> brickXSkip;
+
+        private double brickKx = 1.0;
+        private int brickX(int v) { return (int)Math.Round(v * brickKx); }
+        private const int BrickDesignW = 1360; // client width the layout is designed for
+        private const int BrickMinOuterW = 1280; // smallest window width
 
         private int brickY(int v) { return (int)Math.Round(v * brickK); }
 
@@ -188,9 +194,19 @@ namespace BrickSDR
             foreach (Control c in root.Controls)
             {
                 if (c == picMultiMeterDigital || c == picRX2Meter || c.Dock != DockStyle.None) continue;
-                if (!brickYOrig.ContainsKey(c)) brickYOrig[c] = new int[] { c.Top, c.Height };
+                if (!brickYOrig.ContainsKey(c)) brickYOrig[c] = new int[] { c.Top, c.Height, c.Left, c.Width };
                 if (c is Panel || c is GroupBox || c is BrickVfoBox) brickCaptureY(c);
             }
+        }
+
+        // controls whose horizontal place is calculated in layoutTop
+        private bool brickSkipX(Control c)
+        {
+            if (brickXSkip == null)
+            {
+                brickXSkip = new HashSet<Control> { cardMeter, boxA, boxB, cardVfoFunc, cardOptsA, cardOptsB, optsFunc, cardOptsRow3 };
+            }
+            return brickXSkip.Contains(c) || (c.Parent != null && (c.Parent == cardMeter || c.Parent == boxA || c.Parent == boxB || c.Parent == cardOptsA || c.Parent == cardOptsB));
         }
 
         private void brickApplyScale()
@@ -204,18 +220,29 @@ namespace BrickSDR
                 int nh = container ? brickY(h) : (h <= 18 ? h : Math.Max(18, brickY(h)));
                 if (!container && h > 18 && nh < h && !(c is BrickVfoBox)) nh = Math.Max(nh, Math.Min(h, c.Font.Height + 3)); // text must still fit
                 int nt = brickY(t);
-                if (c.Top != nt || c.Height != nh) c.SetBounds(c.Left, nt, c.Width, nh);
+                int nl = c.Left, nw = c.Width;
+                if (!brickSkipX(c))
+                {
+                    nl = brickX(kv.Value[2]); nw = brickX(kv.Value[3]);
+                    // texts keep the width they need
+                    if (!container && kv.Value[3] > 20 && (c is Label || c is ButtonBase) && !string.IsNullOrEmpty(c.Text))
+                        nw = Math.Max(nw, Math.Min(kv.Value[3], TextRenderer.MeasureText(c.Text, c.Font).Width + 10));
+                }
+                if (c.Top != nt || c.Height != nh || c.Left != nl || c.Width != nw) c.SetBounds(nl, nt, nw, nh);
             }
             int topH = brickY(166);
             if (pnlTop.Height != topH) pnlTop.Height = topH;
+            if (pnlLeft.Width != brickX(346)) pnlLeft.Width = brickX(346);
+            if (pnlRight.Width != brickX(214)) pnlRight.Width = brickX(214);
         }
 
         private void brickRescale()
         {
             if (brickNeedH <= 0 || brickRoot == null) return;
             double k = Math.Min(1.0, Math.Max(BrickMinK, (double)brickRoot.ClientSize.Height / brickNeedH));
-            if (Math.Abs(k - brickK) < 0.003) return;
-            brickK = k;
+            double kx = Math.Min(1.0, Math.Max((BrickMinOuterW - (Width - ClientSize.Width)) / (double)BrickDesignW, (double)brickRoot.ClientSize.Width / BrickDesignW));
+            if (Math.Abs(k - brickK) < 0.003 && Math.Abs(kx - brickKx) < 0.003) return;
+            brickK = k; brickKx = kx;
             SuspendLayout();
             brickApplyScale();
             layoutTop();
@@ -289,8 +316,8 @@ namespace BrickSDR
             int chromeW = this.Width - this.ClientSize.Width;
             // small window: the vertical distances shrink (down to BrickMinK), the window may go down to about 1360 x 768
             brickNeedH = need;
-            brickCaptureY(pnlTop); brickCaptureY(pnlLeft); brickCaptureY(pnlRight);
-            this.MinimumSize = new Size(1360 + chromeW, (int)Math.Ceiling(need * BrickMinK) + menuStrip1.Height + statusStripMain.Height + chrome);
+            brickCaptureY(pnlTop); brickCaptureY(pnlLeft); brickCaptureY(pnlRight); brickCaptureY(pnlRx2View);
+            this.MinimumSize = new Size(BrickMinOuterW, (int)Math.Ceiling(need * BrickMinK) + menuStrip1.Height + statusStripMain.Height + chrome);
             brickRoot.Resize += (s, e) => brickRescale();
             if (this.Height < this.MinimumSize.Height) this.Height = this.MinimumSize.Height;
             if (this.Width < this.MinimumSize.Width) this.Width = this.MinimumSize.Width;
@@ -674,13 +701,14 @@ namespace BrickSDR
             if (cardMeter == null) return;
             int w = pnlTop.ClientSize.Width;
             // the S-meter keeps its size at the right edge, the two VFO blocks share what is left
-            int meterW = Math.Max(300, Math.Min(372, w - 614 - 2 * 223));
+            int x0 = brickX(356), fw = brickX(226);
+            int meterW = Math.Max(brickX(300), Math.Min(brickX(372), w - (x0 + fw + 32) - 2 * brickX(223)));
             picMultiMeterDigital.MouseDown -= brickMeterMouseDown;
             picMultiMeterDigital.MouseDown += brickMeterMouseDown;
-            cardMeter.SetBounds(Math.Max(900, w - 8 - meterW), 6, meterW, 154);
-            int aw = Math.Max(200, (cardMeter.Left - 8 - 356 - 226 - 16) / 2);
-            boxA.SetBounds(356, 6, aw, 92);
-            cardVfoFunc.SetBounds(boxA.Right + 8, 6, 226, 92);
+            cardMeter.SetBounds(Math.Max(850, w - 8 - meterW), 6, meterW, 154);
+            int aw = Math.Max(200, (cardMeter.Left - 8 - x0 - fw - 16) / 2);
+            boxA.SetBounds(x0, 6, aw, 92);
+            cardVfoFunc.SetBounds(boxA.Right + 8, 6, fw, 92);
             boxB.SetBounds(cardVfoFunc.Right + 8, 6, aw, 92);
             foreach (BrickVfoBox bx in new BrickVfoBox[] { boxA, boxB })
             {
@@ -689,15 +717,15 @@ namespace BrickSDR
             txtVFOABand.SetBounds(8, 68, aw - 60, 20); chkVFOATX.SetBounds(aw - 44, 68, 32, 20); chkVFOLock.SetBounds(aw - 32, 30, 26, 26);
             txtVFOBBand.SetBounds(8, 68, aw - 60, 20); chkVFOBTX.SetBounds(aw - 44, 68, 32, 20); chkVFOBLock.SetBounds(aw - 32, 30, 26, 26);
             ddStepA.Left = aw - 84; ddStepB.Left = aw - 84;
-            cardOptsA.SetBounds(356, 102, aw, 28);
-            optsFunc.SetBounds(cardVfoFunc.Left, 102, 226, 28);
+            cardOptsA.SetBounds(x0, 102, aw, 28);
+            optsFunc.SetBounds(cardVfoFunc.Left, 102, fw, 28);
             cardOptsB.SetBounds(boxB.Left, 102, aw, 28);
             {
                 int bw = (aw - 8) / 3;
                 Control[] ra = { chkDisplayPeak, chkDisplayAVG, chkFWCATU }, rb = { chkRX2DisplayPeak, chkRX2DisplayAVG, chkX2TR };
                 for (int k = 0; k < 3; k++) { ra[k].SetBounds(k * (bw + 4), 3, bw, 24); rb[k].SetBounds(k * (bw + 4), 3, bw, 24); }
             }
-            cardOptsRow3.SetBounds(356, 132, cardMeter.Left - 8 - 356, 28);
+            cardOptsRow3.SetBounds(x0, 132, cardMeter.Left - 8 - x0, 28);
             int zs = 0;
             lblDisplayZoom.Left = 252 + zs; ptbDisplayZoom.Left = 294 + zs;
             radDisplayZoom05.Left = 430 + zs; radDisplayZoom1x.Left = 477 + zs; radDisplayZoom2x.Left = 524 + zs; radDisplayZoom4x.Left = 571 + zs; btnDisplayZTB.Left = 618 + zs;

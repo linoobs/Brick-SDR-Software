@@ -80,6 +80,7 @@ namespace BrickSDR
 
             _name = name;
             console.SetupForm.SelectRadioModel(model);
+            BrickProfiles.ApplyOnce(console, name, _mac);
         }
     }
 }

@@ -477,6 +477,7 @@
     <Compile Include="BrickLayout.cs" />
     <Compile Include="BrickModePanels.cs" />
     <Compile Include="BrickProgrammer.cs" />
+    <Compile Include="BrickProfiles.cs" />
     <Compile Include="BrickSetupTweaks.cs" />
     <Compile Include="BrickControls.cs" />
     <Compile Include="clsBrickSkinService.cs" />
@@ -1350,6 +1351,7 @@ copy /Y "..\..\..\lib\NR_Algorithms_$(PlatformName)\rnnoise_avx2.dll" "$(Project
 copy /Y "..\..\..\lib\NR_Algorithms_$(PlatformName)\specbleach.dll" "$(ProjectDir)$(OutDir)";
 copy /Y "$(ProjectDir)CAT\CATStructs.xml" "$(ProjectDir)$(OutDir)";
 copy /Y "..\..\..\lib\Brick-SDR-resources\calculus" "$(ProjectDir)$(OutDir)"
+copy /Y "..\..\..\lib\Brick-SDR-resources\Brick*.xml" "$(ProjectDir)$(OutDir)"
 :: copy /Y "..\..\..\lib\Brick-SDR-resources\zetaHat.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_small.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_large.bin" "$(ProjectDir)$(OutDir)"

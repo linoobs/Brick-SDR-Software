@@ -600,6 +600,28 @@ namespace BrickSDR
             return false;
         }
 
+        // Pan / Zoom row: the old code may move or hide these controls, put them back whenever they are not where they belong
+        private void brickEnsureRow3()
+        {
+            if (cardOptsRow3 == null) return;
+            Control[] cs = { lblDisplayPan, ptbDisplayPan, btnDisplayPanCenter, lblDisplayZoom, ptbDisplayZoom, radDisplayZoom05, radDisplayZoom1x, radDisplayZoom2x, radDisplayZoom4x, btnDisplayZTB };
+            bool bad = false;
+            foreach (Control c in cs) if (c.Parent != cardOptsRow3 || !c.Visible || c.Top != 3) bad = true;
+            if (!bad) return;
+            Put(lblDisplayPan, cardOptsRow3, 0, 3, 30, 22);
+            Put(ptbDisplayPan, cardOptsRow3, 30, 3, 150, 22);
+            Put(btnDisplayPanCenter, cardOptsRow3, 184, 3, 58, 22);
+            Put(lblDisplayZoom, cardOptsRow3, 252, 3, 42, 22);
+            Put(ptbDisplayZoom, cardOptsRow3, 294, 3, 130, 22);
+            Put(radDisplayZoom05, cardOptsRow3, 430, 3, 44, 22);
+            Put(radDisplayZoom1x, cardOptsRow3, 477, 3, 44, 22);
+            Put(radDisplayZoom2x, cardOptsRow3, 524, 3, 44, 22);
+            Put(radDisplayZoom4x, cardOptsRow3, 571, 3, 44, 22);
+            Put(btnDisplayZTB, cardOptsRow3, 618, 3, 44, 22);
+            foreach (Control c in cs) c.Visible = true;
+            layoutTop();
+        }
+
         private void layoutTop()
         {
             if (cardMeter == null) return;
@@ -1257,6 +1279,7 @@ namespace BrickSDR
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
                 bp.Pick = n => { if (n == 1) ra.Checked = true; else rb.Checked = true; };
+                if (i == 3) bp.Pick = n => rb.Checked = true; // DIG / FT8: a click always gives DIGU
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
                 rb.CheckedChanged += (s, e) => bp.Invalidate();
                 parent.Controls.Add(bp);
@@ -1578,6 +1601,7 @@ namespace BrickSDR
         private void brickTick(object sender, EventArgs e)
         {
             if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
+            brickEnsureRow3();
             if (!initializing && !IsSetupFormNull)
             {
                 // moving a volume slider ends MUTE

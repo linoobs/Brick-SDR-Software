@@ -175,6 +175,20 @@ namespace BrickSDR
         #region build
 
         // called once, after the console is initialised and the settings are loaded
+        // the window is never larger than the working area of the monitor it is on
+        private void brickLimitToScreen(bool fit)
+        {
+            if (WindowState == FormWindowState.Minimized) return;
+            Rectangle wa = Screen.FromControl(this).WorkingArea;
+            this.MaximumSize = new Size(Math.Max(wa.Width, MinimumSize.Width), Math.Max(wa.Height, MinimumSize.Height));
+            if (!fit || WindowState != FormWindowState.Normal) return;
+            int w = Math.Min(Width, MaximumSize.Width), h = Math.Min(Height, MaximumSize.Height);
+            if (w != Width || h != Height) Size = new Size(w, h);
+            int x = Math.Min(Math.Max(Left, wa.Left), Math.Max(wa.Left, wa.Right - Width));
+            int y = Math.Min(Math.Max(Top, wa.Top), Math.Max(wa.Top, wa.Bottom - Height));
+            if (x != Left || y != Top) Location = new Point(x, y);
+        }
+
         private void brickBuildLayout()
         {
             if (brickActive) return;
@@ -237,6 +251,8 @@ namespace BrickSDR
             }
 
             brickApplyTheme(brickRoot);
+            brickLimitToScreen(true);
+            this.LocationChanged += (s, e) => brickLimitToScreen(false);
             brickApplyTheme(statusStripMain);
             brickStyleMenu();
             if (!IsSetupFormNull) { SetupForm.BrickSimplifyNR(); SetupForm.BrickAddLineColouring(); SetupForm.BrickHookRadioTools(); }

@@ -210,10 +210,11 @@ namespace BrickSDR
                 string khz = ((hz / 1000) % 1000).ToString("000");
                 string small = (hz % 1000).ToString("000");
 
-                float bigSize = 27f, smallSize = 18f;
+                float kk = Math.Min(1f, Height / 92f); // low box: smaller digits
+                float bigSize = 27f * kk, smallSize = 18f * kk;
                 // narrow box: the digits shrink to fit
-                using (Font f0 = new Font("Consolas", 27f, FontStyle.Bold))
-                using (Font f1 = new Font("Consolas", 18f, FontStyle.Bold))
+                using (Font f0 = new Font("Consolas", bigSize, FontStyle.Bold))
+                using (Font f1 = new Font("Consolas", smallSize, FontStyle.Bold))
                 {
                     StringFormat s0 = StringFormat.GenericTypographic;
                     float full = (mhz.Length + 3) * g.MeasureString("0", f0, 100, s0).Width + g.MeasureString(".", f0, 100, s0).Width + 3 * g.MeasureString("0", f1, 100, s0).Width + g.MeasureString(".", f1, 100, s0).Width;
@@ -231,7 +232,7 @@ namespace BrickSDR
                     float total = mhz.Length * cwB + dwB + 3 * cwB + dwS + 3 * cwS;
                     float right = Width - 38;
                     float x = right - total;
-                    float yBig = 18, ySmall = 18 + (fbig.Height - fsm.Height) - 2;
+                    float yBig = 18 * kk, ySmall = 18 * kk + (fbig.Height - fsm.Height) - 2;
                     Color col = active ? cAccent : Color.FromArgb(150, 154, 166);
                     Color colSmall = active ? Color.FromArgb(200, 110, 30) : Color.FromArgb(110, 114, 126);
 
@@ -243,7 +244,7 @@ namespace BrickSDR
                         for (int i = 0; i < mhz.Length; i++)
                         {
                             g.DrawString(mhz[i].ToString(), fbig, b, x, yBig, sf);
-                            digitRects.Add(new Rectangle((int)x, 14, (int)cwB, fbig.Height + 6));
+                            digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwB, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, mhz.Length - 1 - i) * 1e6);
                             x += cwB;
                         }
@@ -251,7 +252,7 @@ namespace BrickSDR
                         for (int i = 0; i < 3; i++)
                         {
                             g.DrawString(khz[i].ToString(), fbig, b, x, yBig, sf);
-                            digitRects.Add(new Rectangle((int)x, 14, (int)cwB, fbig.Height + 6));
+                            digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwB, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, 2 - i) * 1e3);
                             x += cwB;
                         }
@@ -259,7 +260,7 @@ namespace BrickSDR
                         for (int i = 0; i < 3; i++)
                         {
                             g.DrawString(small[i].ToString(), fsm, bs, x, ySmall, sf);
-                            digitRects.Add(new Rectangle((int)x, 14, (int)cwS, fbig.Height + 6));
+                            digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwS, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, 2 - i));
                             x += cwS;
                         }

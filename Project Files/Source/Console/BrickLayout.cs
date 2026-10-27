@@ -175,6 +175,54 @@ namespace BrickSDR
         #region build
 
         // called once, after the console is initialised and the settings are loaded
+        // ---- compact layout: all vertical positions / heights are scaled by brickK (1 = normal) when the window is low
+        private const double BrickMinK = 0.72;
+        private double brickK = 1.0;
+        private int brickNeedH;
+        private readonly Dictionary<Control, int[]> brickYOrig = new Dictionary<Control, int[]>();
+
+        private int brickY(int v) { return (int)Math.Round(v * brickK); }
+
+        private void brickCaptureY(Control root)
+        {
+            foreach (Control c in root.Controls)
+            {
+                if (c == picMultiMeterDigital || c == picRX2Meter || c.Dock != DockStyle.None) continue;
+                if (!brickYOrig.ContainsKey(c)) brickYOrig[c] = new int[] { c.Top, c.Height };
+                if (c is Panel || c is GroupBox || c is BrickVfoBox) brickCaptureY(c);
+            }
+        }
+
+        private void brickApplyScale()
+        {
+            foreach (KeyValuePair<Control, int[]> kv in brickYOrig)
+            {
+                Control c = kv.Key;
+                if (c.IsDisposed) continue;
+                int t = kv.Value[0], h = kv.Value[1];
+                bool container = c is Panel || c is GroupBox;
+                int nh = container ? brickY(h) : (h <= 18 ? h : Math.Max(18, brickY(h)));
+                if (!container && h > 18 && nh < h && !(c is BrickVfoBox)) nh = Math.Max(nh, Math.Min(h, c.Font.Height + 3)); // text must still fit
+                int nt = brickY(t);
+                if (c.Top != nt || c.Height != nh) c.SetBounds(c.Left, nt, c.Width, nh);
+            }
+            int topH = brickY(166);
+            if (pnlTop.Height != topH) pnlTop.Height = topH;
+        }
+
+        private void brickRescale()
+        {
+            if (brickNeedH <= 0 || brickRoot == null) return;
+            double k = Math.Min(1.0, Math.Max(BrickMinK, (double)brickRoot.ClientSize.Height / brickNeedH));
+            if (Math.Abs(k - brickK) < 0.003) return;
+            brickK = k;
+            SuspendLayout();
+            brickApplyScale();
+            layoutTop();
+            ResumeLayout(true);
+            m_bResizeDX2Display = true;
+        }
+
         // the window is never larger than the working area of the monitor it is on
         private void brickLimitToScreen(bool fit)
         {
@@ -239,7 +287,11 @@ namespace BrickSDR
             int chrome = this.Height - this.ClientSize.Height;
             // the window never gets smaller than the layout needs (VFO B must not run into the S-meter)
             int chromeW = this.Width - this.ClientSize.Width;
-            this.MinimumSize = new Size(1360 + chromeW, need + menuStrip1.Height + statusStripMain.Height + chrome);
+            // small window: the vertical distances shrink (down to BrickMinK), the window may go down to about 1360 x 768
+            brickNeedH = need;
+            brickCaptureY(pnlTop); brickCaptureY(pnlLeft); brickCaptureY(pnlRight);
+            this.MinimumSize = new Size(1360 + chromeW, (int)Math.Ceiling(need * BrickMinK) + menuStrip1.Height + statusStripMain.Height + chrome);
+            brickRoot.Resize += (s, e) => brickRescale();
             if (this.Height < this.MinimumSize.Height) this.Height = this.MinimumSize.Height;
             if (this.Width < this.MinimumSize.Width) this.Width = this.MinimumSize.Width;
             if (brickFirstRun)
@@ -251,6 +303,7 @@ namespace BrickSDR
             }
 
             brickApplyTheme(brickRoot);
+            brickRescale();
             brickLimitToScreen(true);
             this.LocationChanged += (s, e) => brickLimitToScreen(false);
             brickApplyTheme(statusStripMain);
@@ -649,10 +702,11 @@ namespace BrickSDR
             lblDisplayZoom.Left = 252 + zs; ptbDisplayZoom.Left = 294 + zs;
             radDisplayZoom05.Left = 430 + zs; radDisplayZoom1x.Left = 477 + zs; radDisplayZoom2x.Left = 524 + zs; radDisplayZoom4x.Left = 571 + zs; btnDisplayZTB.Left = 618 + zs;
             bool two = chkRX2 != null && chkRX2.Checked && !_mox;
-            picMultiMeterDigital.SetBounds(6, 4, meterW - 12, two ? 74 : 128);
-            picRX2Meter.SetBounds(6, 80, meterW - 12, 52);
+            picMultiMeterDigital.SetBounds(6, brickY(4), meterW - 12, brickY(two ? 74 : 128));
+            picRX2Meter.SetBounds(6, brickY(80), meterW - 12, brickY(52));
             picRX2Meter.Visible = two;
             picMultiMeterDigital.Invalidate();
+            if (brickYOrig.Count > 0) brickApplyScale();
         }
 
         #endregion
@@ -1807,6 +1861,9 @@ namespace BrickSDR
 
             float fBig = big ? 28f : (rx2 ? 14f : 20f), fSmall = big ? 12f : (rx2 ? 8.5f : 10.5f), fTick = big ? 8f : (rx2 ? 6f : 7f);
             int bh = big ? 14 : (rx2 ? 8 : 10);
+            // low window: the meter texts shrink with the meter
+            float ms = Math.Min(1f, H / (big ? 128f : (rx2 ? 52f : 74f)));
+            if (ms < 1f) { fBig = Math.Max(9f, fBig * ms); fSmall = Math.Max(6.5f, fSmall * ms); fTick = Math.Max(5.5f, fTick * ms); bh = Math.Max(5, (int)(bh * ms)); }
             using (Font fb = new Font("Segoe UI", fBig, FontStyle.Bold))
             using (Font fs = new Font("Segoe UI", fSmall))
             using (Font ft = new Font("Segoe UI", fTick))

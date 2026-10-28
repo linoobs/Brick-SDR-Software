@@ -209,6 +209,7 @@ void print_OriginalAndFitSamples(CALCC a);
 
 void print_EQ_Samples(CALCC a);
 
+#define BRICK_PS_HARD_RESET_FAILS 12
 #define SAMPLE_NBUCKS			  16           
 #define SAMPLE_ACCEPT_OVERRANGE	  1             
 #define SAMPLE_MIN_X              0.0050         
@@ -2035,8 +2036,21 @@ void pscc (int channel, int size, double* tx, double* rx)
 							a->ctrl.state = LDELAY;
 						}
 					}
-					else if (++(a->ctrl.bs_count) >= 3)
+					else if (++(a->ctrl.bs_count) >= BRICK_PS_HARD_RESET_FAILS || (a->info[14] == 0 && a->ctrl.bs_count >= 3))
 						a->ctrl.state = LRESET;
+					else if (a->ctrl.bs_count >= 2)
+					{
+						/* Brick-SDR: two or more failed fits in a row. The correction that is running is still good, so do not reset it
+						   (that is the PS-A drop); only forget the history the fits are built on and keep trying. */
+						a->m_fold_prev = 0;
+						a->m_ctrl_ema_valid = a->c_ctrl_ema_valid = a->s_ctrl_ema_valid = 0;
+						a->m_y_pin_valid = a->c_y_pin_valid = a->s_y_pin_valid = 0;
+						a->m_pin_cycle = a->c_pin_cycle = a->s_pin_cycle = 0;
+						a->scheck_valid = 0;
+						if (InterlockedAnd (&a->mox, 1))
+							a->ctrl.state = LSETUP;
+						else a->ctrl.state = LWAIT;
+					}
 					else if (InterlockedAnd (&a->mox, 1))
 						a->ctrl.state = LSETUP;
 					else a->ctrl.state = LWAIT;

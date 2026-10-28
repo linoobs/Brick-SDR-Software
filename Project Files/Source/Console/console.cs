@@ -49004,8 +49004,8 @@ namespace BrickSDR
             try { pnlDisplay_MouseDownCore(sender, e); }
             finally { if (forceCt) current_click_tune_mode = savedCt; }
             brickVisorDrag = brickActive && onVisor && e.Button == MouseButtons.Left && e.Y >= 15;
-            if (brickActive && e.Button == MouseButtons.Left)
-                pnlDisplay.Cursor = brickVisorDrag ? grabbing : Cursors.Arrow;
+            if (brickActive && (e.Button == MouseButtons.Left || pnlDisplay.Cursor == Cursors.Cross || pnlDisplay.Cursor == _cross_outlined))
+                pnlDisplay.Cursor = (e.Button == MouseButtons.Left && brickVisorDrag) ? grabbing : Cursors.Arrow;
             if (brickActive && !onVisor)
             {
                 rx1_spectrum_drag = false; rx2_spectrum_drag = false;

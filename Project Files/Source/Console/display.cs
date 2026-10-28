@@ -2877,6 +2877,7 @@ namespace BrickSDR
 
         private static void initDisplayArrays(int W, int H)
         {
+            if (W < 16) W = 16; // Brick-SDR: a window that is momentarily 0 wide gave empty buffers, and &buffer[0] then threw IndexOutOfRange in the display thread
             lock (_objDX2Lock)
             {
                 if (histogram_data != null) m_objIntPool.Return(histogram_data);

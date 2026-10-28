@@ -52,6 +52,7 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("OpenHPSDR")]
 [assembly: AssemblyProduct("Brick-SDR")]
+[assembly: AssemblyInformationalVersion(BrickSDR.BrickBranding.Version)]
 [assembly: AssemblyCopyright("2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]		

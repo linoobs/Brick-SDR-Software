@@ -153,7 +153,8 @@ struct _txa
 	} calcc;
 	struct
 	{
-		IQC p;
+		IQC p0, p1;
+		// p0 for dsp-synchronized reference, p1 for other
 	} iqc;
 	struct
 	{

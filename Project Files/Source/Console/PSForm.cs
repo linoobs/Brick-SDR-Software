@@ -1038,7 +1038,7 @@ namespace BrickSDR
         public static extern void SetPSPtol(int channel, double ptol);
 
         [DllImport("wdsp.dll", EntryPoint = "GetPSDisp", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void GetPSDisp(int channel, IntPtr x, IntPtr ym, IntPtr yc, IntPtr ys, IntPtr xm_cor, IntPtr ym_cor, IntPtr xa_cor, IntPtr ya_cor, int* nsamps_out, int* cpts_out, double* phs_ref_deg_out);
+        public static extern void GetPSDisp(int channel, IntPtr x, IntPtr ym, IntPtr yc, IntPtr ys, IntPtr cm, IntPtr cc, IntPtr cs);
 
         [DllImport("wdsp.dll", EntryPoint = "SetPSFeedbackRate", CallingConvention = CallingConvention.Cdecl)]
         public static extern void SetPSFeedbackRate(int channel, int rate);

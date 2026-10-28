@@ -76,10 +76,6 @@ namespace BrickSDR
         double[] cm = new double[4 * max_ints];
         double[] cc = new double[4 * max_ints];
         double[] cs = new double[4 * max_ints];
-        // WDSP 2.11 delivers the correction curves as 512 ready points
-        const int dispPts = 512;
-        double[] xmCor = new double[dispPts], ymCor = new double[dispPts], xaCor = new double[dispPts], yaCor = new double[dispPts];
-        int dispN = 0;
         double[] t  = new double[max_ints + 1];
         int skip = 1;
         bool showgain = false;
@@ -107,17 +103,6 @@ namespace BrickSDR
             chkAVLowRes_CheckedChanged(this, ex);
             chkAVPhaseZoom_CheckedChanged(this, ex);
             chkStayOnTop_CheckedChanged(this, ex);
-        }
-        // the chart control crashes (access violation) when a point holds NaN / infinity
-        private void sanitizeSeries()
-        {
-            foreach (string n in new[] { "MagCorr", "PhsCorr", "MagAmp", "PhsAmp", "Ref" })
-                foreach (DataPoint dp in chart1.Series[n].Points)
-                {
-                    double y = dp.YValues[0];
-                    if (double.IsNaN(y) || double.IsInfinity(y)) dp.YValues[0] = 0.0;
-                    if (double.IsNaN(dp.XValue) || double.IsInfinity(dp.XValue)) dp.XValue = 0.0;
-                }
         }
         private void disp_setup()
         {
@@ -194,18 +179,45 @@ namespace BrickSDR
                 chart1.Series["Ref"].Points[1].SetValueXY(1.0, 1.0);
             }
             chart1.Series["MagCorr"].Points[0].SetValueXY(0.0, 0.0);
+            k = ints - 1;
+            dx = t[ints] - t[ints - 1];
+            qyc = cc[4 * k + 0] + dx * (cc[4 * k + 1] + dx * (cc[4 * k + 2] + dx * cc[4 * k + 3]));
+            qys = cs[4 * k + 0] + dx * (cs[4 * k + 1] + dx * (cs[4 * k + 2] + dx * cs[4 * k + 3]));
+            phs_base = 180.0 / Math.PI * Math.Atan2(qys, qyc);
+            int nLastGoodPoint = -1;
             for (int i = 1; i <= np; i++)
             {
-                int j = Math.Min(i - 1, Math.Max(0, dispN - 1));
-                double cx = dispN > 0 ? xmCor[j] : qx;
-                double cy = dispN > 0 ? ymCor[j] : 1.0;
-                chart1.Series["MagCorr"].Points[i].SetValueXY(cx, showgain ? cy : cy * cx);
-                double px2 = dispN > 0 ? xaCor[j] : qx;
-                double py2 = dispN > 0 ? yaCor[j] : 0.0;
-                chart1.Series["PhsCorr"].Points[i - 1].SetValueXY(px2, py2);
+                if ((k = (int)(qx * ints)) > ints - 1) k = ints - 1;
+                dx = qx - t[k];
+                qym = cm[4 * k + 0] + dx * (cm[4 * k + 1] + dx * (cm[4 * k + 2] + dx * cm[4 * k + 3]));
+                qyc = cc[4 * k + 0] + dx * (cc[4 * k + 1] + dx * (cc[4 * k + 2] + dx * cc[4 * k + 3]));
+                qys = cs[4 * k + 0] + dx * (cs[4 * k + 1] + dx * (cs[4 * k + 2] + dx * cs[4 * k + 3]));
+                if (!showgain)
+                    chart1.Series["MagCorr"].Points[i].SetValueXY(qx, qym * qx);
+                else
+                    chart1.Series["MagCorr"].Points[i].SetValueXY(qx, qym);
+                phs = 180.0 / Math.PI * Math.Atan2(qys, qyc) - phs_base;
+                if (phs > -180.0 && phs < +180.0)
+                {
+                    chart1.Series["PhsCorr"].Points[i-1].SetValueXY(qx, phs);
+                    nLastGoodPoint = i-1;
+                }
+                else
+                {
+                    // no data, so need to use last known x/y so that un-used point is 'invisible'
+                    if (nLastGoodPoint != -1)
+                    {
+                        DataPoint dp = chart1.Series["PhsCorr"].Points[nLastGoodPoint];
+                        chart1.Series["PhsCorr"].Points[i - 1].SetValueXY((double)dp.XValue, (double)dp.YValues[0]);
+                    }
+                    else
+                    {
+                        chart1.Series["PhsCorr"].Points[i - 1].SetValueXY(0.0, 0.0);
+                    }
+                    
+                }
                 qx += delta;
             }
-            int k2 = 0; int nLastGoodPoint;
             k = ints * spi - 1;
             phs_base = 180.0 / Math.PI * Math.Atan2(yc[k], ys[k]);
 
@@ -362,21 +374,23 @@ namespace BrickSDR
                 fixed (double* pym = ym)
                 fixed (double* pyc = yc)
                 fixed (double* pys = ys)
-                fixed (double* pxm = xmCor)
-                fixed (double* pym2 = ymCor)
-                fixed (double* pxa = xaCor)
-                fixed (double* pya = yaCor)
+                fixed (double* pcm = cm)
+                fixed (double* pcc = cc)
+                fixed (double* pcs = cs)
                 {
-                    int nsamps = 0, cpts = 0;
-                    double phsRef = 0;
                     puresignal.GetPSDisp(
                         WDSP.id(1, 0),
-                        new IntPtr(px), new IntPtr(pym), new IntPtr(pyc), new IntPtr(pys),
-                        new IntPtr(pxm), new IntPtr(pym2), new IntPtr(pxa), new IntPtr(pya),
-                        &nsamps, &cpts, &phsRef);
-                    dispN = Math.Min(cpts, dispPts);
+                        new IntPtr(px),
+                        new IntPtr(pym),
+                        new IntPtr(pyc),
+                        new IntPtr(pys),
+                        new IntPtr(pcm),
+                        new IntPtr(pcc),
+                        new IntPtr(pcs)
+                    );
                 }
-            }            //
+            }
+            //
 
             lock (intslock)
             {
@@ -412,7 +426,6 @@ namespace BrickSDR
                 chart1.Series["Ref"].Points.ResumeUpdates();
                 chart1.Series.ResumeUpdates();
 
-                sanitizeSeries();
                 chart1.Invalidate();
             }
 

@@ -292,7 +292,7 @@ WDSP_API void SetTXABandpassWindow (int channel, int wintype);
 
 /*  ---- calcc.c ----------------------------------------------------------- */
 
-WDSP_API void GetPSDisp (int channel, double* x, double* ym, double* yc, double* ys, double* xm_cor, double* ym_cor, double* xa_cor, double* ya_cor, int* nsamps_out, int* cpts_out, double* phs_ref_deg_out);
+WDSP_API void GetPSDisp (int channel, double* x, double* ym, double* yc, double* ys, double* cm, double* cc, double* cs);
 WDSP_API void GetPSHWPeak (int channel, double* peak);
 WDSP_API void GetPSInfo (int channel, int *info);
 WDSP_API void GetPSMaxTX (int channel, double* maxtx);

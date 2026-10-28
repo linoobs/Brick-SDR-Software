@@ -48998,10 +48998,14 @@ namespace BrickSDR
             if (brickActive && e.Button == MouseButtons.Left && e.Y >= 15 && !m_bDraggingRx2Split)
                 onVisor = brickOverVisor(e);
             brickClickWaterfall = brickInWaterfall(e.Y);
-            pnlDisplay_MouseDownCore(sender, e);
+            ClickTuneMode savedCt = current_click_tune_mode;
+            bool forceCt = brickActive && brickClickWaterfall && e.Button == MouseButtons.Left;
+            if (forceCt) current_click_tune_mode = ClickTuneMode.VFOA; // click tuning is always on for the waterfall, without the white cross hair (Display keeps its own mode Off)
+            try { pnlDisplay_MouseDownCore(sender, e); }
+            finally { if (forceCt) current_click_tune_mode = savedCt; }
             brickVisorDrag = brickActive && onVisor && e.Button == MouseButtons.Left && e.Y >= 15;
             if (brickActive && e.Button == MouseButtons.Left)
-                pnlDisplay.Cursor = brickVisorDrag ? grabbing : (_useOutlinedCrossCursor ? _cross_outlined : Cursors.Cross);
+                pnlDisplay.Cursor = brickVisorDrag ? grabbing : Cursors.Arrow;
             if (brickActive && !onVisor)
             {
                 rx1_spectrum_drag = false; rx2_spectrum_drag = false;
@@ -49404,11 +49408,20 @@ namespace BrickSDR
                             case DisplayMode.PANADAPTER:
                             case DisplayMode.PANAFALL:
                             case DisplayMode.PANASCOPE:
-                                float x = PixelToHz(e.X);
+                                int clickPx = e.X;
+                                if (brickClickWaterfall)
+                                {
+                                    // Brick-SDR: tune to the nearest real signal (peak) around the click
+                                    int hrx = rx2_enabled && e.Y > Display.SplitY(pnlDisplay.Height) ? 2 : 1;
+                                    float hzPerPx = Math.Abs(PixelToHz(e.X + 1, hrx) - PixelToHz(e.X, hrx));
+                                    int win = Math.Max(4, Math.Min(90, (int)(1500f / Math.Max(0.01f, hzPerPx))));
+                                    clickPx = Display.FindPeakPixel(hrx, e.X, win);
+                                }
+                                float x = PixelToHz(clickPx);
                                 double freq;
                                 if (rx2_enabled && e.Y > Display.SplitY(pnlDisplay.Height)) //RX2
                                 {
-                                    x = PixelToHz(e.X, 2);
+                                    x = PixelToHz(clickPx, 2);
 
                                     bool bShift = true;
                                     if (_click_tune_rx2_display && current_click_tune_mode != ClickTuneMode.Off)
@@ -49848,7 +49861,7 @@ namespace BrickSDR
                             next_cursor = grabbing;
                         }
                     }
-                    else
+                    else if (!brickActive)
                     {
                         switch (current_click_tune_mode)
                         {
@@ -51179,7 +51192,7 @@ namespace BrickSDR
                     {
                         if (brickVisorDrag) next_cursor = grabbing;
                         else if (brickOverVisor(e)) next_cursor = grab;
-                        else if (!(next_cursor == Cursors.SizeNS || next_cursor == Cursors.SizeWE && false)) next_cursor = _useOutlinedCrossCursor ? _cross_outlined : Cursors.Cross;
+                        else if (!(next_cursor == Cursors.SizeNS || next_cursor == Cursors.SizeWE && false)) next_cursor = Cursors.Arrow;
                     }
                 }
                 pnlDisplay.Cursor = next_cursor;

@@ -3075,19 +3075,61 @@ namespace BrickSDR
         // which receiver the user is working with (1 / 2); set by the Brick-SDR console
         public static int BrickActiveRX = 1;
 
-        // ---- Brick-SDR: 3D view of a receiver. The last spectra are drawn one behind the other as a perspective surface.
+        // nearest real signal (local maximum clearly above the noise) around pixel x, within win pixels; x itself when there is none
+        public static int FindPeakPixel(int rx, int x, int win)
+        {
+            float[] d = rx == 1 ? current_display_data : current_display_data_bottom;
+            int dec = Math.Max(1, m_nDecimation);
+            int n = displayTargetWidth / dec;
+            if (d == null || n < 16) return x;
+            int c = x / dec, w = Math.Max(2, win / dec);
+            int a2 = Math.Max(1, c - 4 * w), b2 = Math.Min(n - 2, c + 4 * w);
+            if (b2 - a2 < 8) return x;
+            // noise floor: the mean of the lower third of the surrounding bins
+            float[] tmp = new float[b2 - a2 + 1];
+            for (int i = a2; i <= b2; i++) tmp[i - a2] = (d[i - 1] + d[i] + d[i + 1]) / 3f;
+            float[] sorted = (float[])tmp.Clone();
+            Array.Sort(sorted);
+            int third = Math.Max(1, sorted.Length / 3);
+            float noise = 0; for (int i = 0; i < third; i++) noise += sorted[i];
+            noise /= third;
+            const float margin = 6f; // dB above the noise a signal must have
+            for (int dist = 0; dist <= w; dist++)
+            {
+                int best = -1; float bv = float.MinValue;
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    int i = c + s * dist;
+                    if (i < a2 + 1 || i > b2 - 1) continue;
+                    float v = tmp[i - a2], l = tmp[i - 1 - a2], r = tmp[i + 1 - a2];
+                    if (v >= l && v >= r && v - noise >= margin && v > bv) { bv = v; best = i; }
+                    if (dist == 0) break;
+                }
+                if (best >= 0) return best * dec;
+            }
+            return x;
+        }
+
+        // ---- Brick-SDR: 3D view of a receiver. The last spectra are drawn one behind the other as ridges with a
+        // blue - cyan - green - yellow - red fill, thin light edges, perspective towards the back.
         public static bool Use3DRX1 = false, Use3DRX2 = false;
-        private const int B3D_LAYERS = 28, B3D_POINTS = 150, B3D_INTERVAL_MS = 70;
+        private const int B3D_LAYERS = 56, B3D_POINTS = 170, B3D_INTERVAL_MS = 60;
         private static readonly float[][][] _b3dHist = new float[3][][];
         private static readonly int[] _b3dCount = new int[3];
         private static readonly long[] _b3dLast = new long[3];
+        private static readonly PathGeometry[][] _b3dFill = new PathGeometry[3][];
+        private static readonly PathGeometry[][] _b3dEdge = new PathGeometry[3][];
+        private static readonly float[][] _b3dBase = new float[3][];
+        private static readonly float[][] _b3dAmp = new float[3][];
+        private static readonly int[] _b3dGeoKey = new int[3];
+        private static readonly bool[] _b3dDirty = new bool[3];
 
         private static bool is3dCapable(DisplayMode m)
         {
             return m == DisplayMode.PANADAPTER || m == DisplayMode.PANAFALL || m == DisplayMode.WATERFALL;
         }
 
-        // one vertical gradient brush per receiver (blue at the foot, cyan, yellow, red at the top), moved to every line
+        // one vertical gradient brush per receiver, moved to every ridge (foot = deep blue, top = red)
         private static SharpDX.Direct2D1.Brush b3dGradient(int rx, float yFoot, float yTop, float opacity)
         {
             if (!_bDX2Setup) return null;
@@ -3095,12 +3137,11 @@ namespace BrickSDR
             SharpDX.Direct2D1.Brush existing;
             if (!_DX2Brushes.TryGetValue(key, out existing))
             {
+                Func<float, float, float, float, GradientStop> st = (p, r, g, b) => new GradientStop { Position = p, Color = new SharpDX.Mathematics.Interop.RawColor4(r, g, b, 1f) };
                 GradientStop[] stops = new GradientStop[]
                 {
-                    new GradientStop { Position = 0.0f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.10f, 0.30f, 0.75f, 1f) },
-                    new GradientStop { Position = 0.4f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.10f, 0.80f, 0.90f, 1f) },
-                    new GradientStop { Position = 0.7f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.95f, 0.90f, 0.25f, 1f) },
-                    new GradientStop { Position = 1.0f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.95f, 0.25f, 0.15f, 1f) }
+                    st(0.00f, 0.02f, 0.03f, 0.20f), st(0.16f, 0.03f, 0.10f, 0.55f), st(0.32f, 0.00f, 0.40f, 1.00f), st(0.48f, 0.00f, 0.85f, 0.95f),
+                    st(0.62f, 0.15f, 0.95f, 0.30f), st(0.78f, 1.00f, 0.92f, 0.10f), st(0.90f, 1.00f, 0.50f, 0.10f), st(1.00f, 1.00f, 0.12f, 0.12f)
                 };
                 using (GradientStopCollection sc = new GradientStopCollection(_d2dRenderTarget, stops))
                     existing = new SharpDX.Direct2D1.LinearGradientBrush(_d2dRenderTarget, new LinearGradientBrushProperties { StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 0), EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 1) }, sc);
@@ -3113,15 +3154,52 @@ namespace BrickSDR
             return gb;
         }
 
-        private static Color b3dColour(float t)
+        private static void b3dDisposeGeometry(int rx)
         {
-            // low = deep blue, then cyan, yellow, red at the top (steps, so the brush cache stays small)
-            t = Math.Max(0f, Math.Min(1f, t));
-            t = (float)Math.Round(t * 24f) / 24f;
-            if (t < 0.35f) { float u = t / 0.35f; return Color.FromArgb(255, (int)(20 + 10 * u), (int)(70 + 130 * u), (int)(170 + 50 * u)); }
-            if (t < 0.7f) { float u = (t - 0.35f) / 0.35f; return Color.FromArgb(255, (int)(30 + 210 * u), (int)(200 + 30 * u), (int)(220 - 160 * u)); }
-            float w = (t - 0.7f) / 0.3f;
-            return Color.FromArgb(255, 240, (int)(230 - 170 * w), (int)(60 - 20 * w));
+            if (_b3dFill[rx] != null) for (int i = 0; i < _b3dFill[rx].Length; i++) { if (_b3dFill[rx][i] != null) _b3dFill[rx][i].Dispose(); _b3dFill[rx][i] = null; }
+            if (_b3dEdge[rx] != null) for (int i = 0; i < _b3dEdge[rx].Length; i++) { if (_b3dEdge[rx][i] != null) _b3dEdge[rx][i].Dispose(); _b3dEdge[rx][i] = null; }
+        }
+
+        // the geometry is rebuilt only when a new line was added or the size changed; every frame just draws it
+        private static void b3dBuild(int rx, int nVerticalShift, int W, int H)
+        {
+            float[][] hist = _b3dHist[rx];
+            int cnt = _b3dCount[rx];
+            if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
+            b3dDisposeGeometry(rx);
+            float yFront = nVerticalShift + H - 6, yBack = nVerticalShift + H * 0.30f;
+            float ampFront = H * 0.42f;
+            for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
+            {
+                float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
+                float yBase = yBack + (yFront - yBack) * (float)Math.Pow(t, 1.3);
+                float scale = 0.80f + 0.20f * t;
+                float amp = ampFront * (0.35f + 0.65f * t);
+                float xl = W * 0.5f - W * 0.5f * scale, xs = W * scale / (B3D_POINTS - 1);
+                float[] line = hist[k];
+                _b3dBase[rx][k] = yBase; _b3dAmp[rx][k] = amp;
+
+                PathGeometry fill = new PathGeometry(_d2dFactory);
+                using (GeometrySink sink = fill.Open())
+                {
+                    sink.BeginFigure(new SharpDX.Vector2(xl, yBase), FigureBegin.Filled);
+                    for (int p = 0; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - line[p] * amp));
+                    sink.AddLine(new SharpDX.Vector2(xl + W * scale, yBase));
+                    sink.EndFigure(FigureEnd.Closed);
+                    sink.Close();
+                }
+                PathGeometry edge = new PathGeometry(_d2dFactory);
+                using (GeometrySink sink = edge.Open())
+                {
+                    sink.BeginFigure(new SharpDX.Vector2(xl, yBase - line[0] * amp), FigureBegin.Hollow);
+                    for (int p = 1; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - line[p] * amp));
+                    sink.EndFigure(FigureEnd.Open);
+                    sink.Close();
+                }
+                _b3dFill[rx][k] = fill; _b3dEdge[rx][k] = edge;
+            }
+            _b3dGeoKey[rx] = (W << 16) ^ H ^ (nVerticalShift << 8);
+            _b3dDirty[rx] = false;
         }
 
         unsafe private static void Draw3DDX2D(int nVerticalShift, int W, int H, int rx)
@@ -3161,7 +3239,7 @@ namespace BrickSDR
             float range = Math.Max(10, grid_max - grid_min);
             float offset = rx == 1 ? RX1Offset : RX2Offset;
 
-            // history: a new line about every 70 ms, the oldest one is reused
+            // history: a new line about every 60 ms, the oldest one is reused
             float[][] hist = _b3dHist[rx];
             if (hist == null) { hist = new float[B3D_LAYERS][]; for (int i = 0; i < B3D_LAYERS; i++) hist[i] = new float[B3D_POINTS]; _b3dHist[rx] = hist; _b3dCount[rx] = 0; }
             long now = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -3179,6 +3257,7 @@ namespace BrickSDR
                     line[p] = Math.Max(0f, Math.Min(1f, (mx + offset - grid_min) / range));
                 }
                 if (_b3dCount[rx] < B3D_LAYERS) _b3dCount[rx]++;
+                _b3dDirty[rx] = true;
             }
 
             // back wall: the normal frequency grid
@@ -3186,44 +3265,24 @@ namespace BrickSDR
             drawPanadapterAndWaterfallGridDX2D(nVerticalShift, W, H, rx, rx == 2, out le, out re, false);
 
             int cnt = _b3dCount[rx];
-            float yFront = nVerticalShift + H - 8, yBack = nVerticalShift + H * 0.34f;
-            float ampFront = H * 0.34f;
+            if (_b3dDirty[rx] || _b3dFill[rx] == null || _b3dGeoKey[rx] != ((W << 16) ^ H ^ (nVerticalShift << 8))) b3dBuild(rx, nVerticalShift, W, H);
+
+            SharpDX.Direct2D1.Brush baseFill = getDXBrushForColour(Color.FromArgb(255, 5, 9, 36));
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
-                float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);        // 0 = back, 1 = front
-                float te = (float)Math.Pow(t, 1.45);
-                float yBase = yBack + (yFront - yBack) * te;
-                float scale = 0.5f + 0.5f * t;
-                float amp = ampFront * (0.4f + 0.6f * t);
-                float xl = W * 0.5f - W * 0.5f * scale;
-                float[] line = hist[k];
-                float peak = 0f;
-                using (PathGeometry geo = new PathGeometry(_d2dFactory))
-                {
-                    using (GeometrySink sink = geo.Open())
-                    {
-                        sink.BeginFigure(new SharpDX.Vector2(xl, yBase), FigureBegin.Filled);
-                        for (int p = 0; p < B3D_POINTS; p++)
-                        {
-                            float v = line[p];
-                            if (v > peak) peak = v;
-                            sink.AddLine(new SharpDX.Vector2(xl + W * scale * p / (B3D_POINTS - 1), yBase - v * amp));
-                        }
-                        sink.AddLine(new SharpDX.Vector2(xl + W * scale, yBase));
-                        sink.EndFigure(FigureEnd.Closed);
-                        sink.Close();
-                    }
-                    int shade = 10 + (int)Math.Round(t * 6) * 3;
-                    SharpDX.Direct2D1.Brush fill = getDXBrushForColour(Color.FromArgb(235, shade, shade + 6, shade + 20));
-                    SharpDX.Direct2D1.Brush edge = b3dGradient(rx, yBase, yBase - amp, 0.55f + 0.45f * t);
-                    if (fill != null && edge != null)
-                    {
-                        _d2dRenderTarget.FillGeometry(geo, fill);
-                        _d2dRenderTarget.DrawGeometry(geo, edge, t > 0.95f ? 1.8f : 1.1f);
-                    }
-                }
+                PathGeometry fill = _b3dFill[rx][k], edge = _b3dEdge[rx][k];
+                if (fill == null || edge == null) continue;
+                float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);
+                float yBase = _b3dBase[rx][k], amp = _b3dAmp[rx][k];
+                _d2dRenderTarget.FillGeometry(fill, baseFill);                                  // hides what is behind
+                SharpDX.Direct2D1.Brush grad = b3dGradient(rx, yBase, yBase - amp * 0.6f, 0.6f + 0.4f * t);
+                if (grad != null) _d2dRenderTarget.FillGeometry(fill, grad);
+                int a = 70 + (int)(t * 7) * 25;                                                   // back edges faint, front edges bright
+                SharpDX.Direct2D1.Brush eb = getDXBrushForColour(Color.FromArgb(Math.Min(255, a), 170 + (int)(t * 85), 200 + (int)(t * 55), 255));
+                if (eb != null) _d2dRenderTarget.DrawGeometry(edge, eb, t > 0.97f ? 1.6f : 0.9f);
             }
         }
+
         public static float RX2SplitRatio
         {
             get { return _rx2SplitRatio; }

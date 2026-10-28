@@ -49011,7 +49011,9 @@ namespace BrickSDR
             bool onVisor = true;
             if (brickActive && e.Button == MouseButtons.Left && e.Y >= 15 && !m_bDraggingRx2Split)
                 onVisor = brickOverVisor(e);
-            brickClickWaterfall = brickInWaterfall(e.Y);
+            // click tuning (to the nearest station): everywhere in the waterfall, and in the spectrum anywhere except on the visor
+            // (the visor itself is dragged) and the top strip
+            brickClickWaterfall = brickInWaterfall(e.Y) || (brickActive && e.Button == MouseButtons.Left && e.Y >= 15 && !onVisor);
             ClickTuneMode savedCt = current_click_tune_mode;
             bool forceCt = brickActive && brickClickWaterfall && e.Button == MouseButtons.Left;
             if (forceCt) current_click_tune_mode = ClickTuneMode.VFOA; // click tuning is always on for the waterfall, without the white cross hair (Display keeps its own mode Off)

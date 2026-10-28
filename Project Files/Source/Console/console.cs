@@ -49414,8 +49414,8 @@ namespace BrickSDR
                                     // Brick-SDR: tune to the nearest real signal (peak) around the click
                                     int hrx = rx2_enabled && e.Y > Display.SplitY(pnlDisplay.Height) ? 2 : 1;
                                     float hzPerPx = Math.Abs(PixelToHz(e.X + 1, hrx) - PixelToHz(e.X, hrx));
-                                    int win = Math.Max(4, Math.Min(90, (int)(1500f / Math.Max(0.01f, hzPerPx))));
-                                    clickPx = Display.FindPeakPixel(hrx, e.X, win);
+                                    int win = Math.Max(4, Math.Min(150, (int)(2000f / Math.Max(0.01f, hzPerPx))));
+                                    clickPx = Display.FindStationPixel(hrx, e.X, win);
                                 }
                                 float x = PixelToHz(clickPx);
                                 double freq;

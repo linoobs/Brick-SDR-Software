@@ -3075,41 +3075,66 @@ namespace BrickSDR
         // which receiver the user is working with (1 / 2); set by the Brick-SDR console
         public static int BrickActiveRX = 1;
 
-        // nearest real signal (local maximum clearly above the noise) around pixel x, within win pixels; x itself when there is none
-        public static int FindPeakPixel(int rx, int x, int win)
+        // spectrum or its 3D view
+        private static void brickSpectrum(int nVerticalShift, int W, int H, int rx, bool bottom)
         {
-            float[] d = rx == 1 ? current_display_data : current_display_data_bottom;
-            int dec = Math.Max(1, m_nDecimation);
-            int n = displayTargetWidth / dec;
-            if (d == null || n < 16) return x;
-            int c = x / dec, w = Math.Max(2, win / dec);
-            int a2 = Math.Max(1, c - 4 * w), b2 = Math.Min(n - 2, c + 4 * w);
-            if (b2 - a2 < 8) return x;
-            // noise floor: the mean of the lower third of the surrounding bins
-            float[] tmp = new float[b2 - a2 + 1];
-            for (int i = a2; i <= b2; i++) tmp[i - a2] = (d[i - 1] + d[i] + d[i + 1]) / 3f;
-            float[] sorted = (float[])tmp.Clone();
-            Array.Sort(sorted);
-            int third = Math.Max(1, sorted.Length / 3);
-            float noise = 0; for (int i = 0; i < third; i++) noise += sorted[i];
-            noise /= third;
-            const float margin = 6f; // dB above the noise a signal must have
-            for (int dist = 0; dist <= w; dist++)
-            {
-                int best = -1; float bv = float.MinValue;
-                for (int s = -1; s <= 1; s += 2)
-                {
-                    int i = c + s * dist;
-                    if (i < a2 + 1 || i > b2 - 1) continue;
-                    float v = tmp[i - a2], l = tmp[i - 1 - a2], r = tmp[i + 1 - a2];
-                    if (v >= l && v >= r && v - noise >= margin && v > bv) { bv = v; best = i; }
-                    if (dist == 0) break;
-                }
-                if (best >= 0) return best * dec;
-            }
-            return x;
+            if (rx == 1 ? Use3DRX1 : Use3DRX2) Draw3DDX2D(nVerticalShift, W, H, rx);
+            else DrawPanadapterDX2D(nVerticalShift, W, H, rx, bottom);
         }
 
+        // slowly falling maximum of the spectrum: a station that talked in the last seconds is still found
+        private static readonly float[][] _brickHold = new float[3][];
+        private static void brickHold(int rx, float[] data, int n)
+        {
+            if (data == null || n <= 0 || n > data.Length) return;
+            float[] h = _brickHold[rx];
+            if (h == null || h.Length != n) { h = new float[n]; for (int i = 0; i < n; i++) h[i] = data[i]; _brickHold[rx] = h; return; }
+            for (int i = 0; i < n; i++) { float d = h[i] - 0.25f; h[i] = data[i] > d ? data[i] : d; }
+        }
+
+        // pixel to tune to for a click at x: the nearest real station within win pixels.
+        // LSB stations are tuned to the upper edge of their signal, USB to the lower edge, everything else to the strongest point.
+        public static int FindStationPixel(int rx, int x, int win)
+        {
+            float[] d = _brickHold[rx];
+            int dec = Math.Max(1, m_nDecimation);
+            if (d == null) return x;
+            int n = d.Length;
+            int c = x / dec, w = Math.Max(3, win / dec);
+            if (c < 2 || c > n - 3) return x;
+            int a2 = Math.Max(1, c - 5 * w), b2 = Math.Min(n - 2, c + 5 * w);
+            if (b2 - a2 < 10) return x;
+            float[] sm = new float[n];
+            for (int i = a2; i <= b2; i++) sm[i] = (d[i - 1] + d[i] + d[i + 1]) / 3f;
+            float[] sorted = new float[b2 - a2 + 1];
+            Array.Copy(sm, a2, sorted, 0, sorted.Length);
+            Array.Sort(sorted);
+            float noise = sorted[sorted.Length / 4];       // lower quartile = noise floor
+            float thr = noise + 8f;                          // a station is 8 dB or more above it
+
+            // nearest bin above the threshold
+            int hit = -1;
+            for (int dist = 0; dist <= w && hit < 0; dist++)
+            {
+                if (c + dist <= b2 && sm[c + dist] >= thr) hit = c + dist;
+                else if (c - dist >= a2 && sm[c - dist] >= thr) hit = c - dist;
+            }
+            if (hit < 0) return x;
+
+            // the whole signal around it (short dips allowed)
+            int gap = Math.Max(2, w / 8);
+            int lo = hit, hi = hit, miss = 0;
+            for (int i = hit - 1; i >= a2; i--) { if (sm[i] >= thr - 3f) { lo = i; miss = 0; } else if (++miss > gap) break; }
+            miss = 0;
+            for (int i = hit + 1; i <= b2; i++) { if (sm[i] >= thr - 3f) { hi = i; miss = 0; } else if (++miss > gap) break; }
+
+            DSPMode mode = rx == 1 ? rx1_dsp_mode : rx2_dsp_mode;
+            int px;
+            if (mode == DSPMode.LSB) px = hi;
+            else if (mode == DSPMode.USB) px = lo;
+            else { px = lo; for (int i = lo; i <= hi; i++) if (sm[i] > sm[px]) px = i; }
+            return px * dec + dec / 2;
+        }
         // ---- Brick-SDR: 3D view of a receiver. The last spectra are drawn one behind the other as ridges with a
         // blue - cyan - green - yellow - red fill, thin light edges, perspective towards the back.
         public static bool Use3DRX1 = false, Use3DRX2 = false;
@@ -3167,8 +3192,8 @@ namespace BrickSDR
             int cnt = _b3dCount[rx];
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
-            float yFront = nVerticalShift + H - 6, yBack = nVerticalShift + H * 0.30f;
-            float ampFront = H * 0.42f;
+            float yFront = nVerticalShift + H - 1, yBack = nVerticalShift + H * 0.24f;
+            float ampFront = H * 0.50f;
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
@@ -3221,6 +3246,7 @@ namespace BrickSDR
                     data_ready = false;
                 }
                 data = current_display_data;
+                brickHold(1, data, n);
             }
             else
             {
@@ -3234,6 +3260,7 @@ namespace BrickSDR
                     data_ready_bottom = false;
                 }
                 data = current_display_data_bottom;
+                brickHold(2, data, n);
             }
             if (data == null || n > data.Length) return;
             float range = Math.Max(10, grid_max - grid_min);
@@ -3281,6 +3308,13 @@ namespace BrickSDR
                 SharpDX.Direct2D1.Brush eb = getDXBrushForColour(Color.FromArgb(Math.Min(255, a), 170 + (int)(t * 85), 200 + (int)(t * 55), 255));
                 if (eb != null) _d2dRenderTarget.DrawGeometry(edge, eb, t > 0.97f ? 1.6f : 0.9f);
             }
+
+            // the receive filter on top of the ridges, so it is visible where the receiver listens
+            int fl, fr;
+            getFilterXPositions(rx, W, local_mox, isRxDuplex(rx), out fl, out fr);
+            if (fr <= fl) fr = fl + 1;
+            SharpDX.Direct2D1.Brush fb = getDXBrushForColour(Color.FromArgb(60, 255, 255, 255));
+            if (fb != null) _d2dRenderTarget.FillRectangle(new RectangleF(fl, nVerticalShift, fr - fl, H), fb);
         }
 
         public static float RX2SplitRatio
@@ -4306,14 +4340,13 @@ namespace BrickSDR
                     {
                         m_nRX1DisplayHeight = displayTargetHeight;
 
-                        if (Use3DRX1 && is3dCapable(current_display_mode)) Draw3DDX2D(0, displayTargetWidth, displayTargetHeight, 1);
-                        else switch (current_display_mode)
+                        switch (current_display_mode)
                         {
                             case DisplayMode.SPECTRUM:
                                 DrawSpectrumDX2D(1, displayTargetWidth, m_nRX1DisplayHeight, false);
                                 break;
                             case DisplayMode.PANADAPTER:
-                                DrawPanadapterDX2D(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
+                                brickSpectrum(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
                                 if (_showTCISpots) drawSpots(1, 0, displayTargetWidth, false);
                                 break;
                             case DisplayMode.SCOPE:
@@ -4340,7 +4373,7 @@ namespace BrickSDR
                                 {
                                     m_nRX1DisplayHeight = (int)(displayTargetHeight * m_fPanafallSplitPerc);
                                     split_display = PanafallSplitBarPos <= (displayTargetHeight / 2); // add more granularity, TODO change based on avaialble height
-                                    DrawPanadapterDX2D(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
+                                    brickSpectrum(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
                                     DrawWaterfallDX2D(PanafallSplitBarPos, displayTargetWidth, displayTargetHeight - m_nRX1DisplayHeight, 1, true);
                                     if (_showTCISpots) drawSpots(1, 0, displayTargetWidth, false);
                                     split_display = false;
@@ -4374,8 +4407,7 @@ namespace BrickSDR
                         int splitTop = SplitY(displayTargetHeight);
                         m_nRX1DisplayHeight = splitTop;
 
-                        if (Use3DRX1 && is3dCapable(current_display_mode)) Draw3DDX2D(0, displayTargetWidth, splitTop, 1);
-                        else switch (current_display_mode)
+                        switch (current_display_mode)
                         {
                             case DisplayMode.SPECTRUM:
                                 DrawSpectrumDX2D(1, displayTargetWidth, m_nRX1DisplayHeight, false);
@@ -4393,7 +4425,7 @@ namespace BrickSDR
                                 DrawPhase2DX2D(displayTargetWidth, m_nRX1DisplayHeight, false);
                                 break;
                             case DisplayMode.PANADAPTER:
-                                DrawPanadapterDX2D(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
+                                brickSpectrum(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
                                 if (_showTCISpots) drawSpots(1, 0, displayTargetWidth, false);
                                 break;
                             case DisplayMode.WATERFALL:
@@ -4405,7 +4437,7 @@ namespace BrickSDR
                                 break;
                             case DisplayMode.PANAFALL:
                                 m_nRX1DisplayHeight = (int)(splitTop * m_fPanafallSplitPerc);
-                                DrawPanadapterDX2D(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
+                                brickSpectrum(0, displayTargetWidth, m_nRX1DisplayHeight, 1, false);
                                 DrawWaterfallDX2D(m_nRX1DisplayHeight, displayTargetWidth, splitTop - m_nRX1DisplayHeight, 1, true);
                                 if (_showTCISpots) drawSpots(1, 0, displayTargetWidth, false);
                                 break;
@@ -4413,12 +4445,11 @@ namespace BrickSDR
 
                         m_nRX2DisplayHeight = displayTargetHeight - splitTop;
 
-                        if (Use3DRX2 && is3dCapable(current_display_mode_bottom)) Draw3DDX2D(splitTop, displayTargetWidth, displayTargetHeight - splitTop, 2);
-                        else switch (current_display_mode_bottom)
+                        switch (current_display_mode_bottom)
                         {
 
                             case DisplayMode.PANADAPTER:
-                                DrawPanadapterDX2D(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, true);
+                                brickSpectrum(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, true);
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
                             case DisplayMode.WATERFALL:
@@ -4427,7 +4458,7 @@ namespace BrickSDR
                                 break;
                             case DisplayMode.PANAFALL:
                                 m_nRX2DisplayHeight = (int)((displayTargetHeight - splitTop) * m_fPanafallSplitPercRX2);
-                                DrawPanadapterDX2D(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, false);
+                                brickSpectrum(splitTop, displayTargetWidth, m_nRX2DisplayHeight, 2, false);
                                 DrawWaterfallDX2D(splitTop + m_nRX2DisplayHeight, displayTargetWidth, (displayTargetHeight - splitTop) - m_nRX2DisplayHeight, 2, true);
                                 if (_showTCISpots) drawSpots(2, splitTop, displayTargetWidth, false);
                                 break;
@@ -5328,6 +5359,7 @@ namespace BrickSDR
                 }
 
                 data = current_display_data;
+                brickHold(1, data, nDecimatedWidth);
                 dataCopy = current_display_data_copy;
             }
             else// rx == 2
@@ -5377,6 +5409,7 @@ namespace BrickSDR
                 }
 
                 data = current_display_data_bottom;
+                brickHold(2, data, nDecimatedWidth);
                 dataCopy = current_display_data_bottom_copy;
             }
 

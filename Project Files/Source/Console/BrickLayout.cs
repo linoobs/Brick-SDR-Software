@@ -1979,6 +1979,14 @@ namespace BrickSDR
                     brickBar(g, bx, y1, bw, bh, pw / max);
                     brickBar(g, bx, y2, bw, bh, brickSwrFraction(brickSwrAvg), false, true);
                     brickPwrLabelRect = Rectangle.Empty;
+                    // marks on the SWR bar: yellow at 1.5, red at 2.0
+                    using (Pen pyel = new Pen(Color.FromArgb(255, 214, 60), 2f))
+                    using (Pen pred = new Pen(Color.FromArgb(235, 60, 50), 2f))
+                    {
+                        int mx1 = bx + (int)Math.Round(bw / 3.0), mx2 = bx + (int)Math.Round(bw * 2 / 3.0);
+                        g.DrawLine(pyel, mx1, y2 - 2, mx1, y2 + bh + 2);
+                        g.DrawLine(pred, mx2, y2 - 2, mx2, y2 + bh + 2);
+                    }
                     if (big)
                     {
                         int steps = 4;
@@ -1994,7 +2002,8 @@ namespace BrickSDR
                         {
                             SizeF sz2 = g.MeasureString(swrTicks[i], ft);
                             float lx2 = Math.Min(Math.Max(0, bx + bw * i / 3f - sz2.Width / 2), W - sz2.Width);
-                            g.DrawString(swrTicks[i], ft, bm, lx2, y2 - 14);
+                            Color tc = i == 1 ? Color.FromArgb(255, 214, 60) : (i >= 2 ? Color.FromArgb(235, 60, 50) : cMuted);
+                            using (Brush tb = new SolidBrush(tc)) g.DrawString(swrTicks[i], ft, tb, lx2, y2 - 14);
                         }
                         brickPwrLabelRect = new Rectangle(bx, y1 - 16, bw, 16);
                     }

@@ -24112,6 +24112,8 @@ namespace BrickSDR
                 Display.WDSPMOXTransitionBufferClear = _wdsp_mox_transition_buffer_clear;
             }
         }
+        private int brickDisplayErrors = 0;
+        private DateTime brickDisplayErrTime = DateTime.MinValue;
         unsafe private void RunDisplay()
         {            
             m_bDisplayLoopRunning = true;
@@ -24531,6 +24533,18 @@ namespace BrickSDR
             catch (Exception e)
             {
                 Common.LogException(e);
+                // Brick-SDR: a failed frame (e.g. buffers rebuilt while the window is resized) must not stop the display for good
+                if (m_bDisplayLoopRunning)
+                {
+                    if ((DateTime.Now - brickDisplayErrTime).TotalSeconds > 60) brickDisplayErrors = 0;
+                    brickDisplayErrTime = DateTime.Now;
+                    if (++brickDisplayErrors <= 30)
+                    {
+                        Thread.Sleep(100);
+                        RunDisplay();
+                        return;
+                    }
+                }
             }
 
             m_bDisplayLoopRunning = false;

@@ -1,4 +1,4 @@
-# Builds BrickSDR-Setup.exe (in the folder above) from Project Files\bin\x64\Release.
+# Builds BrickSDR-Setup_<version>.exe (in the folder above) from "Project Files/bin/x64/Release".
 # Run it after building the solution.
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $rel  = Join-Path $root 'Project Files\bin\x64\Release'
@@ -13,7 +13,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $work 'payload.zip'
 [System.IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$out = Join-Path $root 'BrickSDR-Setup.exe'
+$out = Join-Path $root ("BrickSDR-Setup_" + $ver + ".exe")
 $ico = Join-Path $root 'Project Files\Source\Console\Resources\Brick-SDR-icon.ico'
 $inst = Join-Path $root 'Installer'
 & $csc /nologo /target:winexe /optimize+ "/out:$out" "/win32icon:$ico" "/win32manifest:$inst\installer.manifest" `

@@ -73,10 +73,29 @@ namespace BrickSDR
         public void BrickAddLineColouring()
         {
             ComboBox cb = new ComboBox { Name = "brickLineMode", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(112, 111), Width = 156 };
-            cb.Items.AddRange(new object[] { "Line: standard", "Line: waterfall colours", "Line: noise std + signal WF" });
+            cb.Items.AddRange(new object[] { "Line: standard", "Line: waterfall colours", "Line: noise std + signal WF", "Line: noise fill colour + WF" });
             cb.SelectedIndex = console.BrickLineMode;
             cb.SelectedIndexChanged += (s, e) => console.BrickSetLineMode(cb.SelectedIndex);
             grpDisplayRefreshRates.Controls.Add(cb);
+
+            // colour of the spectrum fill, inside "Phase Mode" on the right (the same setting as Appearance - Display - Data Fill);
+            // a click on the swatch opens the colour dialog
+            Label fl = new Label { Name = "brickFillLabel", Text = "Fill", AutoSize = true, Location = new Point(132, 18) };
+            Button swatch = new Button { Name = "brickFillSwatch", Text = "", FlatStyle = FlatStyle.Flat, Location = new Point(158, 14), Size = new Size(32, 22), BackColor = Color.FromArgb(255, clrbtnDataFill.Color) };
+            swatch.FlatAppearance.BorderColor = Color.Gray;
+            swatch.Click += (s, e) =>
+            {
+                using (ColorDialog d = new ColorDialog { Color = clrbtnDataFill.Color, FullOpen = true })
+                {
+                    if (d.ShowDialog(this) != DialogResult.OK) return;
+                    clrbtnDataFill.Color = d.Color;           // saved with the other options
+                    Display.DataFillColor = Color.FromArgb(tbDataFillAlpha.Value, d.Color);
+                    swatch.BackColor = d.Color;
+                }
+            };
+            clrbtnDataFill.Changed += (s, e) => swatch.BackColor = Color.FromArgb(255, clrbtnDataFill.Color);
+            grpDisplayPhase.Controls.Add(fl); grpDisplayPhase.Controls.Add(swatch);
+            swatch.BringToFront();
         }
 
         private void addModeCombo(GroupBox host, ComboBox c)

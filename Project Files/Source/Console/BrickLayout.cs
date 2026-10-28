@@ -548,7 +548,7 @@ namespace BrickSDR
         private string BrickLineFile { get { return Path.Combine(AppDataPath, "line_colours.txt"); } }
         private int brickLineMode()
         {
-            try { int m; if (File.Exists(BrickLineFile) && int.TryParse(File.ReadAllText(BrickLineFile).Trim(), out m) && m >= 0 && m <= 2) return m; } catch { }
+            try { int m; if (File.Exists(BrickLineFile) && int.TryParse(File.ReadAllText(BrickLineFile).Trim(), out m) && m >= 0 && m <= 3) return m; } catch { }
             return 1;
         }
         public int BrickLineMode { get { return brickLineMode(); } }

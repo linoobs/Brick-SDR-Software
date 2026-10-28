@@ -3175,18 +3175,31 @@ namespace BrickSDR
             }
         }
 
-        // the 3D palette: deep blue at the foot, blue, cyan, green, yellow, orange, red at the top
-        private static SharpDX.Direct2D1.LinearGradientBrush b3dPaletteGradient(int rx)
+        // vertical gradient with the colours of the waterfall: a point of the contour has the colour its level has in the waterfall
+        private static SharpDX.Direct2D1.LinearGradientBrush b3dWaterfallGradient(int rx, int grid_min, int grid_max)
         {
-            if (_b3dLineGrad[rx] != null) return _b3dLineGrad[rx];
-            Func<float, float, float, float, GradientStop> st = (p, r, g, b) => new GradientStop { Position = p, Color = new SharpDX.Mathematics.Interop.RawColor4(r, g, b, 1f) };
-            GradientStop[] stops = new GradientStop[]
+            float lowT = rx == 1 ? waterfall_low_threshold : rx2_waterfall_low_threshold;
+            float highT = rx == 1 ? waterfall_high_threshold : rx2_waterfall_high_threshold;
+            if (_brickWfHigh[rx] != 0 || _brickWfLow[rx] != 0) { lowT = (float)Math.Round(_brickWfLow[rx]); highT = (float)Math.Round(_brickWfHigh[rx]); }
+            if (highT - lowT < 10) highT = lowT + 10;
+            Color low = rx == 1 ? waterfall_low_color : rx2_waterfall_low_color;
+            string key = grid_min + "|" + grid_max + "|" + lowT + "|" + highT + "|" + low.ToArgb();
+            if (_b3dLineGrad[rx] != null && _b3dGradKey[rx] == key) return _b3dLineGrad[rx];
+            if (_b3dLineGrad[rx] != null) { _b3dLineGrad[rx].Dispose(); _b3dLineGrad[rx] = null; }
+            const int steps = 24;
+            GradientStop[] stops = new GradientStop[steps];
+            for (int n = 0; n < steps; n++)
             {
-                st(0.00f, 0.05f, 0.12f, 0.45f), st(0.16f, 0.10f, 0.30f, 0.90f), st(0.32f, 0.00f, 0.55f, 1.00f), st(0.48f, 0.00f, 0.85f, 0.95f),
-                st(0.62f, 0.15f, 0.95f, 0.30f), st(0.78f, 1.00f, 0.92f, 0.10f), st(0.90f, 1.00f, 0.50f, 0.10f), st(1.00f, 1.00f, 0.12f, 0.12f)
-            };
+                float pos = n / (float)(steps - 1);
+                float dbm = grid_min + pos * (grid_max - grid_min);
+                Color c = waterfallEnhancedColour((dbm - lowT) / (highT - lowT), low);
+                // the darkest part of the palette would disappear on the dark background: keep a minimum brightness
+                int r = Math.Max((int)c.R, 30), gg = Math.Max((int)c.G, 50), b = Math.Max((int)c.B, 120);
+                stops[n] = new GradientStop { Position = pos, Color = new SharpDX.Mathematics.Interop.RawColor4(r / 255f, gg / 255f, b / 255f, 1f) };
+            }
             using (GradientStopCollection sc = new GradientStopCollection(_d2dRenderTarget, stops))
                 _b3dLineGrad[rx] = new SharpDX.Direct2D1.LinearGradientBrush(_d2dRenderTarget, new LinearGradientBrushProperties { StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 0), EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 1) }, sc);
+            _b3dGradKey[rx] = key;
             _b3dDirty[rx] = true;
             return _b3dLineGrad[rx];
         }
@@ -3246,7 +3259,7 @@ namespace BrickSDR
                 _b3dRTw[rx] = W; _b3dRTh[rx] = H;
                 _b3dDirty[rx] = true;
             }
-            SharpDX.Direct2D1.LinearGradientBrush grad = b3dPaletteGradient(rx);
+            SharpDX.Direct2D1.LinearGradientBrush grad = b3dWaterfallGradient(rx, grid_min, grid_max);
             if (!_b3dDirty[rx]) return;
 
             b3dBuild(rx, W, H);
@@ -3262,7 +3275,7 @@ namespace BrickSDR
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);
                 float yBase = _b3dBase[rx][k], amp = _b3dAmp[rx][k];
                 grad.StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, yBase);
-                grad.EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, yBase - amp * 0.6f);
+                grad.EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, yBase - amp);
                 if (baseFill != null) rt.FillGeometry(fill, baseFill);               // hides what is behind
                 grad.Opacity = 0.18f + 0.12f * t;                                     // faint glow in the waterfall colours
                 rt.FillGeometry(fill, grad);
@@ -8311,7 +8324,8 @@ namespace BrickSDR
             }
         }
         // the spectrum line takes its colour from the signal level, with the colours of the waterfall (enhanced palette)
-        // 0 = standard colour, 1 = waterfall colours, 2 = noise in the standard colour, signals in waterfall colours
+        // 0 = standard colour, 1 = waterfall colours, 2 = noise in the standard colour, signals in waterfall colours,
+        // 3 = noise in the colour of the spectrum fill, signals in waterfall colours
         private static int _lineColourMode = 0;
         private static bool _lineFollowsWaterfall = false;
         public static int LineColourMode
@@ -8375,10 +8389,10 @@ namespace BrickSDR
                     float dbm = grid_min + pos * (grid_max - grid_min);
                     float pw = (dbm - lowT) / (highT - lowT);
                     Color c = waterfallEnhancedColour(pw, waterfall_low_color);
-                    if (_lineColourMode == 2)
+                    if (_lineColourMode == 2 || _lineColourMode == 3)
                     {
-                        // below the cyan part of the palette the line keeps its normal colour, then it blends into the waterfall colours
-                        Color std = data_line_color;
+                        // below the cyan part of the palette the line keeps its normal colour (or the fill colour), then it blends into the waterfall colours
+                        Color std = _lineColourMode == 3 ? data_fill_color : data_line_color;
                         float k = (pw - 2f / 9) / (1f / 9);
                         k = Math.Max(0f, Math.Min(1f, k));
                         c = Color.FromArgb((int)(std.R + (c.R - std.R) * k), (int)(std.G + (c.G - std.G) * k), (int)(std.B + (c.B - std.B) * k));
@@ -8479,10 +8493,10 @@ namespace BrickSDR
                     float dbm = grid_min + pos * (grid_max - grid_min);
                     float pw = (dbm - lowT) / (highT - lowT);
                     Color c = waterfallEnhancedColour(pw, waterfall_low_color);
-                    if (_lineColourMode == 2)
+                    if (_lineColourMode == 2 || _lineColourMode == 3)
                     {
-                        // below the cyan part of the palette the line keeps its normal colour, then it blends into the waterfall colours
-                        Color std = data_line_color;
+                        // below the cyan part of the palette the line keeps its normal colour (or the fill colour), then it blends into the waterfall colours
+                        Color std = _lineColourMode == 3 ? data_fill_color : data_line_color;
                         float k = (pw - 2f / 9) / (1f / 9);
                         k = Math.Max(0f, Math.Min(1f, k));
                         c = Color.FromArgb((int)(std.R + (c.R - std.R) * k), (int)(std.G + (c.G - std.G) * k), (int)(std.B + (c.B - std.B) * k));

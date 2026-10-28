@@ -3074,6 +3074,156 @@ namespace BrickSDR
         private static float _rx2SplitRatio = 0.5f;
         // which receiver the user is working with (1 / 2); set by the Brick-SDR console
         public static int BrickActiveRX = 1;
+
+        // ---- Brick-SDR: 3D view of a receiver. The last spectra are drawn one behind the other as a perspective surface.
+        public static bool Use3DRX1 = false, Use3DRX2 = false;
+        private const int B3D_LAYERS = 28, B3D_POINTS = 150, B3D_INTERVAL_MS = 70;
+        private static readonly float[][][] _b3dHist = new float[3][][];
+        private static readonly int[] _b3dCount = new int[3];
+        private static readonly long[] _b3dLast = new long[3];
+
+        private static bool is3dCapable(DisplayMode m)
+        {
+            return m == DisplayMode.PANADAPTER || m == DisplayMode.PANAFALL || m == DisplayMode.WATERFALL;
+        }
+
+        // one vertical gradient brush per receiver (blue at the foot, cyan, yellow, red at the top), moved to every line
+        private static SharpDX.Direct2D1.Brush b3dGradient(int rx, float yFoot, float yTop, float opacity)
+        {
+            if (!_bDX2Setup) return null;
+            int key = unchecked((int)0x7B3D0000) + rx;
+            SharpDX.Direct2D1.Brush existing;
+            if (!_DX2Brushes.TryGetValue(key, out existing))
+            {
+                GradientStop[] stops = new GradientStop[]
+                {
+                    new GradientStop { Position = 0.0f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.10f, 0.30f, 0.75f, 1f) },
+                    new GradientStop { Position = 0.4f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.10f, 0.80f, 0.90f, 1f) },
+                    new GradientStop { Position = 0.7f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.95f, 0.90f, 0.25f, 1f) },
+                    new GradientStop { Position = 1.0f, Color = new SharpDX.Mathematics.Interop.RawColor4(0.95f, 0.25f, 0.15f, 1f) }
+                };
+                using (GradientStopCollection sc = new GradientStopCollection(_d2dRenderTarget, stops))
+                    existing = new SharpDX.Direct2D1.LinearGradientBrush(_d2dRenderTarget, new LinearGradientBrushProperties { StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 0), EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 1) }, sc);
+                _DX2Brushes.Add(key, existing);
+            }
+            SharpDX.Direct2D1.LinearGradientBrush gb = (SharpDX.Direct2D1.LinearGradientBrush)existing;
+            gb.StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, yFoot);
+            gb.EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, yTop);
+            gb.Opacity = opacity;
+            return gb;
+        }
+
+        private static Color b3dColour(float t)
+        {
+            // low = deep blue, then cyan, yellow, red at the top (steps, so the brush cache stays small)
+            t = Math.Max(0f, Math.Min(1f, t));
+            t = (float)Math.Round(t * 24f) / 24f;
+            if (t < 0.35f) { float u = t / 0.35f; return Color.FromArgb(255, (int)(20 + 10 * u), (int)(70 + 130 * u), (int)(170 + 50 * u)); }
+            if (t < 0.7f) { float u = (t - 0.35f) / 0.35f; return Color.FromArgb(255, (int)(30 + 210 * u), (int)(200 + 30 * u), (int)(220 - 160 * u)); }
+            float w = (t - 0.7f) / 0.3f;
+            return Color.FromArgb(255, 240, (int)(230 - 170 * w), (int)(60 - 20 * w));
+        }
+
+        unsafe private static void Draw3DDX2D(int nVerticalShift, int W, int H, int rx)
+        {
+            int n = W / m_nDecimation;
+            if (n < 8 || H < 40) return;
+            bool local_mox = localMox(rx);
+            float[] data;
+            int grid_max, grid_min;
+            if (rx == 1)
+            {
+                grid_max = local_mox ? tx_spectrum_grid_max : spectrum_grid_max;
+                grid_min = local_mox ? tx_spectrum_grid_min : spectrum_grid_min;
+                if (data_ready)
+                {
+                    fixed (void* rptr = &new_display_data[0])
+                    fixed (void* wptr = &current_display_data[0])
+                        Win32.memcpy(wptr, rptr, n * sizeof(float));
+                    data_ready = false;
+                }
+                data = current_display_data;
+            }
+            else
+            {
+                grid_max = local_mox ? tx_spectrum_grid_max : rx2_spectrum_grid_max;
+                grid_min = local_mox ? tx_spectrum_grid_min : rx2_spectrum_grid_min;
+                if (data_ready_bottom)
+                {
+                    fixed (void* rptr = &new_display_data_bottom[0])
+                    fixed (void* wptr = &current_display_data_bottom[0])
+                        Win32.memcpy(wptr, rptr, n * sizeof(float));
+                    data_ready_bottom = false;
+                }
+                data = current_display_data_bottom;
+            }
+            if (data == null || n > data.Length) return;
+            float range = Math.Max(10, grid_max - grid_min);
+            float offset = rx == 1 ? RX1Offset : RX2Offset;
+
+            // history: a new line about every 70 ms, the oldest one is reused
+            float[][] hist = _b3dHist[rx];
+            if (hist == null) { hist = new float[B3D_LAYERS][]; for (int i = 0; i < B3D_LAYERS; i++) hist[i] = new float[B3D_POINTS]; _b3dHist[rx] = hist; _b3dCount[rx] = 0; }
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (_b3dCount[rx] == 0 || (now - _b3dLast[rx]) * 1000 / System.Diagnostics.Stopwatch.Frequency >= B3D_INTERVAL_MS)
+            {
+                _b3dLast[rx] = now;
+                float[] line = hist[0];
+                for (int k = 0; k < B3D_LAYERS - 1; k++) hist[k] = hist[k + 1];
+                hist[B3D_LAYERS - 1] = line;
+                for (int p = 0; p < B3D_POINTS; p++)
+                {
+                    int a = p * n / B3D_POINTS, b = Math.Max(a + 1, (p + 1) * n / B3D_POINTS);
+                    float mx = float.MinValue;
+                    for (int i = a; i < b && i < n; i++) if (data[i] > mx) mx = data[i];
+                    line[p] = Math.Max(0f, Math.Min(1f, (mx + offset - grid_min) / range));
+                }
+                if (_b3dCount[rx] < B3D_LAYERS) _b3dCount[rx]++;
+            }
+
+            // back wall: the normal frequency grid
+            long le, re;
+            drawPanadapterAndWaterfallGridDX2D(nVerticalShift, W, H, rx, rx == 2, out le, out re, false);
+
+            int cnt = _b3dCount[rx];
+            float yFront = nVerticalShift + H - 8, yBack = nVerticalShift + H * 0.34f;
+            float ampFront = H * 0.34f;
+            for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
+            {
+                float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);        // 0 = back, 1 = front
+                float te = (float)Math.Pow(t, 1.45);
+                float yBase = yBack + (yFront - yBack) * te;
+                float scale = 0.5f + 0.5f * t;
+                float amp = ampFront * (0.4f + 0.6f * t);
+                float xl = W * 0.5f - W * 0.5f * scale;
+                float[] line = hist[k];
+                float peak = 0f;
+                using (PathGeometry geo = new PathGeometry(_d2dFactory))
+                {
+                    using (GeometrySink sink = geo.Open())
+                    {
+                        sink.BeginFigure(new SharpDX.Vector2(xl, yBase), FigureBegin.Filled);
+                        for (int p = 0; p < B3D_POINTS; p++)
+                        {
+                            float v = line[p];
+                            if (v > peak) peak = v;
+                            sink.AddLine(new SharpDX.Vector2(xl + W * scale * p / (B3D_POINTS - 1), yBase - v * amp));
+                        }
+                        sink.AddLine(new SharpDX.Vector2(xl + W * scale, yBase));
+                        sink.EndFigure(FigureEnd.Closed);
+                        sink.Close();
+                    }
+                    int shade = 10 + (int)Math.Round(t * 6) * 3;
+                    SharpDX.Direct2D1.Brush fill = getDXBrushForColour(Color.FromArgb(235, shade, shade + 6, shade + 20));
+                    SharpDX.Direct2D1.Brush edge = b3dGradient(rx, yBase, yBase - amp, 0.55f + 0.45f * t);
+                    if (fill != null && edge != null)
+                    {
+                        _d2dRenderTarget.FillGeometry(geo, fill);
+                        _d2dRenderTarget.DrawGeometry(geo, edge, t > 0.95f ? 1.8f : 1.1f);
+                    }
+                }
+            }
+        }
         public static float RX2SplitRatio
         {
             get { return _rx2SplitRatio; }
@@ -4097,7 +4247,8 @@ namespace BrickSDR
                     {
                         m_nRX1DisplayHeight = displayTargetHeight;
 
-                        switch (current_display_mode)
+                        if (Use3DRX1 && is3dCapable(current_display_mode)) Draw3DDX2D(0, displayTargetWidth, displayTargetHeight, 1);
+                        else switch (current_display_mode)
                         {
                             case DisplayMode.SPECTRUM:
                                 DrawSpectrumDX2D(1, displayTargetWidth, m_nRX1DisplayHeight, false);
@@ -4164,7 +4315,8 @@ namespace BrickSDR
                         int splitTop = SplitY(displayTargetHeight);
                         m_nRX1DisplayHeight = splitTop;
 
-                        switch (current_display_mode)
+                        if (Use3DRX1 && is3dCapable(current_display_mode)) Draw3DDX2D(0, displayTargetWidth, splitTop, 1);
+                        else switch (current_display_mode)
                         {
                             case DisplayMode.SPECTRUM:
                                 DrawSpectrumDX2D(1, displayTargetWidth, m_nRX1DisplayHeight, false);
@@ -4202,7 +4354,8 @@ namespace BrickSDR
 
                         m_nRX2DisplayHeight = displayTargetHeight - splitTop;
 
-                        switch (current_display_mode_bottom)
+                        if (Use3DRX2 && is3dCapable(current_display_mode_bottom)) Draw3DDX2D(splitTop, displayTargetWidth, displayTargetHeight - splitTop, 2);
+                        else switch (current_display_mode_bottom)
                         {
 
                             case DisplayMode.PANADAPTER:

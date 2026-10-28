@@ -206,7 +206,7 @@ namespace BrickSDR
             {
                 brickXSkip = new HashSet<Control> { cardMeter, boxA, boxB, cardVfoFunc, cardOptsA, cardOptsB, optsFunc, cardOptsRow3 };
             }
-            return brickXSkip.Contains(c) || (c.Parent != null && (c.Parent == cardMeter || c.Parent == boxA || c.Parent == boxB || c.Parent == cardOptsA || c.Parent == cardOptsB));
+            return brickXSkip.Contains(c) || (c.Parent != null && (c.Parent == cardOptsRow3 || c.Parent == cardMeter || c.Parent == boxA || c.Parent == boxB || c.Parent == cardOptsA || c.Parent == cardOptsB));
         }
 
         private void brickApplyScale()
@@ -514,7 +514,10 @@ namespace BrickSDR
             Put(radDisplayZoom2x, row3, 524, 3, 44, 22);
             Put(radDisplayZoom4x, row3, 571, 3, 44, 22);
             Put(btnDisplayZTB, row3, 618, 3, 44, 22);
-
+            chk3D1 = new CheckBox { Name = "brick3D1", Text = "3D", Appearance = Appearance.Button };
+            chk3D1.SetBounds(668, 3, 40, 22);
+            row3.Controls.Add(chk3D1);
+            chk3D1.CheckedChanged += (s, e) => { Display.Use3DRX1 = chk3D1.Checked; brickSave3D(); };
             // --- S-meters, the second one only while RX2 runs
             cardMeter = brickCard(pnlTop);
             cardMeter.SetBounds(1094, 6, 372, 154);
@@ -647,6 +650,10 @@ namespace BrickSDR
         }
 
         private Panel pnlRx2View;
+        private CheckBox chk3D1, chk3D2;
+        private string Brick3DFile { get { return Path.Combine(AppDataPath, "display3d.txt"); } }
+        private void brickSave3D() { try { File.WriteAllText(Brick3DFile, (chk3D1 != null && chk3D1.Checked ? "1" : "0") + (chk3D2 != null && chk3D2.Checked ? "1" : "0")); } catch { } }
+        private void brickLoad3D() { try { if (!File.Exists(Brick3DFile)) return; string t = File.ReadAllText(Brick3DFile).Trim(); if (t.Length >= 2) { chk3D1.Checked = t[0] == '1'; chk3D2.Checked = t[1] == '1'; } } catch { } }
         private readonly List<CheckBox> rx2ZoomButtons = new List<CheckBox>();
         private int rx2ZoomValue = -1;
 
@@ -726,9 +733,20 @@ namespace BrickSDR
                 for (int k = 0; k < 3; k++) { ra[k].SetBounds(k * (bw + 4), 3, bw, 24); rb[k].SetBounds(k * (bw + 4), 3, bw, 24); }
             }
             cardOptsRow3.SetBounds(x0, 132, cardMeter.Left - 8 - x0, 28);
-            int zs = 0;
-            lblDisplayZoom.Left = 252 + zs; ptbDisplayZoom.Left = 294 + zs;
-            radDisplayZoom05.Left = 430 + zs; radDisplayZoom1x.Left = 477 + zs; radDisplayZoom2x.Left = 524 + zs; radDisplayZoom4x.Left = 571 + zs; btnDisplayZTB.Left = 618 + zs;
+            {
+                // pan / zoom row: when the row is short the two sliders give room
+                int avail = cardOptsRow3.Width;
+                int panW = brickX(150), zoomW = brickX(130), deficit = Math.Max(0, brickX(712) - avail);
+                int cut = Math.Min((deficit + 1) / 2, panW - 60); panW -= cut; deficit -= cut;
+                cut = Math.Min(deficit, zoomW - 60); zoomW -= cut;
+                int xx = 0;
+                Action<Control, int> put = (c, wd) => { c.SetBounds(xx, c.Top, wd, c.Height); xx += wd; };
+                put(lblDisplayPan, brickX(30)); put(ptbDisplayPan, panW); xx += brickX(4); put(btnDisplayPanCenter, brickX(58)); xx += brickX(10);
+                put(lblDisplayZoom, brickX(42)); put(ptbDisplayZoom, zoomW); xx += brickX(6);
+                foreach (Control zc in new Control[] { radDisplayZoom05, radDisplayZoom1x, radDisplayZoom2x, radDisplayZoom4x, btnDisplayZTB }) { put(zc, brickX(44)); xx += brickX(3); }
+                xx += brickX(3);
+                put(chk3D1, brickX(40));
+            }
             bool two = chkRX2 != null && chkRX2.Checked && !_mox;
             picMultiMeterDigital.SetBounds(6, brickY(4), meterW - 12, brickY(two ? 74 : 128));
             picRX2Meter.SetBounds(6, brickY(80), meterW - 12, brickY(52));
@@ -1412,14 +1430,14 @@ namespace BrickSDR
             dispCard.Controls.Add(pnlRx2View);
             Label l2p = brickLabel(pnlRx2View, "RX2  Pan:", 9f, cText, false, 4, 6, 70, 18);
             PrettyTrackBar p2 = new PrettyTrackBar { Minimum = ptbDisplayPan.Minimum, Maximum = ptbDisplayPan.Maximum, Value = ptbDisplayPan.Value, HeadImage = ptbAF.HeadImage };
-            p2.SetBounds(76, 3, 200, 22);
+            p2.SetBounds(76, 3, 150, 22);
             pnlRx2View.Controls.Add(p2);
             Button c2 = new Button { Text = "Center" };
-            c2.SetBounds(282, 3, 62, 24);
+            c2.SetBounds(232, 3, 62, 24);
             pnlRx2View.Controls.Add(c2);
-            Label l2z = brickLabel(pnlRx2View, "Zoom:", 9f, cText, false, 356, 6, 48, 18);
+            Label l2z = brickLabel(pnlRx2View, "Zoom:", 9f, cText, false, 306, 6, 48, 18);
             PrettyTrackBar z2 = new PrettyTrackBar { Minimum = ptbDisplayZoom.Minimum, Maximum = ptbDisplayZoom.Maximum, Value = ptbDisplayZoom.Value, HeadImage = ptbAF.HeadImage };
-            z2.SetBounds(406, 3, 160, 22);
+            z2.SetBounds(356, 3, 130, 22);
             pnlRx2View.Controls.Add(z2);
             string[] zn = { "0.5x", "1x", "2x", "4x" };
             int[] zv = { 0, 0, 0, 0 };
@@ -1428,7 +1446,7 @@ namespace BrickSDR
             {
                 double factor = i == 0 ? 0.5 : (i == 1 ? 1.0 : (i == 2 ? 2.0 : 4.0));
                 CheckBox zb = new CheckBox { Text = zn[i], Appearance = Appearance.Button, AutoCheck = false };
-                zb.SetBounds(574 + i * 48, 3, 44, 24);
+                zb.SetBounds(494 + i * 48, 3, 44, 24);
                 // zoom factor = 1 / ((max + min - value) * 0.01)  ->  value = max + min - 100 / factor
                 int target = (int)Math.Round(z2.Maximum + z2.Minimum - 100.0 / factor);
                 zb.Click += (s, e) => { z2.Value = Math.Max(z2.Minimum, Math.Min(z2.Maximum, target)); applyRx2View(p2, z2); };
@@ -1436,6 +1454,11 @@ namespace BrickSDR
                 pnlRx2View.Controls.Add(zb);
                 rx2ZoomButtons.Add(zb);
             }
+            chk3D2 = new CheckBox { Name = "brick3D2", Text = "3D", Appearance = Appearance.Button };
+            chk3D2.SetBounds(690, 3, 40, 24);
+            pnlRx2View.Controls.Add(chk3D2);
+            chk3D2.CheckedChanged += (s, e) => { Display.Use3DRX2 = chk3D2.Checked; brickSave3D(); };
+            brickLoad3D();
             rx2ZoomValue = z2.Value;
             foreach (CheckBox zb3 in rx2ZoomButtons) zb3.Checked = (int)zb3.Tag == z2.Value;
             p2.Scroll += (s, e) => applyRx2View(p2, z2);
@@ -1662,9 +1685,20 @@ namespace BrickSDR
 
         #region live values
 
-        private string brickSwrText()
+        private bool brickTxAvgValid;
+        private double brickPwrAvg, brickSwrAvg = 1.0;
+
+        // SWR 1..2 takes two thirds of the bar, 2..3 the last third
+        private static double brickSwrFraction(double s)
         {
-            float s = alex_swr;
+            if (s < 1) s = 1;
+            if (s > 3) s = 3;
+            return s <= 2 ? (s - 1.0) * (2.0 / 3.0) : 2.0 / 3.0 + (s - 2.0) / 3.0;
+        }
+
+        private string brickSwrText(float avg = float.NaN)
+        {
+            float s = float.IsNaN(avg) ? alex_swr : avg;
             if (float.IsNaN(s) || float.IsInfinity(s) || s < 1.0f) return "1.0";
             if (s > 9.9f) s = 9.9f;
             return s.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
@@ -1819,7 +1853,7 @@ namespace BrickSDR
         }
 
         // rxScale: green up to S9, then yellow and red towards +60
-        private static void brickBar(Graphics g, int x, int y, int w, int h, double fraction, bool rxScale = false)
+        private static void brickBar(Graphics g, int x, int y, int w, int h, double fraction, bool rxScale = false, bool swrScale = false)
         {
             if (fraction < 0) fraction = 0;
             if (fraction > 1) fraction = 1;
@@ -1835,12 +1869,19 @@ namespace BrickSDR
             {
                 Color gr = Color.FromArgb(60, 200, 80), ye = Color.FromArgb(235, 210, 60), re = Color.FromArgb(230, 60, 50);
                 System.Drawing.Drawing2D.ColorBlend cb;
-                if (rxScale)
+                if (swrScale)
                 {
-                    // smooth: green at the left, yellow by S9, orange / red from S9+10 on
-                    cb = new System.Drawing.Drawing2D.ColorBlend(5);
-                    cb.Colors = new Color[] { gr, ye, ye, Color.FromArgb(245, 140, 40), re };
-                    cb.Positions = new float[] { 0f, 0.474f, 0.562f, 0.78f, 1f };
+                    // SWR 1 / 1.5 / 2 / 3 at equal distances: green, yellow, red from 2 on
+                    cb = new System.Drawing.Drawing2D.ColorBlend(4);
+                    cb.Colors = new Color[] { gr, ye, re, re };
+                    cb.Positions = new float[] { 0f, 1f / 3f, 2f / 3f, 1f };
+                }
+                else if (rxScale)
+                {
+                    // smooth: green at the left, yellow by S9, orange by S9+10, going red from S9+20
+                    cb = new System.Drawing.Drawing2D.ColorBlend(6);
+                    cb.Colors = new Color[] { gr, ye, Color.FromArgb(245, 150, 40), Color.FromArgb(238, 95, 45), re, re };
+                    cb.Positions = new float[] { 0f, 0.474f, 0.562f, 0.649f, 0.82f, 1f };
                 }
                 else
                 {
@@ -1885,6 +1926,15 @@ namespace BrickSDR
 
             bool tx = !rx2 && _mox;
             float pw = alex_fwd;
+            double swNow = alex_swr < 1 ? 1 : alex_swr;
+            if (!tx) brickTxAvgValid = false;
+            else
+            {
+                // averaged readings: the numbers and bars do not jump
+                if (!brickTxAvgValid) { brickPwrAvg = pw; brickSwrAvg = swNow; brickTxAvgValid = true; }
+                else { brickPwrAvg += (pw - brickPwrAvg) * 0.2; brickSwrAvg += (swNow - brickSwrAvg) * 0.2; }
+                pw = (float)brickPwrAvg;
+            }
             string pwText = Math.Round(pw).ToString("0") + " W";
 
             float fBig = big ? 28f : (rx2 ? 14f : 20f), fSmall = big ? 12f : (rx2 ? 8.5f : 10.5f), fTick = big ? 8f : (rx2 ? 6f : 7f);
@@ -1913,7 +1963,7 @@ namespace BrickSDR
                     SizeF sb = g.MeasureString(pwText, fb);
                     using (Brush yellow = new SolidBrush(Color.FromArgb(255, 214, 60)))
                     {
-                        string swrText = "SWR " + brickSwrText();
+                        string swrText = "SWR " + brickSwrText((float)brickSwrAvg);
                         SizeF ss = g.MeasureString(swrText, fb);
                         // fixed place: the text is as wide as the largest value (9.9), so it does not move
                         SizeF sm = g.MeasureString("SWR 9.9", fb);
@@ -1927,8 +1977,7 @@ namespace BrickSDR
                     g.DrawString("PWR", ft, bm, 2, y1 - 1);
                     g.DrawString("SWR", ft, bm, 2, y2 - 1);
                     brickBar(g, bx, y1, bw, bh, pw / max);
-                    double sw = alex_swr < 1 ? 1 : alex_swr;
-                    brickBar(g, bx, y2, bw, bh, (sw - 1.0) / 2.0);
+                    brickBar(g, bx, y2, bw, bh, brickSwrFraction(brickSwrAvg), false, true);
                     brickPwrLabelRect = Rectangle.Empty;
                     if (big)
                     {
@@ -1939,10 +1988,13 @@ namespace BrickSDR
                             SizeF sz = g.MeasureString(s1, ft);
                             float lx = Math.Min(Math.Max(0, bx + bw * i / (float)steps - sz.Width / 2), W - sz.Width);
                             g.DrawString(s1, ft, bm, lx, y1 - 14);
-                            string s2 = (1.0 + 2.0 * i / steps).ToString("0.0");
-                            SizeF sz2 = g.MeasureString(s2, ft);
-                            float lx2 = Math.Min(Math.Max(0, bx + bw * i / (float)steps - sz2.Width / 2), W - sz2.Width);
-                            g.DrawString(s2, ft, bm, lx2, y2 - 14);
+                        }
+                        string[] swrTicks = { "1.0", "1.5", "2.0", "3.0" };
+                        for (int i = 0; i < swrTicks.Length; i++)
+                        {
+                            SizeF sz2 = g.MeasureString(swrTicks[i], ft);
+                            float lx2 = Math.Min(Math.Max(0, bx + bw * i / 3f - sz2.Width / 2), W - sz2.Width);
+                            g.DrawString(swrTicks[i], ft, bm, lx2, y2 - 14);
                         }
                         brickPwrLabelRect = new Rectangle(bx, y1 - 16, bw, 16);
                     }

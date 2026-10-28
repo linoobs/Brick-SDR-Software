@@ -1276,7 +1276,7 @@ namespace BrickSDR
                 {
                     //log file has changed
                     MessageBox.Show("The ErrorLog.txt has been updated during this sesson.\n\n" +
-                    "Please email it to MW0LGE at : [mw0lge@grange-lane.co.uk].\n\n" +
+                    "Please send it to Lin00bs in the Brick SDR Telegram channel.\n\n" +
                     "It is located in this folder : [" + AppDataPath + "].",
                     "Error Log Change",
                     MessageBoxButtons.OK,
@@ -1637,7 +1637,7 @@ namespace BrickSDR
                 if (!string.IsNullOrEmpty(sFW))
                 {
                     if (BrickHardware.Name != "") sFW = " - " + BrickHardware.Name + " (" + sFW + ")";
-                    else sFW = " (" + sFW + ")";
+                    else sFW = " - " + HardwareSpecific.ModelString + " (" + sFW + ")"; // Brick-SDR: not a Brick board, show the radio model
                 }
             }
 
@@ -33458,7 +33458,8 @@ namespace BrickSDR
                 mode = RX2DSPMode;
             if (mode == DSPMode.FIRST || mode == DSPMode.LAST) return freq;
 
-            if (snap_to_click_tuning &&
+            bool brickWf = brickActive && brickClickWaterfall; // Brick-SDR: a click on the waterfall tunes to a multiple of 500 Hz
+            if ((snap_to_click_tuning || brickWf) &&
                 (current_click_tune_mode != ClickTuneMode.Off || click_tune_drag) &&
                 mode != DSPMode.CWL &&
                 mode != DSPMode.CWU &&
@@ -33469,7 +33470,7 @@ namespace BrickSDR
             {
                 // round freq to the nearest tuning step
                 long f = (long)(freq * 1000000.0);
-                int mult = CurrentTuneStepHz;
+                int mult = brickWf ? 500 : CurrentTuneStepHz;
                 if (f % mult > mult / 2) f += (mult - f % mult);
                 else f -= f % mult;
                 freq = (double)f * 0.0000010;
@@ -48996,6 +48997,7 @@ namespace BrickSDR
             bool onVisor = true;
             if (brickActive && e.Button == MouseButtons.Left && e.Y >= 15 && !m_bDraggingRx2Split)
                 onVisor = brickOverVisor(e);
+            brickClickWaterfall = brickInWaterfall(e.Y);
             pnlDisplay_MouseDownCore(sender, e);
             brickVisorDrag = brickActive && onVisor && e.Button == MouseButtons.Left && e.Y >= 15;
             if (brickActive && e.Button == MouseButtons.Left)
@@ -49008,6 +49010,18 @@ namespace BrickSDR
         }
 
         private bool brickVisorDrag = false;
+        private bool brickClickWaterfall = false;
+        // is y inside the waterfall part of the receiver under it?
+        private bool brickInWaterfall(int y)
+        {
+            int h = pnlDisplay.Height;
+            bool inRx2 = rx2_enabled && y > Display.SplitY(h);
+            DisplayMode dm = inRx2 ? Display.CurrentDisplayModeBottom : Display.CurrentDisplayMode;
+            if (dm == DisplayMode.WATERFALL) return true;
+            if (dm != DisplayMode.PANAFALL) return false;
+            if (!rx2_enabled) return y >= Display.PanafallSplitBarPos + 20;
+            return inRx2 ? y >= Display.PanafallBarYRX2 + 20 : y >= Display.PanafallBarYRX1 + 20;
+        }
         private int brickPanafallBarRx = 1, brickBarTmp;
         // spectrum / waterfall border of a receiver in PANAFALL mode (it can be dragged up and down)
         private bool brickOverPanafallBar(int y, out int rxn)

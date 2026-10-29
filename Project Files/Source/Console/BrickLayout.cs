@@ -1369,10 +1369,13 @@ namespace BrickSDR
             for (int i = 0; i < pairs.Length; i++)
             {
                 RadioButton ra = pairs[i][0], rb = pairs[i][1];
-                BrickModePair bp = new BrickModePair { NameA = names[i][0], NameB = names[i][1], Font = new Font("Segoe UI", 8.5f) };
+                bool digi = i == 3;
+                bool rx2Card = ra.Name.StartsWith("radRX2");
+                BrickModePair bp = new BrickModePair { NameA = digi ? "DIGI \u25BE" : names[i][0], NameB = digi ? null : names[i][1], Font = new Font("Segoe UI", 8.5f) };
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
-                bp.Pick = n => { if (n == 1) ra.Checked = true; else rb.Checked = true; };
+                bp.Pick = n => { if (digi) brickShowDigiMenu(bp, rx2Card); else if (n == 1) ra.Checked = true; else rb.Checked = true; };
+                if (digi) bp.GetState = () => (ra.Checked || rb.Checked) ? 1 : 0;
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
                 rb.CheckedChanged += (s, e) => bp.Invalidate();
                 parent.Controls.Add(bp);
@@ -1385,6 +1388,51 @@ namespace BrickSDR
                 }
             }
             Grid(parent, 8, y0 + 2 * (h + gap), w, 2, h, gap, dsb, fm, drm, spec);
+        }
+
+        // ---- DIGI: digital modes and presets in a drop-down (the way PAN works), styled like the menu bar
+        private static readonly Dictionary<Band, double[]> brickDigiFreq = new Dictionary<Band, double[]>
+        {
+            // band -> { FT8, FT4 } dial frequency in MHz
+            { Band.B160M, new[] { 1.840, 1.840 } }, { Band.B80M, new[] { 3.573, 3.575 } }, { Band.B60M, new[] { 5.357, 5.357 } },
+            { Band.B40M, new[] { 7.074, 7.0475 } }, { Band.B30M, new[] { 10.136, 10.140 } }, { Band.B20M, new[] { 14.074, 14.080 } },
+            { Band.B17M, new[] { 18.100, 18.104 } }, { Band.B15M, new[] { 21.074, 21.140 } }, { Band.B12M, new[] { 24.915, 24.919 } },
+            { Band.B10M, new[] { 28.074, 28.180 } }, { Band.B6M, new[] { 50.313, 50.318 } }
+        };
+
+        private void brickDigiSet(bool rx2, DSPMode mode, double? mhz)
+        {
+            if (rx2) { RX2DSPMode = mode; if (mhz.HasValue) VFOBFreq = mhz.Value; }
+            else { RX1DSPMode = mode; if (mhz.HasValue) VFOAFreq = mhz.Value; }
+        }
+
+        private void brickShowDigiMenu(Control anchor, bool rx2)
+        {
+            DSPMode cur = rx2 ? RX2DSPMode : RX1DSPMode;
+            Band band = rx2 ? RX2Band : RX1Band;
+            double freq = rx2 ? VFOBFreq : VFOAFreq;
+            ContextMenuStrip m = new ContextMenuStrip { Renderer = new BrickMenuRenderer(), Font = new Font("Segoe UI", 10f), ShowImageMargin = false, ShowCheckMargin = false, RightToLeft = RightToLeft.No, BackColor = cCard, ForeColor = cText };
+            Action<string, bool, Action, bool> add = (text, on, act, enabled) =>
+            {
+                ToolStripMenuItem it = new ToolStripMenuItem(text) { Enabled = enabled, ForeColor = cText, BackColor = cCard, CheckOnClick = false, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 3, 8, 3) };
+                if (on) it.Text = "\u25CF  " + text; else it.Text = "    " + text;
+                if (act != null) it.Click += (s, e) => act();
+                m.Items.Add(it);
+            };
+            double[] ft;
+            brickDigiFreq.TryGetValue(band, out ft);
+            add("DIGL", cur == DSPMode.DIGL, () => brickDigiSet(rx2, DSPMode.DIGL, null), true);
+            add("DIGU", cur == DSPMode.DIGU, () => brickDigiSet(rx2, DSPMode.DIGU, null), true);
+            m.Items.Add(new ToolStripSeparator());
+            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => brickDigiSet(rx2, DSPMode.DIGU, ft[0]), ft != null);
+            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => brickDigiSet(rx2, DSPMode.DIGU, ft[1]), ft != null);
+            add("FreeDV RADE", false, () => brickDigiSet(rx2, DSPMode.DIGU, null), false);
+            add("RTTY", false, () => brickDigiSet(rx2, DSPMode.DIGL, null), true);
+            add("CW", false, () => brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null), true);
+            m.Items.Add(new ToolStripSeparator());
+            add("DX", false, () => { try { System.Diagnostics.Process.Start("https://www.dxsummit.fi/"); } catch { } }, true);
+            add("POTA", false, () => { try { System.Diagnostics.Process.Start("https://pota.app/#/"); } catch { } }, true);
+            m.Show(anchor, new Point(0, anchor.Height));
         }
 
         private void brickPickRx2Band(string key)
@@ -1487,7 +1535,10 @@ namespace BrickSDR
         {
             menuStrip1.BackColor = cBg;
             menuStrip1.ForeColor = cText;
-            menuStrip1.Renderer = new ToolStripProfessionalRenderer(new BrickColorTable());
+            menuStrip1.Renderer = new BrickMenuRenderer();
+            statusStripMain.Renderer = new BrickMenuRenderer();
+            statusStripMain.BackColor = cCard; statusStripMain.ForeColor = cText;
+            foreach (ToolStripItem si in statusStripMain.Items) { si.ForeColor = cText; if (!(si is ToolStripSeparator)) si.BackColor = Color.Transparent; if (si is ToolStripDropDownItem) brickMenuColours(si); }
             menuStrip1.ForeColor = cText;
             foreach (ToolStripItem it0 in menuStrip1.Items) brickMenuColours(it0);
             foreach (ToolStripItem it in menuStrip1.Items) { it.ForeColor = cText; it.BackColor = cBg; }
@@ -1506,6 +1557,95 @@ namespace BrickSDR
                 dd.DropDown.BackColor = cCard; dd.DropDown.ForeColor = cText;
                 dd.DropDown.Font = new Font("Segoe UI", 10.5f);
                 foreach (ToolStripItem sub in dd.DropDownItems) brickMenuColours(sub);
+            }
+        }
+
+        // menu bar, drop-down menus and the status bar in the Brick-SDR style: flat dark, rounded hover with an accent line
+        private class BrickMenuRenderer : ToolStripProfessionalRenderer
+        {
+            public BrickMenuRenderer() : base(new BrickColorTable()) { RoundedEdges = false; }
+
+            protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+            {
+                bool status = e.ToolStrip is StatusStrip;
+                using (SolidBrush b = new SolidBrush(status || e.ToolStrip is ToolStripDropDown ? cCard : cBg)) e.Graphics.FillRectangle(b, e.AffectedBounds);
+            }
+
+            protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+            {
+                if (e.ToolStrip is StatusStrip)
+                {
+                    using (Pen p = new Pen(cLine)) e.Graphics.DrawLine(p, 0, 0, e.ToolStrip.Width, 0);
+                }
+                else if (e.ToolStrip is ToolStripDropDown)
+                {
+                    using (Pen p = new Pen(Color.FromArgb(70, 76, 98))) e.Graphics.DrawRectangle(p, 0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
+                }
+                else
+                {
+                    using (Pen p = new Pen(cLine)) e.Graphics.DrawLine(p, 0, e.ToolStrip.Height - 1, e.ToolStrip.Width, e.ToolStrip.Height - 1);
+                }
+            }
+
+            private void hover(Graphics g, Rectangle r, bool top, bool pressed)
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                Rectangle rr = new Rectangle(r.X + 2, r.Y + 2, r.Width - 5, r.Height - 5);
+                using (System.Drawing.Drawing2D.GraphicsPath gp = brickRoundPath(rr, 6))
+                {
+                    using (System.Drawing.Drawing2D.LinearGradientBrush lg = new System.Drawing.Drawing2D.LinearGradientBrush(rr, brickShade(cBtn, pressed ? 0.05 : 0.22), brickShade(cBtn, pressed ? -0.1 : -0.05), 90f))
+                        g.FillPath(lg, gp);
+                    using (Pen p = new Pen(Color.FromArgb(top ? 200 : 120, cAccent), 1f)) g.DrawPath(p, gp);
+                }
+                if (top) using (Pen u = new Pen(cAccent, 2f)) g.DrawLine(u, rr.Left + 8, rr.Bottom - 1, rr.Right - 8, rr.Bottom - 1);
+            }
+
+            protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+            {
+                ToolStripItem it = e.Item;
+                if (!it.Selected && !it.Pressed) return;
+                hover(e.Graphics, new Rectangle(Point.Empty, it.Size), !it.IsOnDropDown, it.Pressed);
+            }
+
+            protected override void OnRenderDropDownButtonBackground(ToolStripItemRenderEventArgs e)
+            {
+                if (!e.Item.Selected && !e.Item.Pressed) return;
+                hover(e.Graphics, new Rectangle(Point.Empty, e.Item.Size), false, e.Item.Pressed);
+            }
+
+            protected override void OnRenderButtonBackground(ToolStripItemRenderEventArgs e)
+            {
+                if (!e.Item.Selected && !e.Item.Pressed) return;
+                hover(e.Graphics, new Rectangle(Point.Empty, e.Item.Size), false, e.Item.Pressed);
+            }
+
+            protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+            {
+                e.TextColor = !e.Item.Enabled ? cMuted : ((e.Item.Selected || e.Item.Pressed) ? Color.White : cText);
+                base.OnRenderItemText(e);
+            }
+
+            protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+            {
+                e.ArrowColor = e.Item.Selected ? cAccent : cMuted;
+                base.OnRenderArrow(e);
+            }
+
+            protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+            {
+                using (Pen p = new Pen(cLine))
+                {
+                    if (e.Vertical) e.Graphics.DrawLine(p, e.Item.Width / 2, 4, e.Item.Width / 2, e.Item.Height - 4);
+                    else e.Graphics.DrawLine(p, 8, e.Item.Height / 2, e.Item.Width - 8, e.Item.Height / 2);
+                }
+            }
+
+            protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+            {
+                Rectangle r = new Rectangle(e.ImageRectangle.X - 1, e.ImageRectangle.Y - 1, e.ImageRectangle.Width + 2, e.ImageRectangle.Height + 2);
+                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(70, cAccent))) e.Graphics.FillRectangle(b, r);
+                using (Pen p = new Pen(cAccent, 2f)) { e.Graphics.DrawLine(p, r.Left + 3, r.Top + r.Height / 2, r.Left + r.Width / 2 - 1, r.Bottom - 4); e.Graphics.DrawLine(p, r.Left + r.Width / 2 - 1, r.Bottom - 4, r.Right - 3, r.Top + 4); }
             }
         }
 

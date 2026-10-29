@@ -6719,7 +6719,7 @@
     <MicGain>5</MicGain>
     <FMMicGain>10</FMMicGain>
     <MicMute>true</MicMute>
-    <Lev_On>false</Lev_On>
+    <Lev_On>true</Lev_On>
     <Lev_MaxGain>15</Lev_MaxGain>
     <Lev_Decay>100</Lev_Decay>
     <ALC_MaximumGain>3</ALC_MaximumGain>
@@ -6920,7 +6920,7 @@
     <MicGain>5</MicGain>
     <FMMicGain>10</FMMicGain>
     <MicMute>true</MicMute>
-    <Lev_On>false</Lev_On>
+    <Lev_On>true</Lev_On>
     <Lev_MaxGain>15</Lev_MaxGain>
     <Lev_Decay>100</Lev_Decay>
     <ALC_MaximumGain>3</ALC_MaximumGain>
@@ -8324,7 +8324,7 @@
     <MicGain>10</MicGain>
     <FMMicGain>10</FMMicGain>
     <MicMute>true</MicMute>
-    <Lev_On>false</Lev_On>
+    <Lev_On>true</Lev_On>
     <Lev_MaxGain>15</Lev_MaxGain>
     <Lev_Decay>100</Lev_Decay>
     <ALC_MaximumGain>3</ALC_MaximumGain>

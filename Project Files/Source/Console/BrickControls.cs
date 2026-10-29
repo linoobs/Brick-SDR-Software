@@ -44,6 +44,12 @@ namespace BrickSDR
                         g.FillPath(lg, gp);
                     using (Pen pen = new Pen(st > 0 ? brickShade(cAccent, -0.35) : Color.FromArgb(70, 76, 98), 1f)) g.DrawPath(pen, gp);
                 }
+                if (string.IsNullOrEmpty(NameB))
+                {
+                    using (Font f1 = new Font(Font.FontFamily, Font.Size, st > 0 ? FontStyle.Bold : FontStyle.Regular))
+                        TextRenderer.DrawText(g, NameA, f1, new Rectangle(0, 0, Width, Height - 1), st > 0 ? Color.FromArgb(20, 20, 24) : cText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                    return;
+                }
                 string sep = string.IsNullOrEmpty(Extra) ? "  /  " : " / ";
                 Color on = Color.FromArgb(20, 20, 24), off = st > 0 ? Color.FromArgb(120, 70, 20) : cText;
                 Color ca = st == 1 ? on : (st == 2 ? off : cText), cb = st == 2 ? on : (st == 1 ? off : cText);

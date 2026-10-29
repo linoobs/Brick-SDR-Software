@@ -24,6 +24,7 @@ namespace BrickSDR
         private Form _digiHost;                         // the terminal's own window while it is popped out
         private Panel _pnlDigi;                         // under the panadapter: where a terminal (or the FreeDV strip) docks
         private bool _digiPopped;
+        private string _digiOpenKey = "";               // what was open under the panadapter ("RTTY", "CW", "RADE"), reopened at the next start
         private int _digiDockHeight = 250;
         private string _digiMode = "";                  // "RTTY" or "CW" while a terminal is open
 
@@ -49,8 +50,11 @@ namespace BrickSDR
 
         private string DigiFile { get { return Path.Combine(AppDataPath, "digital.txt"); } }
 
+        private bool _digiLoaded;
+
         private void digiLoadSettings()
         {
+            _digiLoaded = true;
             try
             {
                 if (!File.Exists(DigiFile)) return;
@@ -73,6 +77,7 @@ namespace BrickSDR
                         case "rlevel": if (num) _rttyLevel = (int)Math.Max(-40, Math.Min(0, d)); break;
                         case "csql": if (num) _cwSql = (int)Math.Max(0, Math.Min(100, d)); break;
                         case "pop": _digiPopped = v == "1"; break;
+                        case "open": _digiOpenKey = v.Trim(); break;
                     }
                 }
             }
@@ -81,13 +86,14 @@ namespace BrickSDR
 
         private void digiSaveSettings()
         {
+            if (!_digiLoaded) digiLoadSettings();
             try
             {
                 File.WriteAllLines(DigiFile, new[]
                 {
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
-                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0)
+                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey
                 });
             }
             catch { }
@@ -118,10 +124,23 @@ namespace BrickSDR
                     if (_cwEcho.TryDequeue(out c)) _digiOut.Enqueue(new KeyValuePair<char, bool>(c, true));
                 };
             }
+            _digiOpenKey = mode; digiSaveSettings();
             _digiPane.SetMode(mode);
             brickDockRelease("digi");        // the FreeDV strip (one thing under the panadapter at a time)
             digiPlace();
             digiStartEngine();
+        }
+
+        // at the start: the terminal or strip that was open when the program was closed is back
+        private void brickDigitalRestore()
+        {
+            try
+            {
+                digiLoadSettings();
+                if (_digiOpenKey == "RTTY" || _digiOpenKey == "CW") brickDigitalOpen(_digiOpenKey);
+                else if (_digiOpenKey == "RADE") brickRadeOpen();
+            }
+            catch { }
         }
 
         private void digiStop()
@@ -177,6 +196,7 @@ namespace BrickSDR
 
         internal void digiClose()
         {
+            _digiOpenKey = ""; digiSaveSettings();
             if (_digiPane != null) _digiPane.Visible = false;
             if (_digiHost != null) _digiHost.Hide();
             brickDockHide("digi");
@@ -270,6 +290,7 @@ namespace BrickSDR
                         else if (mode == "CW")
                         {
                             _cwDecoder = new CwDecoder(rate);
+                            if (File.Exists(Path.Combine(AppDataPath, "cw_debug.flag"))) { CwDecoder dd = _cwDecoder; dd.Decoded += ch => { try { File.AppendAllText(Path.Combine(AppDataPath, "cw_debug.txt"), ch + "(" + dd.TonePitch.ToString("0") + "/" + dd.Wpm.ToString("0") + ") "); } catch { } }; }   // TEMPCWDBG
                             _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
                         }
                     }
@@ -428,296 +449,6 @@ namespace BrickSDR
                 bool sending = CwSending;
                 if (_cwWasSending && !sending) f.Append('\n', true);
                 _cwWasSending = sending;
-            }
-        }
-
-        // ---- the terminal window ----
-
-        internal sealed class BrickDigiPane : Panel
-        {
-            private readonly Console c;
-            private readonly RichTextBox rx;
-            private readonly TextBox type, my, their;
-            private readonly Label status, title;
-            private string hintText = "";
-            private readonly Panel settings;
-            private readonly Button bRx1, bRx2, bTx, bEnd, bAbort, bClear, bPop, bClose;
-            private readonly List<Button> macroButtons = new List<Button>();
-            private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 80 };
-            private readonly MeterBar meter = new MeterBar();
-            private string mode = "";
-            private bool lastSent;
-            private int lines;
-
-            // RTTY settings
-            private ComboBox shift, baud;
-            private CheckBox rev, afc;
-            private NumericUpDown rsql, rlevel;
-            // CW settings
-            private NumericUpDown csql, wpm;
-            private Label lblShift, lblBaud, lblSql, lblLevel, lblWpm;
-
-            private static readonly string[][] Macros =
-            {
-                new[] { "CQ", "CQ CQ CQ DE {MY} {MY} {MY} PSE K\r\n" },
-                new[] { "Answer", "{CALL} DE {MY} {MY} KN\r\n" },
-                new[] { "Report", "{CALL} DE {MY} UR RST 599 599 NAME OP QTH HR = HW? {CALL} DE {MY} KN\r\n" },
-                new[] { "73", "{CALL} DE {MY} TNX FER QSO 73 SK\r\n" },
-            };
-
-            public BrickDigiPane(Console console)
-            {
-                c = console;
-                BackColor = cBg;
-                ForeColor = cText;
-                Font = new Font("Segoe UI", 9f);
-                Size = new Size(760, 250);
-
-                title = new Label { AutoSize = false, Left = 8, Top = 6, Width = 54, Height = 26, Font = new Font("Segoe UI Semibold", 12f), ForeColor = cAccent, TextAlign = ContentAlignment.MiddleLeft };
-                bRx1 = mk("RX1", 218, 8, 54, 26, () => { c._digiRx = 0; c.digiSaveSettings(); sync(); });
-                bRx2 = mk("RX2", 276, 8, 54, 26, () => { c._digiRx = 1; c.digiSaveSettings(); sync(); });
-                my = field(354, 9, 90); their = field(500, 9, 90);
-                Label lm = lbl("My call", 354 - 0, -1), lt = lbl("Their call", 500, -1);
-                my.Text = c._digiMyCall;
-                my.TextChanged += (s, e) => { c._digiMyCall = my.Text.Trim().ToUpperInvariant(); c.digiSaveSettings(); };
-                my.CharacterCasing = CharacterCasing.Upper; their.CharacterCasing = CharacterCasing.Upper;
-                bClear = mk("Clear", 0, 8, 60, 26, () => { rx.Clear(); lines = 0; });
-                bPop = mk("Pop out", 0, 6, 70, 26, () => c.digiTogglePop());
-                bClose = mk("Close", 0, 6, 60, 26, () => c.digiClose());
-
-                settings = new Panel { Left = 12, Top = 40, Height = 30, BackColor = cBg };
-                shift = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 62, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText };
-                shift.Items.AddRange(new object[] { "170", "200", "425", "850" });
-                baud = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 62, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText };
-                baud.Items.AddRange(new object[] { "45.45", "50", "75", "100" });
-                rev = new CheckBox { Text = "Reverse", AutoSize = true, ForeColor = cText };
-                afc = new CheckBox { Text = "AFC", AutoSize = true, ForeColor = cText };
-                rsql = nud(0, 60, 5, c._rttySql); rlevel = nud(-40, 0, 1, c._rttyLevel);
-                csql = nud(0, 100, 5, c._cwSql); wpm = nud(5, 60, 1, 20);
-                lblShift = lbl("Shift", 0, 0); lblBaud = lbl("Baud", 0, 0); lblSql = lbl("SQL", 0, 0); lblLevel = lbl("TX dB", 0, 0); lblWpm = lbl("TX WPM", 0, 0);
-                shift.Text = c._rttyShift.ToString("0", CultureInfo.InvariantCulture);
-                baud.Text = c._rttyBaud.ToString("0.##", CultureInfo.InvariantCulture);
-                rev.Checked = c._rttyReverse; afc.Checked = c._rttyAfc;
-                shift.SelectedIndexChanged += (s, e) => { c._rttyShift = double.Parse((string)shift.SelectedItem, CultureInfo.InvariantCulture); c.digiSaveSettings(); };
-                baud.SelectedIndexChanged += (s, e) => { c._rttyBaud = double.Parse((string)baud.SelectedItem, CultureInfo.InvariantCulture); c.digiSaveSettings(); };
-                rev.CheckedChanged += (s, e) => { c._rttyReverse = rev.Checked; c.digiSaveSettings(); };
-                afc.CheckedChanged += (s, e) => { c._rttyAfc = afc.Checked; c.digiSaveSettings(); };
-                rsql.ValueChanged += (s, e) => { c._rttySql = (int)rsql.Value; c.digiSaveSettings(); };
-                rlevel.ValueChanged += (s, e) => { c._rttyLevel = (int)rlevel.Value; c.digiSaveSettings(); };
-                csql.ValueChanged += (s, e) => { c._cwSql = (int)csql.Value; c.digiSaveSettings(); };
-                wpm.ValueChanged += (s, e) => { try { if (c.CWXForm.WPM != (int)wpm.Value) c.CWXForm.WPM = (int)wpm.Value; } catch { } };
-
-                rx = new RichTextBox
-                {
-                    ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = cField, ForeColor = cText, DetectUrls = false,
-                    Font = new Font("Consolas", 12f), ScrollBars = RichTextBoxScrollBars.Vertical, HideSelection = false, TabStop = false
-                };
-                meter.Height = 5;
-                status = new Label { AutoSize = false, Height = 22, ForeColor = cMuted, TextAlign = ContentAlignment.MiddleRight };
-                type = new TextBox { BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 12f), CharacterCasing = CharacterCasing.Upper };
-                type.KeyPress += typeKey;
-                bTx = mk("TX", 0, 0, 70, 28, () => { if (mode == "RTTY") c.RttySend("", false); });
-                bEnd = mk("RX", 0, 0, 70, 28, () => { if (mode == "RTTY") c.RttyReceive(); else c.CwStopQueueSafe(); });
-                bAbort = mk("ABORT", 0, 0, 80, 28, () => { if (mode == "RTTY") c.RttyAbort(); else c.CwAbort(); });
-                bAbort.FlatAppearance.BorderColor = cTx;
-                foreach (string[] m in Macros)
-                {
-                    string text = m[1];
-                    macroButtons.Add(mk(m[0], 0, 0, 80, 28, () => macro(text)));
-                }
-
-                Controls.AddRange(new Control[] { title, bRx1, bRx2, lm, lt, my, their, bClear, bPop, bClose, settings, rx, meter, status, type, bTx, bEnd, bAbort });
-                foreach (Button b in macroButtons) Controls.Add(b);
-                settings.Controls.AddRange(new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
-                Resize += (s, e) => layout();
-                timer.Tick += (s, e) => tick();
-                VisibleChanged += (s, e) => { if (Visible) { layout(); timer.Start(); } else timer.Stop(); };
-                layout();
-            }
-
-            private Label lbl(string t, int x, int y)
-            {
-                Label l = new Label { Text = t, AutoSize = true, ForeColor = cMuted, Left = x, Top = y < 0 ? -1 : y };
-                if (y == -1) { l.Top = 0; l.Left = x; l.Tag = "hdr"; }
-                return l;
-            }
-
-            private TextBox field(int x, int y, int w)
-            {
-                return new TextBox { Left = x, Top = y + 0, Width = w, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
-            }
-
-            private NumericUpDown nud(int min, int max, int inc, int v)
-            {
-                return new NumericUpDown { Minimum = min, Maximum = max, Increment = inc, Value = Math.Max(min, Math.Min(max, v)), Width = 56, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
-            }
-
-            private Button mk(string text, int x, int y, int w, int h, Action act)
-            {
-                Button b = new Button
-                {
-                    Text = text, Left = x, Top = y, Width = w, Height = h, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText,
-                    UseVisualStyleBackColor = false, TabStop = false, Cursor = Cursors.Hand
-                };
-                b.FlatAppearance.BorderColor = cLine;
-                b.FlatAppearance.MouseOverBackColor = cBtnHover;
-                b.Click += (s, e) => { act(); type.Focus(); };
-                return b;
-            }
-
-            public void SetPopped(bool popped) { bPop.Text = popped ? "Dock" : "Pop out"; }
-
-            public void SetMode(string m)
-            {
-                mode = m;
-                title.Text = m == "RTTY" ? "RTTY" : "CW";
-                bool r = m == "RTTY";
-                foreach (Control k in new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblLevel, rlevel }) k.Visible = r;
-                foreach (Control k in new Control[] { lblWpm, wpm }) k.Visible = !r;
-                csql.Visible = !r; rsql.Visible = r; lblSql.Visible = true;
-                bTx.Visible = r;
-                bEnd.Text = r ? "RX" : "STOP";
-                if (!r) { try { wpm.Value = Math.Max(wpm.Minimum, Math.Min(wpm.Maximum, c.CWXForm.WPM)); } catch { } }
-                int si = shift.Items.IndexOf(c._rttyShift.ToString("0", CultureInfo.InvariantCulture)); if (si >= 0) shift.SelectedIndex = si;
-                int bi = baud.Items.IndexOf(c._rttyBaud.ToString("0.##", CultureInfo.InvariantCulture)); if (bi >= 0) baud.SelectedIndex = bi;
-                layoutSettings();
-                sync();
-            }
-
-            private void sync()
-            {
-                foreach (Button b in new[] { bRx1, bRx2 })
-                {
-                    bool on = (b == bRx1) == (c._digiRx == 0);
-                    b.BackColor = on ? cAccent : cBtn; b.ForeColor = on ? Color.FromArgb(20, 20, 24) : cText;
-                }
-            }
-
-            private void layoutSettings()
-            {
-                int x = 0;
-                Action<Control, int> put = (ctl, gap) => { if (!ctl.Visible) return; ctl.Left = x; ctl.Top = ctl.Height < 24 ? 5 : 3; x += ctl.Width + gap; };
-                // size labels first
-                foreach (Control k in settings.Controls) if (k is Label) { k.Top = 5; }
-                if (mode == "RTTY")
-                {
-                    put(lblShift, 4); put(shift, 14); put(lblBaud, 4); put(baud, 14); put(rev, 14); put(afc, 14); put(lblSql, 4); put(rsql, 14); put(lblLevel, 4); put(rlevel, 4);
-                }
-                else
-                {
-                    put(lblSql, 4); put(csql, 14); put(lblWpm, 4); put(wpm, 4);
-                }
-            }
-
-            private void layout()
-            {
-                int w = Width, h = Height;
-                if (w < 100 || h < 100) return;
-                // row 1: title, receiver, call signs; window buttons at the right
-                bClose.Left = w - 8 - bClose.Width; bPop.Left = bClose.Left - 6 - bPop.Width; bClear.Left = bPop.Left - 6 - bClear.Width;
-                bRx1.SetBounds(66, 6, 48, 26); bRx2.SetBounds(118, 6, 48, 26);
-                foreach (Control k in Controls)
-                {
-                    Label l = k as Label;
-                    if (l != null && (string)l.Tag == "hdr") { l.Top = 11; l.Left = l.Text == "My call" ? 180 : 340; }
-                }
-                my.SetBounds(232, 8, 96, 22); their.SetBounds(404, 8, 96, 22);
-                // row 2: settings at the left, the decoder's readings at the right
-                int sw = Math.Min(w - 16, 520);
-                settings.SetBounds(8, 34, sw, 30);
-                layoutSettings();
-                status.SetBounds(settings.Right + 6, 38, Math.Max(40, w - 8 - settings.Right - 6), 22);
-                // bottom row: macros, the type-ahead line, TX / RX / ABORT
-                int rowY = h - 34;
-                int bx = 8;
-                foreach (Button b in macroButtons) { b.Width = 64; b.Height = 28; b.Left = bx; b.Top = rowY; bx += b.Width + 6; }
-                bAbort.Left = w - 8 - bAbort.Width; bAbort.Top = rowY;
-                bEnd.Left = bAbort.Left - 6 - bEnd.Width; bEnd.Top = rowY;
-                bTx.Left = bEnd.Left - 6 - bTx.Width; bTx.Top = rowY;
-                int endX = bTx.Visible ? bTx.Left : bEnd.Left;
-                type.Left = bx + 6; type.Top = rowY + 1; type.Width = Math.Max(60, endX - 6 - type.Left); type.Height = 26;
-                // text between, with the level strip under it
-                rx.SetBounds(8, 68, w - 16, Math.Max(30, rowY - 6 - 68 - 8));
-                meter.SetBounds(8, rx.Bottom + 1, w - 16, 5);
-            }
-
-            public void Append(char ch, bool sent)
-            {
-                if (ch == '\r') return;
-                if (rx.TextLength > 60000) { rx.Select(0, 20000); rx.SelectedText = ""; }
-                if (sent != lastSent && ch != '\n')
-                {
-                    if (rx.TextLength > 0 && !rx.Text.EndsWith("\n")) rx.AppendText("\n");
-                    lastSent = sent;
-                }
-                if (ch == '\n' && rx.TextLength > 0 && rx.Text.EndsWith("\n")) return;
-                rx.SelectionStart = rx.TextLength;
-                rx.SelectionLength = 0;
-                rx.SelectionColor = sent ? cAccent : cText;
-                rx.AppendText(ch.ToString());
-            }
-
-            private void macro(string text)
-            {
-                string t = text.Replace("{MY}", c._digiMyCall).Replace("{CALL}", their.Text.Trim().ToUpperInvariant());
-                if (c._digiMyCall.Length == 0) { status.Text = "Enter your call sign first"; return; }
-                if (mode == "RTTY") c.RttySend(t.Replace("\r\n", "\r\n"), true);
-                else c.CwSend(t.Replace("\r\n", " "));
-            }
-
-            private void typeKey(object s, KeyPressEventArgs e)
-            {
-                if (e.KeyChar == (char)Keys.Enter)
-                {
-                    e.Handled = true;
-                    string t = type.Text;
-                    type.Clear();
-                    if (mode == "RTTY")
-                    {
-                        if (c.RttyTransmitting) { foreach (char ch in "\r\n") c.RttyType(ch); }
-                        else if (t.Length > 0) c.RttySend(t + "\r\n", false);
-                    }
-                    else if (t.Length > 0) c.CwSend(t);
-                    return;
-                }
-                // while RTTY is on the air, characters go out as they are typed
-                if (mode == "RTTY" && c.RttyTransmitting && e.KeyChar >= ' ')
-                {
-                    e.Handled = true;
-                    c.RttyType(char.ToUpperInvariant(e.KeyChar));
-                }
-            }
-
-            private void tick()
-            {
-                c.DigiUiTick(this);
-                string problem = mode == "RTTY" ? c.RttyStartProblem : c.CwStartProblem;
-                bool ok = mode == "RTTY" ? c.RttyModeOk : c.CwModeOk;
-                if (mode == "RTTY")
-                {
-                    RttyDemod d = c._rttyDemod;
-                    if (d != null)
-                    {
-                        meter.Value = d.Quality;
-                        status.Text = string.Format(CultureInfo.InvariantCulture, "Quality {0:0}%   centre {1:0} Hz", d.Quality * 100, d.Center);
-                    }
-                    hintText = c.RttyTransmitting ? "TRANSMITTING" : (ok ? "" : "Use DIGL / LSB");
-                    status.ForeColor = c.RttyTransmitting ? cTx : cMuted;
-                    bTx.BackColor = c.RttyTransmitting ? cTx : cBtn;
-                }
-                else
-                {
-                    CwDecoder d = c._cwDecoder;
-                    if (d != null)
-                    {
-                        meter.Value = d.Level;
-                        status.Text = string.Format(CultureInfo.InvariantCulture, "{0:0} WPM   pitch {1} Hz   SNR {2:0.0}   {3}", d.Wpm, c.CWPitch, d.Snr, d.KeyDown ? "key down" : "");
-                    }
-                    hintText = c.CwSending ? "SENDING" : (ok ? "" : "Use CWL / CWU");
-                    status.ForeColor = c.CwSending ? cTx : cMuted;
-                }
-                if (hintText.Length > 0) status.Text = hintText + (status.Text.Length > 0 && !status.Text.StartsWith(hintText) ? "   " + status.Text : "");
-                if (problem != null && !c.PowerOn) status.Text = problem;
             }
         }
 

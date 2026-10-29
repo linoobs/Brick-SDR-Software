@@ -17,8 +17,8 @@ namespace BrickSDR
         private Panel brickDispCard;                    // the card holding the panadapter (BrickLayout.buildCenter)
         private Panel _dockGrip;
         private string brickDockKey;                    // what is docked now ("digi", "rade"), null when nothing
-        private readonly Dictionary<string, int> brickDockHeights = new Dictionary<string, int> { { "digi", 250 }, { "rade", 118 } };
-        private readonly Dictionary<string, int> brickDockMin = new Dictionary<string, int> { { "digi", 190 }, { "rade", 100 } };
+        private readonly Dictionary<string, int> brickDockHeights = new Dictionary<string, int> { { "digi", 270 }, { "rade", 118 } };
+        private readonly Dictionary<string, int> brickDockMin = new Dictionary<string, int> { { "digi", 210 }, { "rade", 100 } };
 
         private void brickDockEnsure()
         {

@@ -361,6 +361,7 @@ namespace BrickSDR
             BandBackgroundColor = cField;
 
             chkSplitDisplay.Checked = RX2Enabled;
+            BeginInvoke(new Action(brickDigitalRestore));      // the terminal or FreeDV strip that was open at the last exit
 
             // focus parking place: the old code moves the focus here after clicks, it must stay focusable (off screen)
             btnHidden.SetBounds(-1000, -1000, 1, 1);

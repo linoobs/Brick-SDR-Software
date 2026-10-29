@@ -141,17 +141,17 @@ namespace BrickSDR
         internal sealed class BrickRadeForm : Form
         {
             private readonly Console c;
-            private readonly Button bOn, bV1, bV2, bRx1, bRx2, bNoise, bAgc, bEq;
+            private readonly BrickBtn bOn, bV1, bV2, bRx1, bRx2, bNoise, bAgc, bEq;
             private readonly Label status, footer;
             private readonly StatusPanel statusPanel;
             private readonly HeardPanel heard;
             private readonly LevelBar rxBar, micBar;
-            private readonly TextBox call;
-            private TextBox grid, repMsg;
-            private CheckBox chkReport, chkQsy, chkUtc, chkOv1, chkOv2, chkOvTx;
-            private Button bReporter;
-            private readonly NumericUpDown mic, rxLevel, agcTarget, bassF, bassG, midF, midG, midQ, trebleF, trebleG, eqVol;
-            private readonly ComboBox mode;
+            private readonly BrickField call;
+            private BrickField grid, repMsg;
+            private BrickBtn chkReport, chkQsy, chkUtc, chkOv1, chkOv2, chkOvTx;
+            private BrickBtn bReporter;
+            private readonly BrickNum mic, rxLevel, agcTarget, bassF, bassG, midF, midG, midQ, trebleF, trebleG, eqVol;
+            private readonly BrickDropDown mode;
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 50 };
             private int rx;
             private bool syncing;
@@ -162,7 +162,7 @@ namespace BrickSDR
                 c = console;
                 c.radeLoadSettings();
                 Text = "Brick-SDR - FreeDV RADE";
-                BackColor = cBg;
+                BackColor = cCard;
                 ForeColor = cText;
                 Font = new Font("Segoe UI", 9f);
                 FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -187,17 +187,17 @@ namespace BrickSDR
                 // settings
                 int y = 276;
                 Controls.Add(lbl("Callsign", 12, y + 4));
-                call = new TextBox { Left = 70, Top = y, Width = 100, MaxLength = 8, CharacterCasing = CharacterCasing.Upper, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
-                call.TextChanged += (s, e) => { if (!syncing) { c._rs.Call = call.Text.Trim(); c.radeSettingsChanged(); } };
+                call = new BrickField { Left = 70, Top = y, Width = 100, MaxLength = 8, CharacterCasing = CharacterCasing.Upper };
+                call.TextChangedX += (s, e) => { if (!syncing) { c._rs.Call = call.Text.Trim(); c.radeSettingsChanged(); } };
                 Controls.Add(call);
                 Controls.Add(lbl("Mic (dB)", 190, y + 4));
                 mic = nud(246, y, -40, 40, 1, 0, v => c._rs.MicDb = (int)v);
                 Controls.Add(lbl("RX level (dB)", 320, y + 4));
                 rxLevel = nud(404, y, -100, 40, 1, 0, v => { if (rx == 0) c._rs.Rx1Db = (int)v; else c._rs.Rx2Db = (int)v; });
                 Controls.Add(lbl("Mode", 478, y + 4));
-                mode = new ComboBox { Left = 514, Top = y, Width = 74, DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText };
-                mode.Items.AddRange(new object[] { "DIGU/L", "USB/LSB" });
-                mode.SelectedIndexChanged += (s, e) => { if (!syncing) { c._rs.VoiceModes = mode.SelectedIndex == 1; c.radeSettingsChanged(); } };
+                mode = new BrickDropDown { Left = 514, Top = y, Width = 74, Height = 24 };
+                mode.Items.AddRange(new[] { "DIGU/L", "USB/LSB" });
+                mode.SelectedChanged += (s, e) => { if (!syncing) { c._rs.VoiceModes = mode.SelectedIndex == 1; c.radeSettingsChanged(); } };
                 Controls.Add(mode);
 
                 y += 40;
@@ -228,15 +228,14 @@ namespace BrickSDR
                 // FreeDV Reporter (qso.freedv.org) and the panadapter overlay
                 y += 40;
                 bReporter = mk("Reporter", 12, y, 100, 28, () => FreeDVReporter.FreeDVReporterManager.ShowWindow(c));
-                bReporter.FlatAppearance.BorderColor = cLine;
                 Controls.Add(bReporter);
                 Controls.Add(lbl("Grid", 126, y + 6));
-                grid = new TextBox { Left = 158, Top = y + 3, Width = 64, MaxLength = 6, CharacterCasing = CharacterCasing.Upper, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
-                grid.TextChanged += (s, e) => { if (!syncing) { c._rs.Grid = grid.Text.Trim(); c.radeSettingsChanged(); } };
+                grid = new BrickField { Left = 158, Top = y + 2, Width = 64, MaxLength = 6, CharacterCasing = CharacterCasing.Upper };
+                grid.TextChangedX += (s, e) => { if (!syncing) { c._rs.Grid = grid.Text.Trim(); c.radeSettingsChanged(); } };
                 Controls.Add(grid);
                 Controls.Add(lbl("Message", 236, y + 6));
-                repMsg = new TextBox { Left = 296, Top = y + 3, Width = 292, MaxLength = 64, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
-                repMsg.TextChanged += (s, e) => { if (!syncing) { c._rs.ReporterMessage = repMsg.Text; c.radeSettingsChanged(); } };
+                repMsg = new BrickField { Left = 296, Top = y + 2, Width = 292, MaxLength = 64 };
+                repMsg.TextChangedX += (s, e) => { if (!syncing) { c._rs.ReporterMessage = repMsg.Text; c.radeSettingsChanged(); } };
                 Controls.Add(repMsg);
                 y += 32;
                 chkReport = chk("Report my station while RADE is on", 12, y, 250, v => c._rs.Reporting = v);
@@ -256,9 +255,9 @@ namespace BrickSDR
                 showReceiver(!c.RadeEnabledOn(0) && c.RadeEnabledOn(1) ? 1 : 0);
             }
 
-            private CheckBox chk(string text, int x, int y, int w, Action<bool> set)
+            private BrickBtn chk(string text, int x, int y, int w, Action<bool> set)
             {
-                CheckBox b = new CheckBox { Text = text, Left = x, Top = y, Width = w, ForeColor = cText, BackColor = cBg, FlatStyle = FlatStyle.Standard };
+                BrickBtn b = new BrickBtn { Text = text, Left = x, Top = y, Width = w, Height = 24, Toggle = true };
                 b.CheckedChanged += (s, e) => { if (!syncing) { set(b.Checked); c.radeSettingsChanged(); } };
                 Controls.Add(b);
                 return b;
@@ -272,32 +271,22 @@ namespace BrickSDR
                 return l;
             }
 
-            private NumericUpDown nud(int x, int y, decimal min, decimal max, decimal inc, decimal val, Action<double> set, int dec = 0)
+            private BrickNum nud(int x, int y, decimal min, decimal max, decimal inc, decimal val, Action<double> set, int dec = 0)
             {
-                NumericUpDown n = new NumericUpDown { Left = x, Top = y, Width = 64, Minimum = min, Maximum = max, Increment = inc, DecimalPlaces = dec, Value = val, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
+                BrickNum n = new BrickNum { Left = x, Top = y, Width = 74, Height = 24, Minimum = min, Maximum = max, Increment = inc, DecimalPlaces = dec, Value = Math.Max(min, Math.Min(max, val)) };
                 n.ValueChanged += (s, e) => { if (!syncing) { set((double)n.Value); c.radeSettingsChanged(); } };
                 Controls.Add(n);
                 return n;
             }
 
-            private Button mk(string text, int x, int y, int w, int h, Action act)
+            private BrickBtn mk(string text, int x, int y, int w, int h, Action act)
             {
-                Button b = new Button
-                {
-                    Text = text, Left = x, Top = y, Width = w, Height = h, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText,
-                    UseVisualStyleBackColor = false, TabStop = false, Cursor = Cursors.Hand
-                };
-                b.FlatAppearance.BorderColor = cLine;
-                b.FlatAppearance.MouseOverBackColor = cBtnHover;
+                BrickBtn b = new BrickBtn { Text = text, Left = x, Top = y, Width = w, Height = h };
                 b.Click += (s, e) => act();
                 return b;
             }
 
-            private static void light(Button b, bool on)
-            {
-                b.BackColor = on ? cAccent : cBtn;
-                b.ForeColor = on ? Color.FromArgb(20, 20, 24) : cText;
-            }
+            private static void light(BrickBtn b, bool on) { b.On = on; }
 
             public void ShowAt()
             {
@@ -373,7 +362,7 @@ namespace BrickSDR
                 finally { syncing = false; }
             }
 
-            private static decimal clamp(NumericUpDown n, double v)
+            private static decimal clamp(BrickNum n, double v)
             {
                 return Math.Max(n.Minimum, Math.Min(n.Maximum, (decimal)v));
             }
@@ -419,7 +408,7 @@ namespace BrickSDR
                     if (status.Text != text) status.Text = text;
                     status.ForeColor = color;
                 }
-                if (bOn.BackColor != (on ? cAccent : cBtn)) light(bOn, on);
+                if (bOn.On != on) light(bOn, on);
             }
 
             protected override void OnVisibleChanged(EventArgs e)

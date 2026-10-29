@@ -11288,6 +11288,7 @@ namespace BrickSDR
         private int m_nLastRXThatHadModeChange = 0;
         private void updateStepIndexForMode(int rx, DSPMode mode)
         {
+            if (brickActive && isDSPModeValid(mode)) { brickApplyModeStep(mode); return; }   // Brick: SSB 500 Hz, CW 10 Hz, AM / FM 1 kHz
             if (!isDSPModeValid(mode) || rx == 2) return;
             if (!TuneStepPerModeRX1) return;
 

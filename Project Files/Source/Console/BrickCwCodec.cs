@@ -32,7 +32,9 @@ namespace BrickSDR
     // two to five dots end a character and longer ones a word.
     internal class CwDecoder
     {
-        public double Pitch = 600;
+        public double Pitch = 600;          // the receiver's CW pitch: where the tone is looked for first
+        public bool AutoTune = true;        // follow the strongest tone near the pitch (no exact zero-beat needed)
+        public double TonePitch { get { return _tone; } }
         public double Squelch = 0.2;        // 0..1: how far above the noise a signal must be to be keyed
         public event Action<char> Decoded;
 
@@ -66,6 +68,12 @@ namespace BrickSDR
         private readonly StringBuilder _sym = new StringBuilder();
         private bool _wordSpaced = true;
         private double _pitchUsed = -1;
+        private double _tone = 600;                 // the tone being decoded: the pitch, or the tone that was found near it
+        private float[] _tb;                        // a block of audio for the tone search
+        private int _tbN;
+        private double[] _tpow;                     // smoothed power per candidate frequency
+        private double _cand; private int _candCount;
+        private const double TStep = 10, TSpan = 350;
         private int _ms;                    // milliseconds since start (the noise floor is learnt quickly at first)
 
         public CwDecoder(int rate)
@@ -76,9 +84,64 @@ namespace BrickSDR
             _bi = new double[_n]; _bq = new double[_n];
         }
 
+
+        // Tone search: every 125 ms the power of the audio at each frequency within +-350 Hz of the pitch (every 10 Hz, a
+        // Goertzel filter each), smoothed. A tone clearly above the median of the others that stays at the same place for
+        // three blocks becomes the tone that is decoded. A CW signal is on for about half of the time, so its power shows
+        // in each block; between stations the last tone is kept.
+        private void collectForTone(float[] x, int count)
+        {
+            int n = _rate / 8;
+            if (_tb == null || _tb.Length != n) { _tb = new float[n]; _tbN = 0; }
+            for (int k = 0; k < count; k++)
+            {
+                _tb[_tbN++] = x[k];
+                if (_tbN == n) { _tbN = 0; analyseTone(); }
+            }
+        }
+
+        private void analyseTone()
+        {
+            double lo = Math.Max(250, Pitch - TSpan), hi = Math.Min(_rate / 2 - 200, Pitch + TSpan);
+            int bins = (int)((hi - lo) / TStep) + 1;
+            if (bins < 5) return;
+            if (_tpow == null || _tpow.Length != bins) _tpow = new double[bins];
+            double[] p = new double[bins];
+            for (int b = 0; b < bins; b++)
+            {
+                double w = 2 * Math.PI * (lo + b * TStep) / _rate, coef = 2 * Math.Cos(w), s1 = 0, s2 = 0;
+                for (int i = 0; i < _tb.Length; i++) { double s0 = _tb[i] + coef * s1 - s2; s2 = s1; s1 = s0; }
+                p[b] = s1 * s1 + s2 * s2 - coef * s1 * s2;
+                _tpow[b] = _tpow[b] * 0.5 + p[b] * 0.5;
+            }
+            int best = 0;
+            for (int b = 1; b < bins; b++) if (_tpow[b] > _tpow[best]) best = b;
+            double[] sorted = (double[])_tpow.Clone();
+            Array.Sort(sorted);
+            double median = Math.Max(1e-18, sorted[bins / 2]);
+            if (_tpow[best] < median * 8) return;                     // nothing clearly there: keep what was
+            // refine between the bins around the peak
+            double f = lo + best * TStep;
+            if (best > 0 && best < bins - 1)
+            {
+                double a = _tpow[best - 1], c = _tpow[best], d = _tpow[best + 1], den = a - 2 * c + d;
+                if (Math.Abs(den) > 1e-30) f += Math.Max(-0.5, Math.Min(0.5, 0.5 * (a - d) / den)) * TStep;
+            }
+            if (Math.Abs(f - _tone) < 15) { _cand = 0; _candCount = 0; if (Math.Abs(f - _tone) > 2) retune(0.5 * _tone + 0.5 * f); return; }
+            if (Math.Abs(f - _cand) < 15) _candCount++; else { _cand = f; _candCount = 1; }
+            if (_candCount >= 3) { retune(f); _cand = 0; _candCount = 0; }
+        }
+
+        private void retune(double f)
+        {
+            _tone = f;
+            _inc = 2 * Math.PI * _tone / _rate;
+        }
+
         public void Process(float[] x, int count)
         {
-            if (Pitch != _pitchUsed) { _pitchUsed = Pitch; _inc = 2 * Math.PI * Pitch / _rate; }
+            if (Pitch != _pitchUsed) { _pitchUsed = Pitch; _tone = Pitch; _cand = 0; _candCount = 0; _tpow = null; _inc = 2 * Math.PI * _tone / _rate; }
+            if (AutoTune) collectForTone(x, count);
             for (int k = 0; k < count; k++)
             {
                 double s = x[k];

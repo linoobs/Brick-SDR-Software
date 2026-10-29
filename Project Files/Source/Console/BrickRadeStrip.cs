@@ -18,7 +18,7 @@ namespace BrickSDR
         internal sealed class BrickRadeStrip : Panel
         {
             private readonly Console c;
-            private readonly Button bOn, bV1, bV2, bRx1, bRx2, bSet, bRep, bClose;
+            private readonly BrickBtn bOn, bV1, bV2, bRx1, bRx2, bSet, bRep, bClose;
             private readonly Label status;
             private readonly BrickRadeForm.LevelBar rxBar, micBar;
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
@@ -53,24 +53,14 @@ namespace BrickSDR
                 place();
             }
 
-            private Button mk(string text, int x, int y, int w, int h, Action act)
+            private BrickBtn mk(string text, int x, int y, int w, int h, Action act)
             {
-                Button b = new Button
-                {
-                    Text = text, Left = x, Top = y, Width = w, Height = h, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText,
-                    UseVisualStyleBackColor = false, TabStop = false, Cursor = Cursors.Hand
-                };
-                b.FlatAppearance.BorderColor = cLine;
-                b.FlatAppearance.MouseOverBackColor = cBtnHover;
+                BrickBtn b = new BrickBtn { Text = text, Left = x, Top = y, Width = w, Height = h };
                 b.Click += (s, e) => act();
                 return b;
             }
 
-            private static void light(Button b, bool on)
-            {
-                b.BackColor = on ? cAccent : cBtn;
-                b.ForeColor = on ? Color.FromArgb(20, 20, 24) : cText;
-            }
+            private static void light(BrickBtn b, bool on) { b.On = on; }
 
             private void place()
             {
@@ -133,7 +123,7 @@ namespace BrickSDR
                 string text = c.radeStatusText(r, on, power, sy, out col);
                 if (status.Text != text) status.Text = text;
                 status.ForeColor = col;
-                if (bOn.BackColor != (on ? cAccent : cBtn)) sync_();
+                if (bOn.On != on) sync_();
                 Invalidate();
             }
 
@@ -207,9 +197,10 @@ namespace BrickSDR
             if (_radeStrip == null || _radeStrip.IsDisposed) _radeStrip = new BrickRadeStrip(this);
             brickDockRelease("rade");        // a terminal under the panadapter makes room
             brickDockShow("rade", _radeStrip);
+            _digiOpenKey = "RADE"; digiSaveSettings();
         }
 
-        internal void brickRadeClose() { brickDockHide("rade"); }
+        internal void brickRadeClose() { brickDockHide("rade"); _digiOpenKey = ""; digiSaveSettings(); }
 
         // the FreeDV window: settings, mic processing, Reporter options
         internal void brickRadeSettings()

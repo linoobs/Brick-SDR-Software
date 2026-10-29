@@ -361,8 +361,6 @@ namespace BrickSDR
             BandBackgroundColor = cField;
 
             chkSplitDisplay.Checked = RX2Enabled;
-            // the tune power slider is gone, tuning always uses a safe 10 %
-            ptbTune.Value = 10;
 
             // focus parking place: the old code moves the focus here after clicks, it must stay focusable (off screen)
             btnHidden.SetBounds(-1000, -1000, 1, 1);
@@ -898,10 +896,15 @@ namespace BrickSDR
             Panel tx = brickCard(pnlLeft);
             tx.SetBounds(8, y, cw, 64);
             int ty = brickSection(tx, "Transmit", 6, tx.Width);
-            Put(lblPWR, tx, 8, ty, 160, 15);
-            lblPWR.TextAlign = ContentAlignment.MiddleLeft;
-            Put(ptbPWR, tx, 8, ty + 15, tx.Width - 16, 22);
-            ptbTune.Visible = false; lblTune.Visible = false;
+            brickSliderAt(tx, lblPWR, ptbPWR, 8, ty, 156);
+            brickSliderAt(tx, lblTune, ptbTune, 176, ty, 156);
+            // the old code hides the tune slider unless it is in use: keep it on screen, a highlight shows when it is active
+            foreach (Control tc in new Control[] { lblTune, ptbTune })
+            {
+                Control t0 = tc;
+                t0.Visible = true;
+                t0.VisibleChanged += (s, e) => { if (!t0.Visible) t0.Visible = true; };
+            }
             lblPAProfile.Visible = false;
             foreach (Control c in new Control[] { comboTXProfile, comboAMTXProfile, comboFMTXProfile, comboDigTXProfile, lblTransmitProfile, labelTS7, lblDigTXProfile })
                 c.Visible = false;
@@ -1388,11 +1391,17 @@ namespace BrickSDR
                 BrickModePair bp = new BrickModePair { NameA = digi ? "DIGU" : names[i][0], NameB = digi ? null : names[i][1], Font = new Font("Segoe UI", 8.5f) };
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
-                bp.Pick = n => { if (digi) brickShowDigiMenu(bp, rx2Card); else if (n == 1) ra.Checked = true; else rb.Checked = true; };
+                int pairIndex = i;
+                bp.Pick = n =>
+                {
+                    if (digi) { brickShowDigiMenu(bp, rx2Card); return; }
+                    if (n == 0) n = brickDefaultSideband(pairIndex, rx2Card);
+                    if (n == 1) ra.Checked = true; else rb.Checked = true;
+                };
                 if (digi)
                 {
                     bp.GetState = () => (ra.Checked || rb.Checked || (brickDigiChoice == "CW" && (RX1DSPMode == DSPMode.CWL || RX1DSPMode == DSPMode.CWU))) ? 1 : 0;
-                    bp.TextFn = () => brickDigiLabel();
+                    bp.TextFn = () => brickDigiLabel() + "  \u25BE";
                     brickDigiButton = bp;
                 }
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
@@ -1450,6 +1459,19 @@ namespace BrickSDR
             if (m == DSPMode.DIGL && (c == "DIGU" || c == "FT8" || c == "FT4" || c == "CW")) return "DIGL";
             if (m == DSPMode.DIGU && (c == "DIGL" || c == "RTTY" || c == "CW")) return "DIGU";
             return c;
+        }
+
+        // which of the two modes of a pair to start with: LSB below 10 MHz (not on 60 m), USB above; the other pairs use their first
+        private int brickDefaultSideband(int pairIndex, bool rx2)
+        {
+            if (pairIndex == 0)
+            {
+                double f = rx2 ? VFOBFreq : VFOAFreq;
+                Band b = rx2 ? RX2Band : RX1Band;
+                return (f < 10.0 && b != Band.B60M) ? 1 : 2;
+            }
+            if (pairIndex == 3) return 2;   // DIGU
+            return 1;
         }
 
         private void brickDigiSet(bool rx2, DSPMode mode, double? mhz)
@@ -1593,7 +1615,7 @@ namespace BrickSDR
             foreach (ToolStripItem si in statusStripMain.Items) { si.ForeColor = cText; if (!(si is ToolStripSeparator)) si.BackColor = Color.Transparent; if (si is ToolStripDropDownItem) brickMenuColours(si); }
             menuStrip1.ForeColor = cText;
             foreach (ToolStripItem it0 in menuStrip1.Items) brickMenuColours(it0);
-            foreach (ToolStripItem it in menuStrip1.Items) { it.ForeColor = cText; it.BackColor = cBg; }
+            foreach (ToolStripItem it in menuStrip1.Items) { it.ForeColor = cText; it.BackColor = cBg; it.AutoSize = true; }
             // the console can no longer be collapsed
             foreach (ToolStripItem it in menuStrip1.Items)
                 if (it.Text != null && it.Text.StartsWith("Collapse", StringComparison.OrdinalIgnoreCase)) it.Visible = false;
@@ -1661,6 +1683,7 @@ namespace BrickSDR
                     Graphics g = e.Graphics;
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     bool on = it.Selected || it.Pressed;
+                    using (SolidBrush clear = new SolidBrush(cBg)) g.FillRectangle(clear, new Rectangle(Point.Empty, it.Size));
                     Rectangle r = new Rectangle(1, 2, it.Width - 3, it.Height - 5);
                     Color baseC = on ? cAccent : cBtn;
                     using (System.Drawing.Drawing2D.GraphicsPath gp = brickRoundPath(r, 6))
@@ -1935,6 +1958,13 @@ namespace BrickSDR
                 }
             }
             foreach (Action a in brickAgcSyncs) a();
+            {
+                // tune power: lit while Setup - Transmit makes TUNE or 2TONE use this slider
+                bool tuneOn = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER || TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+                Color want = tuneOn ? cAccent : cMuted;
+                if (lblTune.ForeColor != want) lblTune.ForeColor = want;
+                if (ptbTune.Enabled != tuneOn) ptbTune.Enabled = tuneOn;
+            }
             brickKeepBandFont(txtVFOABand); brickKeepBandFont(txtVFOBBand);
             pbAutoAttWarningRX1.Visible = false; pbAutoAttWarningRX2.Visible = false;
             brickMirrorLabel(lblFbMirror, infoBar.FeedbackLabel); brickMirrorLabel(lblPsMirror, infoBar.PureSignalLabel);

@@ -28,7 +28,7 @@ namespace BrickSDR
             {
                 base.OnClick(e);
                 int st = GetState == null ? 0 : GetState();
-                if (Pick != null) Pick(st == 1 ? 2 : 1);
+                if (Pick != null) Pick(st == 1 ? 2 : (st == 2 ? 1 : 0));   // 0: nothing of this pair is on yet
             }
             protected override void OnPaint(PaintEventArgs e)
             {

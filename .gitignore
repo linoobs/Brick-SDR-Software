@@ -419,3 +419,6 @@ Project Files/lib/*.pdb
 Project Files/lib/opus_dnn/cmake-build/
 # opus_dnn needs its (placeholder) arm source lists present even on x64
 !Project Files/lib/opus_dnn/**/arm/
+
+# database exports of the Brick boards kept next to the installer (the ones in lib\Brick-SDR-resources are the shipped copies)
+/Brick*.xml

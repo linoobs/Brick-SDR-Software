@@ -36,6 +36,9 @@ namespace BrickSDR
                 string key = mac + "=" + xml;
                 if (File.Exists(done) && File.ReadAllLines(done).Any(l => l.Trim() == key)) return;
 
+                // the PA profiles are loaded into the Setup form: without it nothing would be applied and the flag below would still be written,
+                // leaving the default PA gains for good; wait for the next connect instead
+                if (console.IsSetupFormNull) return;
                 XDocument doc = XDocument.Load(file);
                 Dictionary<string, string> state = Table(doc, "State"), options = Table(doc, "Options");
                 console.BrickApplyCalibration(state);

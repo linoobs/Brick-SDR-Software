@@ -272,6 +272,20 @@ namespace BrickSDR
 
             brickActive = true;
 
+            // status bar: room for the texts, no size grip, items do not touch the frame
+            statusStripMain.AutoSize = false;
+            statusStripMain.SizingGrip = false;
+            statusStripMain.Height = 30;
+            statusStripMain.Padding = new Padding(8, 3, 8, 3);
+            statusStripMain.GripStyle = ToolStripGripStyle.Hidden;
+            foreach (ToolStripItem sit in statusStripMain.Items)
+            {
+                sit.Font = new Font("Segoe UI", 9f);
+                sit.Margin = new Padding(2, 2, 2, 2);
+                sit.AutoSize = true;
+                sit.TextAlign = ContentAlignment.MiddleLeft;
+            }
+
             // fixed pixel layout, do not let the old autoscale / resize code move things around
             this.AutoScaleMode = AutoScaleMode.None;
             this.BackColor = cBg;
@@ -1369,13 +1383,18 @@ namespace BrickSDR
             for (int i = 0; i < pairs.Length; i++)
             {
                 RadioButton ra = pairs[i][0], rb = pairs[i][1];
-                bool digi = i == 3;
                 bool rx2Card = ra.Name.StartsWith("radRX2");
-                BrickModePair bp = new BrickModePair { NameA = digi ? "DIGI \u25BE" : names[i][0], NameB = digi ? null : names[i][1], Font = new Font("Segoe UI", 8.5f) };
+                bool digi = i == 3 && !rx2Card;   // RX1: the DIGI drop-down, RX2 keeps DIGL / DIGU
+                BrickModePair bp = new BrickModePair { NameA = digi ? "DIGU" : names[i][0], NameB = digi ? null : names[i][1], Font = new Font("Segoe UI", 8.5f) };
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
                 bp.Pick = n => { if (digi) brickShowDigiMenu(bp, rx2Card); else if (n == 1) ra.Checked = true; else rb.Checked = true; };
-                if (digi) bp.GetState = () => (ra.Checked || rb.Checked) ? 1 : 0;
+                if (digi)
+                {
+                    bp.GetState = () => (ra.Checked || rb.Checked || (brickDigiChoice == "CW" && (RX1DSPMode == DSPMode.CWL || RX1DSPMode == DSPMode.CWU))) ? 1 : 0;
+                    bp.TextFn = () => brickDigiLabel();
+                    brickDigiButton = bp;
+                }
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
                 rb.CheckedChanged += (s, e) => bp.Invalidate();
                 parent.Controls.Add(bp);
@@ -1400,6 +1419,39 @@ namespace BrickSDR
             { Band.B10M, new[] { 28.074, 28.180 } }, { Band.B6M, new[] { 50.313, 50.318 } }
         };
 
+        // what the DIGI button shows: the last choice from its menu (DIGU on a fresh install), kept in line with the real mode
+        private string brickDigiChoiceValue;
+        private BrickModePair brickDigiButton;
+        private string BrickDigiFile { get { return Path.Combine(AppDataPath, "digi_choice.txt"); } }
+        private string brickDigiChoice
+        {
+            get
+            {
+                if (brickDigiChoiceValue == null)
+                {
+                    brickDigiChoiceValue = "DIGU";
+                    try { if (File.Exists(BrickDigiFile)) { string t = File.ReadAllText(BrickDigiFile).Trim(); if (t.Length > 0) brickDigiChoiceValue = t; } } catch { }
+                }
+                return brickDigiChoiceValue;
+            }
+            set
+            {
+                brickDigiChoiceValue = value;
+                try { File.WriteAllText(BrickDigiFile, value); } catch { }
+                if (brickDigiButton != null) brickDigiButton.Invalidate();
+            }
+        }
+
+        private string brickDigiLabel()
+        {
+            string c = brickDigiChoice;
+            DSPMode m = RX1DSPMode;
+            // the real mode wins when it contradicts the choice (e.g. the mode was changed elsewhere)
+            if (m == DSPMode.DIGL && (c == "DIGU" || c == "FT8" || c == "FT4" || c == "CW")) return "DIGL";
+            if (m == DSPMode.DIGU && (c == "DIGL" || c == "RTTY" || c == "CW")) return "DIGU";
+            return c;
+        }
+
         private void brickDigiSet(bool rx2, DSPMode mode, double? mhz)
         {
             if (rx2) { RX2DSPMode = mode; if (mhz.HasValue) VFOBFreq = mhz.Value; }
@@ -1421,14 +1473,14 @@ namespace BrickSDR
             };
             double[] ft;
             brickDigiFreq.TryGetValue(band, out ft);
-            add("DIGL", cur == DSPMode.DIGL, () => brickDigiSet(rx2, DSPMode.DIGL, null), true);
-            add("DIGU", cur == DSPMode.DIGU, () => brickDigiSet(rx2, DSPMode.DIGU, null), true);
+            add("DIGL", cur == DSPMode.DIGL, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "DIGL"; }, true);
+            add("DIGU", cur == DSPMode.DIGU, () => { brickDigiSet(rx2, DSPMode.DIGU, null); brickDigiChoice = "DIGU"; }, true);
             m.Items.Add(new ToolStripSeparator());
-            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => brickDigiSet(rx2, DSPMode.DIGU, ft[0]), ft != null);
-            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => brickDigiSet(rx2, DSPMode.DIGU, ft[1]), ft != null);
+            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => { brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickDigiChoice = "FT8"; }, ft != null);
+            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => { brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickDigiChoice = "FT4"; }, ft != null);
             add("FreeDV RADE", false, () => brickDigiSet(rx2, DSPMode.DIGU, null), false);
-            add("RTTY", false, () => brickDigiSet(rx2, DSPMode.DIGL, null), true);
-            add("CW", false, () => brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null), true);
+            add("RTTY", false, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; }, true);
+            add("CW", false, () => { brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; }, true);
             m.Items.Add(new ToolStripSeparator());
             add("DX", false, () => { try { System.Diagnostics.Process.Start("https://www.dxsummit.fi/"); } catch { } }, true);
             add("POTA", false, () => { try { System.Diagnostics.Process.Start("https://pota.app/#/"); } catch { } }, true);
@@ -1603,8 +1655,25 @@ namespace BrickSDR
             protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
             {
                 ToolStripItem it = e.Item;
+                if (!it.IsOnDropDown)
+                {
+                    // like the band buttons: rounded, slightly raised, orange while hovered / open
+                    Graphics g = e.Graphics;
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    bool on = it.Selected || it.Pressed;
+                    Rectangle r = new Rectangle(1, 2, it.Width - 3, it.Height - 5);
+                    Color baseC = on ? cAccent : cBtn;
+                    using (System.Drawing.Drawing2D.GraphicsPath gp = brickRoundPath(r, 6))
+                    {
+                        using (System.Drawing.Drawing2D.LinearGradientBrush lg = new System.Drawing.Drawing2D.LinearGradientBrush(r, brickShade(baseC, on ? 0.12 : 0.16), brickShade(baseC, it.Pressed ? 0.02 : -0.18), 90f))
+                            g.FillPath(lg, gp);
+                        using (Pen pen = new Pen(on ? brickShade(cAccent, -0.35) : Color.FromArgb(70, 76, 98), 1f)) g.DrawPath(pen, gp);
+                    }
+                    using (Pen hi = new Pen(Color.FromArgb(on ? 90 : 45, 255, 255, 255), 1f)) g.DrawLine(hi, r.Left + 6, r.Top + 1, r.Right - 6, r.Top + 1);
+                    return;
+                }
                 if (!it.Selected && !it.Pressed) return;
-                hover(e.Graphics, new Rectangle(Point.Empty, it.Size), !it.IsOnDropDown, it.Pressed);
+                hover(e.Graphics, new Rectangle(Point.Empty, it.Size), false, it.Pressed);
             }
 
             protected override void OnRenderDropDownButtonBackground(ToolStripItemRenderEventArgs e)
@@ -1621,7 +1690,8 @@ namespace BrickSDR
 
             protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
             {
-                e.TextColor = !e.Item.Enabled ? cMuted : ((e.Item.Selected || e.Item.Pressed) ? Color.White : cText);
+                bool topOn = !e.Item.IsOnDropDown && (e.Item.Selected || e.Item.Pressed);
+                e.TextColor = !e.Item.Enabled ? cMuted : (topOn ? Color.FromArgb(20, 20, 24) : ((e.Item.Selected || e.Item.Pressed) ? Color.White : cText));
                 base.OnRenderItemText(e);
             }
 

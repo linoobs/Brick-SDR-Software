@@ -44837,7 +44837,7 @@ namespace BrickSDR
             // NOTE: Important if you are ading more items to the status bar
             // MW0LGE_21e could not get the designer to keep widths of these
             // so force them here
-            toolStripDropDownButton_ScreenSize.Width = 110;
+            if (!brickActive) toolStripDropDownButton_ScreenSize.Width = 110;
             toolStripDropDownButton_CPU.Width = 68;
             toolStripStatusLabel_Volts.Width = 60;
             toolStripStatusLabel_Amps.Width = 50;

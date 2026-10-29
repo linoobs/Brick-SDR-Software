@@ -4517,7 +4517,7 @@ namespace BrickSDR
                         {
                             Color act = Color.FromArgb(255, 255, 140, 30), dim = Color.FromArgb(150, 90, 98, 120);
                             SharpDX.Direct2D1.Brush bTop = getDXBrushForColour(BrickActiveRX == 1 ? act : dim);
-                            Color grn = Color.FromArgb(255, 60, 200, 90), grnDim = Color.FromArgb(200, 40, 140, 70);
+                            Color grn = Color.FromArgb(255, 110, 240, 140), grnDim = Color.FromArgb(235, 80, 200, 115);
                             SharpDX.Direct2D1.Brush bBot = getDXBrushForColour(BrickActiveRX == 2 ? grn : grnDim);
                             if (bTop != null && bBot != null)
                             {

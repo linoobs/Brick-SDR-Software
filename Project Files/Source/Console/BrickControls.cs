@@ -12,6 +12,7 @@ namespace BrickSDR
         private sealed class BrickModePair : Control
         {
             public string NameA, NameB, Extra; // Extra: small tag at the left (FT8)
+            public Func<string> TextFn; // single name that follows a choice (DIGI)
             public Func<int> GetState; // 0 neither, 1 first, 2 second
             public Action<int> Pick;
             private bool hover;
@@ -47,7 +48,7 @@ namespace BrickSDR
                 if (string.IsNullOrEmpty(NameB))
                 {
                     using (Font f1 = new Font(Font.FontFamily, Font.Size, st > 0 ? FontStyle.Bold : FontStyle.Regular))
-                        TextRenderer.DrawText(g, NameA, f1, new Rectangle(0, 0, Width, Height - 1), st > 0 ? Color.FromArgb(20, 20, 24) : cText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                        TextRenderer.DrawText(g, TextFn != null ? TextFn() : NameA, f1, new Rectangle(0, 0, Width, Height - 1), st > 0 ? Color.FromArgb(20, 20, 24) : cText, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
                     return;
                 }
                 string sep = string.IsNullOrEmpty(Extra) ? "  /  " : " / ";

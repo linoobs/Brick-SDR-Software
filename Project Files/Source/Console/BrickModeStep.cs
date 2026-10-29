@@ -29,9 +29,24 @@ namespace BrickSDR
                     }
                     if (brickDockKey == "ft" && _digiRx == i && m != DSPMode.USB && m != DSPMode.DIGU) brickFtClose();
                     if (_radeStrip != null && brickDockKey == "rade" && _radeStrip.Rx == i && !digital && !(RadeEnabledOn(i) && m == _radeForcedMode[i])) brickRadeClose();
+                    brickEnsureSsbLeveler();
                 }
                 catch { }
             }));
+        }
+
+        // The TX leveler is on by default in SSB, without it the microphone is quiet. Thetis switches it off while a digital mode is selected
+        // and a program started in DIGU keeps it off, so a change to LSB / USB (and the start in one) switches it on again.
+        // In the other modes it stays as the user or the TX profile has it.
+        internal void brickEnsureSsbLeveler()
+        {
+            try
+            {
+                if (IsSetupFormNull) return;
+                DSPMode m = (RX2Enabled && VFOBTX) ? RX2DSPMode : RX1DSPMode;
+                if ((m == DSPMode.LSB || m == DSPMode.USB) && !SetupForm.TXLevelerOn) SetupForm.TXLevelerOn = true;
+            }
+            catch { }
         }
 
         private void brickApplyModeStep(DSPMode mode)

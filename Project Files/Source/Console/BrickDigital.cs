@@ -148,6 +148,11 @@ namespace BrickSDR
             try
             {
                 digiLoadSettings();
+                brickEnsureSsbLeveler();
+                // the TX profile and the saved state may still be loading: look again
+                System.Windows.Forms.Timer lv = new System.Windows.Forms.Timer { Interval = 4000 };
+                lv.Tick += (s, e) => { lv.Stop(); lv.Dispose(); brickEnsureSsbLeveler(); };
+                lv.Start();
                 if (_digiOpenKey == "RTTY" || _digiOpenKey == "CW") brickDigitalOpen(_digiOpenKey);
                 else if (_digiOpenKey == "RADE") brickRadeOpen();
                 else if (_digiOpenKey == "FT8" || _digiOpenKey == "FT4") brickFtOpen(_digiOpenKey);

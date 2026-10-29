@@ -1,6 +1,6 @@
 /*  BrickModeStep.cs
 
-    The tuning step follows the mode: 500 Hz for SSB and the digital modes, 10 Hz for CW, 1 kHz for AM / SAM / FM / DRM.
+    The tuning step follows the mode: 500 Hz for LSB / USB, 10 Hz for CW and the digital modes, 1 kHz for AM / SAM / FM / DRM.
 */
 
 namespace BrickSDR
@@ -14,6 +14,8 @@ namespace BrickSDR
             {
                 case DSPMode.CWL:
                 case DSPMode.CWU:
+                case DSPMode.DIGL:
+                case DSPMode.DIGU:
                     name = "10Hz";
                     break;
                 case DSPMode.AM:

@@ -290,7 +290,6 @@ namespace BrickSDR
                         else if (mode == "CW")
                         {
                             _cwDecoder = new CwDecoder(rate);
-                            if (File.Exists(Path.Combine(AppDataPath, "cw_debug.flag"))) { CwDecoder dd = _cwDecoder; dd.Decoded += ch => { try { File.AppendAllText(Path.Combine(AppDataPath, "cw_debug.txt"), ch + "(" + dd.TonePitch.ToString("0") + "/" + dd.Wpm.ToString("0") + ") "); } catch { } }; }   // TEMPCWDBG
                             _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
                         }
                     }

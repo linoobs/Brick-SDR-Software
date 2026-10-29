@@ -23,7 +23,8 @@ namespace BrickSDR
 
             public BrickBtn()
             {
-                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, false);
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+                SetStyle(ControlStyles.Selectable, false);
                 SetStyle(ControlStyles.StandardClick, true);
                 Font = new Font("Segoe UI Semibold", 9f);
                 Cursor = Cursors.Hand;

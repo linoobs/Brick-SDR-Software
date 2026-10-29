@@ -477,6 +477,9 @@
     <Compile Include="BrickLayout.cs" />
     <Compile Include="BrickDigital.cs" />
     <Compile Include="BrickDock.cs" />
+    <Compile Include="BrickMfsk.cs" />
+    <Compile Include="BrickFt.cs" />
+    <Compile Include="BrickFtPane.cs" />
     <Compile Include="BrickUi.cs" />
     <Compile Include="BrickModeStep.cs" />
     <Compile Include="BrickDigiPane.cs" />
@@ -1372,6 +1375,7 @@ copy /Y "..\..\..\lib\Brick-SDR-resources\Brick*.xml" "$(ProjectDir)$(OutDir)"
 :: copy /Y "..\..\..\lib\Brick-SDR-resources\zetaHat.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_small.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_large.bin" "$(ProjectDir)$(OutDir)"
+copy /Y "..\..\..\lib\mfsk\mfsk.dll" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\Source\packages\SkiaSharp.NativeAssets.Win32.3.119.2\runtimes\win-x64\native\libSkiaSharp.dll" "$(ProjectDir)$(OutDir)"
 </PostBuildEvent>
   </PropertyGroup>

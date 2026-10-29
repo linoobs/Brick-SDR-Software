@@ -78,6 +78,12 @@ namespace BrickSDR
                         case "csql": if (num) _cwSql = (int)Math.Max(0, Math.Min(100, d)); break;
                         case "pop": _digiPopped = v == "1"; break;
                         case "open": _digiOpenKey = v.Trim(); break;
+                        case "grid": _ftGrid = v.Trim().ToUpperInvariant(); break;
+                        case "ftmode": if (v == "FT4") _ftMode = "FT4"; break;
+                        case "ftrx": if (num) _ftRxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
+                        case "fttx": if (num) _ftTxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
+                        case "ftlevel": if (num) _ftLevel = (int)Math.Max(-40, Math.Min(0, d)); break;
+                        case "ftauto": _ftAuto = v != "0"; break;
                     }
                 }
             }
@@ -93,7 +99,8 @@ namespace BrickSDR
                 {
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
-                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey
+                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
+                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftlevel=" + _ftLevel, "ftauto=" + (_ftAuto ? 1 : 0)
                 });
             }
             catch { }
@@ -139,6 +146,7 @@ namespace BrickSDR
                 digiLoadSettings();
                 if (_digiOpenKey == "RTTY" || _digiOpenKey == "CW") brickDigitalOpen(_digiOpenKey);
                 else if (_digiOpenKey == "RADE") brickRadeOpen();
+                else if (_digiOpenKey == "FT8" || _digiOpenKey == "FT4") brickFtOpen(_digiOpenKey);
             }
             catch { }
         }

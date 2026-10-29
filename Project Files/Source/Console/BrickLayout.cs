@@ -898,6 +898,7 @@ namespace BrickSDR
             int ty = brickSection(tx, "Transmit", 6, tx.Width);
             brickSliderAt(tx, lblPWR, ptbPWR, 8, ty, 156);
             brickSliderAt(tx, lblTune, ptbTune, 176, ty, 156);
+            lblTune.TextChanged += (s, e) => { if (lblTune.Text.StartsWith("Tu | 2T")) lblTune.Text = "Tune" + lblTune.Text.Substring(7); };
             // the old code hides the tune slider unless it is in use: keep it on screen, a highlight shows when it is active
             foreach (Control tc in new Control[] { lblTune, ptbTune })
             {
@@ -1685,14 +1686,20 @@ namespace BrickSDR
                     bool on = it.Selected || it.Pressed;
                     using (SolidBrush clear = new SolidBrush(cBg)) g.FillRectangle(clear, new Rectangle(Point.Empty, it.Size));
                     Rectangle r = new Rectangle(1, 2, it.Width - 3, it.Height - 5);
-                    Color baseC = on ? cAccent : cBtn;
+                    // flat and quiet at rest (these are not radio controls), orange only while hovered / open
                     using (System.Drawing.Drawing2D.GraphicsPath gp = brickRoundPath(r, 6))
                     {
-                        using (System.Drawing.Drawing2D.LinearGradientBrush lg = new System.Drawing.Drawing2D.LinearGradientBrush(r, brickShade(baseC, on ? 0.12 : 0.16), brickShade(baseC, it.Pressed ? 0.02 : -0.18), 90f))
-                            g.FillPath(lg, gp);
-                        using (Pen pen = new Pen(on ? brickShade(cAccent, -0.35) : Color.FromArgb(70, 76, 98), 1f)) g.DrawPath(pen, gp);
+                        if (on)
+                        {
+                            using (System.Drawing.Drawing2D.LinearGradientBrush lg = new System.Drawing.Drawing2D.LinearGradientBrush(r, brickShade(cAccent, 0.12), brickShade(cAccent, it.Pressed ? 0.02 : -0.18), 90f))
+                                g.FillPath(lg, gp);
+                            using (Pen pen = new Pen(brickShade(cAccent, -0.35), 1f)) g.DrawPath(pen, gp);
+                        }
+                        else
+                        {
+                            using (Pen pen = new Pen(Color.FromArgb(52, 57, 74), 1f)) g.DrawPath(pen, gp);
+                        }
                     }
-                    using (Pen hi = new Pen(Color.FromArgb(on ? 90 : 45, 255, 255, 255), 1f)) g.DrawLine(hi, r.Left + 6, r.Top + 1, r.Right - 6, r.Top + 1);
                     return;
                 }
                 if (!it.Selected && !it.Pressed) return;
@@ -1961,8 +1968,10 @@ namespace BrickSDR
             {
                 // tune power: lit while Setup - Transmit makes TUNE or 2TONE use this slider
                 bool tuneOn = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER || TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
-                Color want = tuneOn ? cAccent : cMuted;
+                Color want = tuneOn ? lblPWR.ForeColor : cMuted;
+                if (!lblTune.Enabled) lblTune.Enabled = true;   // a disabled label would ignore the colour
                 if (lblTune.ForeColor != want) lblTune.ForeColor = want;
+                if (lblTune.Text.StartsWith("Tu | 2T")) lblTune.Text = "Tune" + lblTune.Text.Substring(7);
                 if (ptbTune.Enabled != tuneOn) ptbTune.Enabled = tuneOn;
             }
             brickKeepBandFont(txtVFOABand); brickKeepBandFont(txtVFOBBand);

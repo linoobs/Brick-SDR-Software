@@ -1972,7 +1972,13 @@ namespace BrickSDR
                 if (!lblTune.Enabled) lblTune.Enabled = true;   // a disabled label would ignore the colour
                 if (lblTune.ForeColor != want) lblTune.ForeColor = want;
                 if (lblTune.Text.StartsWith("Tu | 2T")) lblTune.Text = "Tune" + lblTune.Text.Substring(7);
-                if (ptbTune.Enabled != tuneOn) ptbTune.Enabled = tuneOn;
+                // like Drive: while transmitting, the slider works only for the mode that uses it (TUNE / 2TONE), not for a normal over
+                bool tuneCan;
+                if (chkTUN.Checked) tuneCan = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+                else if (chk2TONE.Checked) tuneCan = TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+                else if (_mox) tuneCan = false;
+                else tuneCan = tuneOn;
+                if (ptbTune.Enabled != tuneCan) ptbTune.Enabled = tuneCan;
             }
             brickKeepBandFont(txtVFOABand); brickKeepBandFont(txtVFOBBand);
             pbAutoAttWarningRX1.Visible = false; pbAutoAttWarningRX2.Visible = false;

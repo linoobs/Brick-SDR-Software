@@ -1482,6 +1482,7 @@ namespace BrickSDR
 
         private void brickDigiSet(bool rx2, DSPMode mode, double? mhz)
         {
+            if (mode == DSPMode.DIGU || mode == DSPMode.DIGL) brickRememberBeforeDigi(rx2);
             if (rx2) { RX2DSPMode = mode; if (mhz.HasValue) VFOBFreq = mhz.Value; }
             else { RX1DSPMode = mode; if (mhz.HasValue) VFOAFreq = mhz.Value; }
         }

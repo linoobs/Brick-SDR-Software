@@ -42,6 +42,8 @@ namespace BrickSDR
         private readonly ConcurrentQueue<FtRow> _ftRows = new ConcurrentQueue<FtRow>();
         private readonly object _ftDecLock = new object();
         private Mfsk.Decoder _ftDecoder;
+        private readonly HashSet<string> _ftSeen = new HashSet<string>();
+        private long _ftSeenPeriod = long.MinValue;
         private long _ftDecoderKey = -1;
         private string _ftStatus = "";
         private volatile float _ftInDb = -120;           // receive audio level (dB re full scale) for the meter
@@ -184,7 +186,7 @@ namespace BrickSDR
             float[] ring = null;
             long total = 0, startIdx = 0;
             int rate = 0;
-            long lastSlot = long.MinValue;
+            long lastSlot = long.MinValue, earlySlot = long.MinValue;
             int lastRateWarn = 0;
             double smooth = -120;
             while (_ftRun)
@@ -262,6 +264,30 @@ namespace BrickSDR
                             lastSlot = slot;
                             startIdx = endIdx;
                         }
+                        // An early pass 1.5 s before the slot ends (the signals are over by then): the messages are on the screen while the slot is still running,
+                        // so a station clicked and TX enabled in time is answered in the very next slot. The pass at the end only adds what the early one missed.
+                        if (slot == lastSlot && earlySlot != slot && into >= T - 1.5 && slot != _ftSkipSlot && !_ftTxActive && total - startIdx > rate * 3)
+                        {
+                            earlySlot = slot;
+                            int len = (int)Math.Round(T * rate);
+                            int have = (int)Math.Min(len, total - startIdx);
+                            if (startIdx >= 0 && total - startIdx < ring.Length)
+                            {
+                                float peak = 0;
+                                for (int i = 0; i < have; i++) { float a = Math.Abs(ring[(int)((startIdx + i) % ring.Length)]); if (a > peak) peak = a; }
+                                float scale = peak > 1e-6f ? Math.Max(0.02f, Math.Min(50f, 0.9f / peak)) * 32767f : 0f;
+                                short[] s = new short[len];
+                                for (int i = 0; i < have; i++)
+                                {
+                                    float v = ring[(int)((startIdx + i) % ring.Length)] * scale;
+                                    s[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+                                }
+                                long period = slot;
+                                int rt = rate;
+                                string md = mode;
+                                Task.Run(() => ftDecode(s, rt, period, md));
+                            }
+                        }
                         ftTxStep(now, T, slot, into);
                     }
                     else
@@ -285,6 +311,9 @@ namespace BrickSDR
                     if (_ftDecoder == null) _ftDecoder = new Mfsk.Decoder(mode == "FT4" ? Mfsk.FT4 : Mfsk.FT8);
                     _ftDecoder.Context(_digiMyCall, _ftGrid, _ftDx, _ftDxGrid, _ftRxHz);
                     rows = _ftDecoder.DecodePeriod(samples, rate, period);
+                    // the early pass and the pass at the end of a slot see the same signals: report each message once
+                    if (_ftSeenPeriod != period) { _ftSeen.Clear(); _ftSeenPeriod = period; }
+                    rows = rows.FindAll(x => _ftSeen.Add(x.Text));
                 }
                 double T = mode == "FT4" ? 7.5 : 15.0;
                 DateTime start = FtEpoch.AddSeconds(period * T);
@@ -427,9 +456,20 @@ namespace BrickSDR
                 if (p != null) { _ftStatus = p; return; }
                 if (ftCurrentMessage().Length == 0) { _ftStatus = "Choose a station or press CQ first"; return; }
                 _ftTries = 0;
+                if (_ftDx.Length == 0 && !_ftTxEnable) ftTxInSoonestSlot();                      // CQ: no station to keep step with
                 _ftTxEnable = true;
             }
             else FtHalt();
+        }
+
+        // the parity of the slot a transmission can still start in: this one when it has only just begun, else the next
+        private void ftTxInSoonestSlot()
+        {
+            double T = FtSlotLength, now = ftUtcSeconds() - _ftClock;
+            long slot = (long)Math.Floor(now / T);
+            double into = now - slot * T;
+            long use = into <= (T > 10 ? 1.4 : 0.9) ? slot : slot + 1;
+            _ftTxEven = use % 2 == 0;
         }
 
         internal void FtSetMessage(int no)
@@ -445,6 +485,7 @@ namespace BrickSDR
             _ftDx = ""; _ftDxGrid = ""; _ftRptSent = ""; _ftRptRcvd = ""; _ftCustom = ""; _ftMsgNo = 6; _ftLogged = false;
             _ftQsoStart = default(DateTime);
             if (_ftPane != null) _ftPane.Refresh2();
+            ftTxInSoonestSlot();
             FtEnableTx(true);
         }
 

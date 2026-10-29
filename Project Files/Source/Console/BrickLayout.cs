@@ -1405,6 +1405,8 @@ namespace BrickSDR
                     bp.GetState = () => (ra.Checked || rb.Checked || (brickDigiChoice == "CW" && (RX1DSPMode == DSPMode.CWL || RX1DSPMode == DSPMode.CWU))) ? 1 : 0;
                     bp.TextFn = () => brickDigiLabel() + "  \u25BE";
                     brickDigiButton = bp;
+                    string digiSig = null;
+                    brickAgcSyncs.Add(() => { string sig = brickDigiLabel() + "|" + bp.GetState(); if (sig != digiSig) { digiSig = sig; bp.Invalidate(); } });   // follows mode changes made elsewhere (the CW buttons)
                 }
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
                 rb.CheckedChanged += (s, e) => bp.Invalidate();

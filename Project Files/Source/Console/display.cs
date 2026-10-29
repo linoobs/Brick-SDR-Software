@@ -6959,6 +6959,7 @@ namespace BrickSDR
         private static DateTime _rx2_centrefreq_change_time = DateTime.UtcNow;
         unsafe static private bool DrawWaterfallDX2D(int nVerticalShift, int W, int H, int rx, bool bottom)
         {
+            if (W < 4 || H < 2) return false;   // minimised window: nothing to draw (a zero width row crashed the renderer)
             bool addRow;
 
             // this add row block prevents rows from being added if the centre frequency changes
@@ -8213,7 +8214,7 @@ namespace BrickSDR
 
                     if (!stopWaterfallOnTx)
                     {
-                        if (addRow)
+                        if (addRow && W <= (int)waterfallBitmap.Size.Width)
                         {
                             waterfallBitmap.CopyFromMemory(row, W * pixel_size, new SharpDX.Rectangle(0, 0, W, 1));
                         }

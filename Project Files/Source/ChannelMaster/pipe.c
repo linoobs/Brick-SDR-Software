@@ -210,6 +210,7 @@ void xpipe (int stream, int pos, double** buffs)
 					for (j = 0; j < n; j++) buffs[0][j] *= gd;
 				}
 			}
+			else xkdigi_rx_af(rx, buffs[0]);											// the AF level of a receiver whose audio the digital decoders read: applied after their copy (kdigi.c)
 			xkdigi_preview(rx, buffs[0]);														// Kainos: a module's preview, heard with RX1 (kdigi.c)
 			memcpy (ppip->rbuff[rx], buffs[0], pcm->rcvr[rx].ch_outsize * sizeof (complex));
 			for (i = 1; i < pcm->cmSubRCVR; i++)
@@ -246,6 +247,7 @@ void xpipe (int stream, int pos, double** buffs)
 					for (j = 0; j < n; j++) buffs[0][j] *= gd;
 				}
 			}
+			else xkdigi_rx_af(rx, buffs[0]);
 			memcpy (ppip->rbuff[rx], buffs[0], pcm->rcvr[rx].ch_outsize * sizeof (complex));
 			for (i = 1; i < pcm->cmSubRCVR; i++)
 				for (j = 0; j < 2 * pcm->rcvr[rx].ch_outsize; j++)

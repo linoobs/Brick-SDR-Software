@@ -131,7 +131,7 @@ namespace BrickSDR
             _ftRun = false;
             if (_ftThread != null) _ftThread.Join(800);
             _ftThread = null;
-            try { if (_digiTapRx >= 0) KDigi.KDigiRxTap(_digiTapRx, 0); } catch { }
+            try { if (_digiTapRx >= 0) digiTap(_digiTapRx, 0); } catch { }
             _digiTapRx = -1;
             ftDropDecoder();
         }
@@ -194,8 +194,8 @@ namespace BrickSDR
                     int rx = _digiRx;
                     if (rx != _digiTapRx)
                     {
-                        if (_digiTapRx >= 0) KDigi.KDigiRxTap(_digiTapRx, 0);
-                        KDigi.KDigiRxTap(rx, 1);
+                        if (_digiTapRx >= 0) digiTap(_digiTapRx, 0);
+                        digiTap(rx, 1);
                         _digiTapRx = rx;
                         lastSlot = long.MinValue;
                     }

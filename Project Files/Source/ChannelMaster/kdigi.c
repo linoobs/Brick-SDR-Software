@@ -63,6 +63,34 @@ PORT void KDigiRxTap(int rx, int on)
     InterlockedExchange(&rx_on[rx], on ? 1 : 0);
 }
 
+static volatile float rx_af[KDIGI_NRX] = { 1.0f, 1.0f };
+
+/* While the decoders read a receiver, WDSP's output gain stays at unity (so they see the same level whatever RX AF or MUTE says) and
+   the AF level the operator chose is applied here, after the tap, to what the speakers and VAC get (as Thetis-RADE does for RADE). */
+void xkdigi_rx_af(int rx, double* audio)
+{
+    int i, n;
+    float g;
+    if (rx < 0 || rx >= KDIGI_NRX || !pcm) return;
+    if (!_InterlockedAnd(&rx_on[rx], 1)) return;
+    g = rx_af[rx];
+    if (g == 1.0f) return;
+    n = 2 * pcm->rcvr[rx].ch_outsize;
+    for (i = 0; i < n; i++) audio[i] *= g;
+}
+
+PORT void KDigiRxSetAF(int rx, float g)
+{
+    if (rx < 0 || rx >= KDIGI_NRX) return;
+    rx_af[rx] = g;
+}
+
+PORT int KDigiRxActive(int rx)
+{
+    if (rx < 0 || rx >= KDIGI_NRX) return 0;
+    return _InterlockedAnd(&rx_on[rx], 1) ? 1 : 0;
+}
+
 PORT int KDigiRxRate(int rx)
 {
     if (rx < 0 || rx >= KDIGI_NRX) return 0;

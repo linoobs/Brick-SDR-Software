@@ -35,6 +35,7 @@ extern "C" {
 
 /* splices, called from xpipe (pipe.c) */
 void xkdigi_rx(int rx, double* audio);      /* receiver audio (interleaved L/R doubles), read only */
+void xkdigi_rx_af(int rx, double* audio);    /* the AF level, applied after the tap while it is on */
 void xkdigi_tx(double* mic_io);             /* mic audio (interleaved I/Q doubles), replaced while the feed is on */
 void xkdigi_mic(double* mic);               /* mic audio, read only (before xkdigi_tx) */
 void xkdigi_preview(int rx, double* audio); /* RX1's audio: the preview added */

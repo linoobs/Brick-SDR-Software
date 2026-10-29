@@ -223,12 +223,28 @@ namespace BrickSDR
             _digiThread.Start();
         }
 
+        // The decoders' tap on a receiver on or off. While it is on, WDSP's output gain of that receiver stays at unity and the
+        // RX AF / MUTE level is applied after the tap (radio.cs RXOutputGain, kdigi.c), so what is decoded doesn't depend on them.
+        private void digiTap(int rx, int on)
+        {
+            KDigi.KDigiRxTap(rx, on);
+            if (rx < 0 || rx > 1) return;
+            try
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    try { var d = radio.GetDSPRX(rx, 0); d.RXOutputGain = d.RXOutputGain; } catch { }
+                }));
+            }
+            catch { }
+        }
+
         private void digiStopEngine()
         {
             _digiRun = false;
             if (_digiThread != null) _digiThread.Join(500);
             _digiThread = null;
-            try { if (_digiTapRx >= 0) KDigi.KDigiRxTap(_digiTapRx, 0); } catch { }
+            try { if (_digiTapRx >= 0) digiTap(_digiTapRx, 0); } catch { }
             _digiTapRx = -1;
             _rttyDemod = null; _cwDecoder = null;
         }
@@ -282,8 +298,8 @@ namespace BrickSDR
                     int rx = _digiRx;
                     if (rx != _digiTapRx)
                     {
-                        if (_digiTapRx >= 0) KDigi.KDigiRxTap(_digiTapRx, 0);
-                        KDigi.KDigiRxTap(rx, 1);
+                        if (_digiTapRx >= 0) digiTap(_digiTapRx, 0);
+                        digiTap(rx, 1);
                         _digiTapRx = rx;
                     }
                     int rate = KDigi.KDigiRxRate(rx);

@@ -1094,6 +1094,16 @@ namespace BrickSDR
                         if (WaveThing.wave_file_writer[rade_rx] != null)
                             WaveThing.wave_file_writer[rade_rx].RecordGain = 1.0f;
                     }
+                    else if (rade_rx >= 0 && KDigi.KDigiRxActive(rade_rx) != 0)
+                    {
+                        // the RTTY / CW / FT8 / FT4 decoders read this receiver: same arrangement as for RADE
+                        KDigi.KDigiRxSetAF(rade_rx, (float)value);
+                        if (1.0 != rx_output_gain_dsp || force)
+                        {
+                            WDSP.SetRXAPanelGain1(dsp_id, 1.0);
+                            rx_output_gain_dsp = 1.0;
+                        }
+                    }
                     else if (value != rx_output_gain_dsp || force)
 					{
                         WDSP.SetRXAPanelGain1(WDSP.id(thread, subrx), value);

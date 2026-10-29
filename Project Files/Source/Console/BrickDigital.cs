@@ -20,7 +20,11 @@ namespace BrickSDR
 {
     public partial class Console
     {
-        private BrickDigiForm _digiForm;
+        private BrickDigiPane _digiPane;
+        private Form _digiHost;                         // the terminal's own window while it is popped out
+        private Panel _pnlDigi;                         // under the panadapter: where a terminal (or the FreeDV strip) docks
+        private bool _digiPopped;
+        private int _digiDockHeight = 250;
         private string _digiMode = "";                  // "RTTY" or "CW" while a terminal is open
 
         // settings (digital.txt in the data folder)
@@ -68,6 +72,7 @@ namespace BrickSDR
                         case "rsql": if (num) _rttySql = (int)Math.Max(0, Math.Min(60, d)); break;
                         case "rlevel": if (num) _rttyLevel = (int)Math.Max(-40, Math.Min(0, d)); break;
                         case "csql": if (num) _cwSql = (int)Math.Max(0, Math.Min(100, d)); break;
+                        case "pop": _digiPopped = v == "1"; break;
                     }
                 }
             }
@@ -82,7 +87,7 @@ namespace BrickSDR
                 {
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
-                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql
+                    "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0)
                 });
             }
             catch { }
@@ -92,11 +97,10 @@ namespace BrickSDR
 
         private void brickDigitalOpen(string mode)
         {
-            if (_digiForm == null || _digiForm.IsDisposed)
+            if (_digiPane == null || _digiPane.IsDisposed)
             {
                 digiLoadSettings();
-                _digiForm = new BrickDigiForm(this);
-                _digiForm.FormClosed += (s, e) => digiStop();
+                _digiPane = new BrickDigiPane(this);
             }
             if (_digiMode != mode)
             {
@@ -114,9 +118,9 @@ namespace BrickSDR
                     if (_cwEcho.TryDequeue(out c)) _digiOut.Enqueue(new KeyValuePair<char, bool>(c, true));
                 };
             }
-            _digiForm.SetMode(mode);
-            if (!_digiForm.Visible) _digiForm.Show(this);
-            _digiForm.BringToFront();
+            _digiPane.SetMode(mode);
+            brickDockRelease("digi");        // the FreeDV strip (one thing under the panadapter at a time)
+            digiPlace();
             digiStartEngine();
         }
 
@@ -125,6 +129,58 @@ namespace BrickSDR
             digiTransmitAbort();
             digiStopEngine();
             _digiMode = "";
+        }
+
+        // ---- where the terminal lives: docked under the panadapter, or in its own window (Pop out) ----
+
+        private void digiPlace()
+        {
+            if (_digiPane == null) return;
+            if (_digiPopped)
+            {
+                if (_digiHost == null || _digiHost.IsDisposed)
+                {
+                    _digiHost = new Form
+                    {
+                        Owner = this,
+                        ShowInTaskbar = false,
+                        StartPosition = FormStartPosition.Manual,
+                        BackColor = cBg,
+                        Size = new Size(820, 340),
+                        MinimumSize = new Size(700, 280),
+                        Location = new Point(Left + 80, Top + Height / 2),
+                        Icon = Icon
+                    };
+                    _digiHost.FormClosing += (s, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; digiClose(); } };
+                }
+                _digiHost.Text = "Brick-SDR - " + _digiMode;
+                brickDockHide("digi");
+                if (_digiPane.Parent != _digiHost) { _digiPane.Dock = DockStyle.Fill; _digiHost.Controls.Add(_digiPane); }
+                _digiPane.SetPopped(true);
+                _digiPane.Visible = true;
+                if (!_digiHost.Visible) _digiHost.Show(this);
+            }
+            else
+            {
+                if (_digiHost != null) _digiHost.Hide();
+                _digiPane.SetPopped(false);
+                brickDockShow("digi", _digiPane);
+            }
+        }
+
+        internal void digiTogglePop()
+        {
+            _digiPopped = !_digiPopped;
+            digiSaveSettings();
+            digiPlace();
+        }
+
+        internal void digiClose()
+        {
+            if (_digiPane != null) _digiPane.Visible = false;
+            if (_digiHost != null) _digiHost.Hide();
+            brickDockHide("digi");
+            digiStop();
         }
 
         private DSPMode digiRxMode { get { return _digiRx == 0 ? _rx1_dsp_mode : _rx2_dsp_mode; } }
@@ -154,6 +210,18 @@ namespace BrickSDR
 
         internal bool RttyModeOk { get { DSPMode m = digiRxMode; return m == DSPMode.LSB || m == DSPMode.USB || m == DSPMode.DIGL || m == DSPMode.DIGU; } }
         internal bool CwModeOk { get { DSPMode m = digiRxMode; return m == DSPMode.CWL || m == DSPMode.CWU; } }
+
+        // The RTTY tones as offsets from the receiver's VFO in Hz (mark first; negative below the VFO on LSB / DIGL), for the
+        // markers on that receiver's panadapter (BrickDigiMarkers.cs); null when the terminal isn't open on it
+        internal double[] BrickDigiMarkers(int rx)
+        {
+            if (_digiMode != "RTTY" || _digiPane == null || !_digiPane.Visible || _digiRx != rx - 1 || !RttyModeOk) return null;
+            RttyDemod d = _rttyDemod;
+            double c = d != null ? d.Center : 2210, h = _rttyShift / 2;
+            bool upper = rttyUpperSideband;
+            double mark = _rttyReverse ^ upper ? c + h : c - h, space = _rttyReverse ^ upper ? c - h : c + h;
+            return upper ? new[] { mark, space } : new[] { -mark, -space };
+        }
 
         private void rttyApplyParams()
         {
@@ -344,7 +412,7 @@ namespace BrickSDR
         }
 
         // called by the terminal's timer
-        internal void DigiUiTick(BrickDigiForm f)
+        internal void DigiUiTick(BrickDigiPane f)
         {
             KeyValuePair<char, bool> kv;
             int guard = 0;
@@ -365,14 +433,15 @@ namespace BrickSDR
 
         // ---- the terminal window ----
 
-        internal sealed class BrickDigiForm : Form
+        internal sealed class BrickDigiPane : Panel
         {
             private readonly Console c;
             private readonly RichTextBox rx;
             private readonly TextBox type, my, their;
-            private readonly Label status, title, hint;
+            private readonly Label status, title;
+            private string hintText = "";
             private readonly Panel settings;
-            private readonly Button bRx1, bRx2, bTx, bEnd, bAbort, bClear;
+            private readonly Button bRx1, bRx2, bTx, bEnd, bAbort, bClear, bPop, bClose;
             private readonly List<Button> macroButtons = new List<Button>();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 80 };
             private readonly MeterBar meter = new MeterBar();
@@ -396,22 +465,15 @@ namespace BrickSDR
                 new[] { "73", "{CALL} DE {MY} TNX FER QSO 73 SK\r\n" },
             };
 
-            public BrickDigiForm(Console console)
+            public BrickDigiPane(Console console)
             {
                 c = console;
-                Text = "Brick-SDR - Digital";
                 BackColor = cBg;
                 ForeColor = cText;
                 Font = new Font("Segoe UI", 9f);
-                StartPosition = FormStartPosition.Manual;
-                MinimumSize = new Size(640, 420);
-                ClientSize = new Size(760, 500);
-                ShowInTaskbar = false;
-                try { Icon = c.Icon; } catch { }
-                Rectangle wa = c.Bounds;
-                Location = new Point(Math.Max(0, wa.Left + 60), Math.Max(0, wa.Top + 90));
+                Size = new Size(760, 250);
 
-                title = new Label { AutoSize = false, Left = 12, Top = 8, Width = 200, Height = 26, Font = new Font("Segoe UI Semibold", 12f), ForeColor = cAccent, TextAlign = ContentAlignment.MiddleLeft };
+                title = new Label { AutoSize = false, Left = 8, Top = 6, Width = 54, Height = 26, Font = new Font("Segoe UI Semibold", 12f), ForeColor = cAccent, TextAlign = ContentAlignment.MiddleLeft };
                 bRx1 = mk("RX1", 218, 8, 54, 26, () => { c._digiRx = 0; c.digiSaveSettings(); sync(); });
                 bRx2 = mk("RX2", 276, 8, 54, 26, () => { c._digiRx = 1; c.digiSaveSettings(); sync(); });
                 my = field(354, 9, 90); their = field(500, 9, 90);
@@ -420,6 +482,8 @@ namespace BrickSDR
                 my.TextChanged += (s, e) => { c._digiMyCall = my.Text.Trim().ToUpperInvariant(); c.digiSaveSettings(); };
                 my.CharacterCasing = CharacterCasing.Upper; their.CharacterCasing = CharacterCasing.Upper;
                 bClear = mk("Clear", 0, 8, 60, 26, () => { rx.Clear(); lines = 0; });
+                bPop = mk("Pop out", 0, 6, 70, 26, () => c.digiTogglePop());
+                bClose = mk("Close", 0, 6, 60, 26, () => c.digiClose());
 
                 settings = new Panel { Left = 12, Top = 40, Height = 30, BackColor = cBg };
                 shift = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 62, FlatStyle = FlatStyle.Flat, BackColor = cBtn, ForeColor = cText };
@@ -448,14 +512,13 @@ namespace BrickSDR
                     ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = cField, ForeColor = cText, DetectUrls = false,
                     Font = new Font("Consolas", 12f), ScrollBars = RichTextBoxScrollBars.Vertical, HideSelection = false, TabStop = false
                 };
-                meter.Height = 14;
-                status = new Label { AutoSize = false, Height = 20, ForeColor = cMuted, TextAlign = ContentAlignment.MiddleLeft };
-                hint = new Label { AutoSize = false, Height = 20, ForeColor = cMuted, TextAlign = ContentAlignment.MiddleRight };
+                meter.Height = 5;
+                status = new Label { AutoSize = false, Height = 22, ForeColor = cMuted, TextAlign = ContentAlignment.MiddleRight };
                 type = new TextBox { BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Consolas", 12f), CharacterCasing = CharacterCasing.Upper };
                 type.KeyPress += typeKey;
-                bTx = mk("TX", 0, 0, 70, 30, () => { if (mode == "RTTY") c.RttySend("", false); });
-                bEnd = mk("RX", 0, 0, 70, 30, () => { if (mode == "RTTY") c.RttyReceive(); else c.CwStopQueueSafe(); });
-                bAbort = mk("ABORT", 0, 0, 80, 30, () => { if (mode == "RTTY") c.RttyAbort(); else c.CwAbort(); });
+                bTx = mk("TX", 0, 0, 70, 28, () => { if (mode == "RTTY") c.RttySend("", false); });
+                bEnd = mk("RX", 0, 0, 70, 28, () => { if (mode == "RTTY") c.RttyReceive(); else c.CwStopQueueSafe(); });
+                bAbort = mk("ABORT", 0, 0, 80, 28, () => { if (mode == "RTTY") c.RttyAbort(); else c.CwAbort(); });
                 bAbort.FlatAppearance.BorderColor = cTx;
                 foreach (string[] m in Macros)
                 {
@@ -463,13 +526,12 @@ namespace BrickSDR
                     macroButtons.Add(mk(m[0], 0, 0, 80, 28, () => macro(text)));
                 }
 
-                Controls.AddRange(new Control[] { title, bRx1, bRx2, lm, lt, my, their, bClear, settings, rx, meter, status, hint, type, bTx, bEnd, bAbort });
+                Controls.AddRange(new Control[] { title, bRx1, bRx2, lm, lt, my, their, bClear, bPop, bClose, settings, rx, meter, status, type, bTx, bEnd, bAbort });
                 foreach (Button b in macroButtons) Controls.Add(b);
                 settings.Controls.AddRange(new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
-                FormClosing += (s, e) => timer.Stop();
-                Shown += (s, e) => { layout(); timer.Start(); type.Focus(); };
+                VisibleChanged += (s, e) => { if (Visible) { layout(); timer.Start(); } else timer.Stop(); };
                 layout();
             }
 
@@ -502,6 +564,8 @@ namespace BrickSDR
                 b.Click += (s, e) => { act(); type.Focus(); };
                 return b;
             }
+
+            public void SetPopped(bool popped) { bPop.Text = popped ? "Dock" : "Pop out"; }
 
             public void SetMode(string m)
             {
@@ -547,39 +611,34 @@ namespace BrickSDR
 
             private void layout()
             {
-                int w = ClientSize.Width, h = ClientSize.Height;
-                bClear.Left = w - 12 - bClear.Width;
-                title.Width = 200;
+                int w = Width, h = Height;
+                if (w < 100 || h < 100) return;
+                // row 1: title, receiver, call signs; window buttons at the right
+                bClose.Left = w - 8 - bClose.Width; bPop.Left = bClose.Left - 6 - bPop.Width; bClear.Left = bPop.Left - 6 - bClear.Width;
+                bRx1.SetBounds(66, 6, 48, 26); bRx2.SetBounds(118, 6, 48, 26);
                 foreach (Control k in Controls)
                 {
                     Label l = k as Label;
-                    if (l != null && (string)l.Tag == "hdr") l.Top = 12;
+                    if (l != null && (string)l.Tag == "hdr") { l.Top = 11; l.Left = l.Text == "My call" ? 180 : 340; }
                 }
-                // call boxes: labels sit left of the boxes
-                int cx = 354;
-                foreach (Control k in Controls)
-                {
-                    Label l = k as Label;
-                    if (l != null && (string)l.Tag == "hdr") { l.Left = l.Text == "My call" ? 346 : 506; }
-                }
-                my.Left = 396; my.Width = 100; their.Left = 574; their.Width = 100;
-                my.Top = their.Top = 10;
+                my.SetBounds(232, 8, 96, 22); their.SetBounds(404, 8, 96, 22);
+                // row 2: settings at the left, the decoder's readings at the right
+                int sw = Math.Min(w - 16, 520);
+                settings.SetBounds(8, 34, sw, 30);
                 layoutSettings();
-                settings.Width = w - 24;
-                int bottom = h - 12;
-                int mY = bottom - 28;
-                int bx = 12;
-                foreach (Button b in macroButtons) { b.Left = bx; b.Top = mY; bx += b.Width + 8; }
-                int tY = mY - 38;
-                bAbort.Left = w - 12 - bAbort.Width; bAbort.Top = tY;
-                bEnd.Left = bAbort.Left - 8 - bEnd.Width; bEnd.Top = tY;
-                bTx.Left = bEnd.Left - 8 - bTx.Width; bTx.Top = tY;
-                int tx2 = bTx.Visible ? bTx.Left : bEnd.Left;
-                type.Left = 12; type.Top = tY + 1; type.Width = tx2 - 20; type.Height = 28;
-                status.Left = 12; status.Top = tY - 26; status.Width = (w - 24) / 2;
-                hint.Left = status.Right; hint.Top = status.Top; hint.Width = w - 12 - hint.Left;
-                meter.Left = 12; meter.Width = w - 24; meter.Top = status.Top - 18;
-                rx.Left = 12; rx.Top = 76; rx.Width = w - 24; rx.Height = Math.Max(40, meter.Top - 6 - rx.Top);
+                status.SetBounds(settings.Right + 6, 38, Math.Max(40, w - 8 - settings.Right - 6), 22);
+                // bottom row: macros, the type-ahead line, TX / RX / ABORT
+                int rowY = h - 34;
+                int bx = 8;
+                foreach (Button b in macroButtons) { b.Width = 64; b.Height = 28; b.Left = bx; b.Top = rowY; bx += b.Width + 6; }
+                bAbort.Left = w - 8 - bAbort.Width; bAbort.Top = rowY;
+                bEnd.Left = bAbort.Left - 6 - bEnd.Width; bEnd.Top = rowY;
+                bTx.Left = bEnd.Left - 6 - bTx.Width; bTx.Top = rowY;
+                int endX = bTx.Visible ? bTx.Left : bEnd.Left;
+                type.Left = bx + 6; type.Top = rowY + 1; type.Width = Math.Max(60, endX - 6 - type.Left); type.Height = 26;
+                // text between, with the level strip under it
+                rx.SetBounds(8, 68, w - 16, Math.Max(30, rowY - 6 - 68 - 8));
+                meter.SetBounds(8, rx.Bottom + 1, w - 16, 5);
             }
 
             public void Append(char ch, bool sent)
@@ -642,8 +701,8 @@ namespace BrickSDR
                         meter.Value = d.Quality;
                         status.Text = string.Format(CultureInfo.InvariantCulture, "Quality {0:0}%   centre {1:0} Hz", d.Quality * 100, d.Center);
                     }
-                    hint.Text = c.RttyTransmitting ? "TRANSMITTING - type to send, RX to finish" : (ok ? "Enter sends a line; TX keys the radio, then type" : "Use DIGL / LSB");
-                    hint.ForeColor = c.RttyTransmitting ? cTx : cMuted;
+                    hintText = c.RttyTransmitting ? "TRANSMITTING" : (ok ? "" : "Use DIGL / LSB");
+                    status.ForeColor = c.RttyTransmitting ? cTx : cMuted;
                     bTx.BackColor = c.RttyTransmitting ? cTx : cBtn;
                 }
                 else
@@ -654,9 +713,10 @@ namespace BrickSDR
                         meter.Value = d.Level;
                         status.Text = string.Format(CultureInfo.InvariantCulture, "{0:0} WPM   pitch {1} Hz   SNR {2:0.0}   {3}", d.Wpm, c.CWPitch, d.Snr, d.KeyDown ? "key down" : "");
                     }
-                    hint.Text = c.CwSending ? "SENDING" : (ok ? "Enter sends the line through CWX" : "Use CWL / CWU");
-                    hint.ForeColor = c.CwSending ? cTx : cMuted;
+                    hintText = c.CwSending ? "SENDING" : (ok ? "" : "Use CWL / CWU");
+                    status.ForeColor = c.CwSending ? cTx : cMuted;
                 }
+                if (hintText.Length > 0) status.Text = hintText + (status.Text.Length > 0 && !status.Text.StartsWith(hintText) ? "   " + status.Text : "");
                 if (problem != null && !c.PowerOn) status.Text = problem;
             }
         }

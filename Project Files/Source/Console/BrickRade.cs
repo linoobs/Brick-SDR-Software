@@ -37,13 +37,6 @@ namespace BrickSDR
     {
         private BrickRadeForm _radeForm;
 
-        // the FreeDV window (DIGI menu: FreeDV RADE)
-        internal void brickRadeOpen()
-        {
-            if (_radeForm == null || _radeForm.IsDisposed) _radeForm = new BrickRadeForm(this);
-            _radeForm.ShowAt();
-        }
-
         #region Enable
 
         // the callsign sent in each over's end-of-over frame (from Setup > DSP > FreeDV (RADE))
@@ -85,6 +78,10 @@ namespace BrickSDR
 
         // Setup > DSP > FreeDV (RADE) > Mode: RADE puts the receiver in USB / LSB instead of DIGU / DIGL (GitHub #21)
         public bool RadeVoiceModes;
+
+        // FreeDV Reporter options (the FreeDV window), read by the reporter window
+        public bool RadeIgnoreQsyRequest { get; set; }
+        public bool RadeReporterTimesUtc { get; set; } = true;
 
         public bool SetRadeEnabled(bool on) { return SetRadeEnabled(0, on); }
 
@@ -146,6 +143,8 @@ namespace BrickSDR
             }
 
             Rade.holdTxProcessing(this, RadeAnyEnabled);     // TX compressor / CFC / EQ off while RADE is on (BrickRadeCore.cs)
+            RadaeEnabledChangedHandlers?.Invoke(rx + 1, on);       // meter containers that hide without RADE
+            FreeDVReporter.FreeDVReporterManager.Update(this);     // report while RADE is on, if asked to
             RadeEnabledChanged?.Invoke(this, EventArgs.Empty);
             return true;
         }
@@ -234,6 +233,50 @@ namespace BrickSDR
 
         #endregion
 
+        #region Meters and panadapter overlay (from Thetis-RADE)
+
+        // Thetis-RADE's meter code (MeterManager, frmMeterDisplay) uses these names. rx is 1 or 2.
+        public delegate void RadaeEnabledChanged(int rx, bool enabled);
+        public RadaeEnabledChanged RadaeEnabledChangedHandlers;
+        public bool RadaeRx1Enabled { get { return RadeEnabledOn(0); } }
+        public bool RadaeRx2Enabled { get { return RadeEnabledOn(1); } }
+
+        // The RADE status overlay at the top right of each panadapter (display.cs), per receiver and on
+        // transmit; set from Setup > DSP > FreeDV (RADE). It shows only while that receiver has RADE on.
+        public bool RadeMeasureRx1 { get; set; } = true;
+        public bool RadeMeasureRx2 { get; set; } = true;
+        public bool RadeMeasureTx { get; set; } = true;
+
+        // the RADE readings for meter containers, polled with the other receiver meters (rx is 1 or 2)
+        private void radeMeterReadings(int rx)
+        {
+            int i = rx - 1;
+            Dictionary<Reading, float> values = rx == 1 ? _RX1MeterValues : _RX2MeterValues;
+            if (!RadeEnabledOn(i))
+            {
+                // idle values while RADE is off, so nothing freezes at its last reading
+                values[Reading.RADAE_SYNC] = 0;
+                values[Reading.RADAE_SNR_DB] = 0;
+                values[Reading.RADAE_RX_LEVEL_DB] = -120;
+                values[Reading.RADAE_CLIP] = 0;
+                values[Reading.RADAE_EOO_DECODE] = 0;
+                return;
+            }
+            if (MeterManager.RequiresUpdate(rx, Reading.RADAE_SYNC)) values[Reading.RADAE_SYNC] = Rade.GetRadaeSync(i);
+            if (MeterManager.RequiresUpdate(rx, Reading.RADAE_SNR_DB)) values[Reading.RADAE_SNR_DB] = Rade.GetRadaeSnrDb(i);
+            if (MeterManager.RequiresUpdate(rx, Reading.RADAE_RX_LEVEL_DB)) values[Reading.RADAE_RX_LEVEL_DB] = Rade.GetRadaeRxLevelDb(i);
+            if (MeterManager.RequiresUpdate(rx, Reading.RADAE_CLIP)) values[Reading.RADAE_CLIP] = Rade.GetRadaeClip(i);
+            if (MeterManager.RequiresUpdate(rx, Reading.RADAE_EOO_DECODE)) values[Reading.RADAE_EOO_DECODE] = Rade.GetRadaeEooDecodePulse(i);
+        }
+
+        // the encoder's mic level and clip, while transmitting
+        private void radeMeterReadingsTX()
+        {
+            updateMetersReading(Reading.RADAE_TX_MIC_LEVEL_DB, Rade.GetRadaeTxMicLevelDb(), 0);
+            updateMetersReading(Reading.RADAE_TX_MIC_CLIP, Rade.GetRadaeTxMicClip(), 0);
+        }
+
+        #endregion
         #region PTT arbiter
 
         // From Thetis-RADE ("Option B"). A RADE over is keyed as normal. When it is released, by the MOX

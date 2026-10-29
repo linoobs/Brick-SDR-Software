@@ -46996,6 +46996,7 @@ namespace BrickSDR
                         else
                             _RX1MeterValues[Reading.ESTIMATED_PBSNR] = 0f;
                     }
+                    radeMeterReadings(1); // RADE meters (BrickRade.cs)
 
                     ////[2.10.3.9]MW0LGE sub rx (future)
                     //if (SubRXEnabled)
@@ -47040,6 +47041,7 @@ namespace BrickSDR
                 {
                     updateMetersReading(Reading.MIC, (float)Math.Max(-195.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.MIC)), 0);
                     updateMetersReading(Reading.MIC_PK, (float)Math.Max(-195.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.MIC_PK)), 0);
+                    radeMeterReadingsTX(); // RADE meters (BrickRade.cs)
                     updateMetersReading(Reading.EQ, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.EQ)), 0);
                     updateMetersReading(Reading.EQ_PK, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.EQ_PK)), 0);
                     updateMetersReading(Reading.LEVELER, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.LEVELER)), 0);
@@ -47201,6 +47203,7 @@ namespace BrickSDR
                         else
                             _RX2MeterValues[Reading.ESTIMATED_PBSNR] = 0f;
                     }
+                    radeMeterReadings(2); // RADE meters (BrickRade.cs)
 
                     if(MeterManager.RequiresUpdate(2, Reading.SIGNAL_MAX_BIN) || (TCIServer != null && TCIServer.SensorRequiresUpdate(2, Reading.SIGNAL_MAX_BIN)))
                     {
@@ -47217,6 +47220,7 @@ namespace BrickSDR
                 {
                     updateMetersReading(Reading.MIC, (float)Math.Max(-195.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.MIC)), 0);
                     updateMetersReading(Reading.MIC_PK, (float)Math.Max(-195.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.MIC_PK)), 0);
+                    radeMeterReadingsTX(); // RADE meters (BrickRade.cs)
                     updateMetersReading(Reading.EQ, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.EQ)), 0);
                     updateMetersReading(Reading.EQ_PK, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.EQ_PK)), 0);
                     updateMetersReading(Reading.LEVELER, (float)Math.Max(-30.0f, -WDSP.CalculateTXMeter(1, WDSP.MeterType.LEVELER)), 0);

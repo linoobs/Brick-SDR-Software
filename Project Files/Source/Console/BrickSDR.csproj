@@ -476,9 +476,17 @@
     </Content>
     <Compile Include="BrickLayout.cs" />
     <Compile Include="BrickDigital.cs" />
+    <Compile Include="BrickDock.cs" />
     <Compile Include="BrickRadeCore.cs" />
     <Compile Include="BrickRade.cs" />
     <Compile Include="BrickRadeUi.cs" />
+    <Compile Include="BrickRadeStrip.cs" />
+    <Compile Include="BrickRadeSetup.cs" />
+    <Compile Include="BrickDigiMarkers.cs" />
+    <Compile Include="FreeDVReporter/FreeDVReporterClient.cs" />
+    <Compile Include="FreeDVReporter/FreeDVReporterForm.cs" />
+    <Compile Include="FreeDVReporter/FreeDVReporterManager.cs" />
+    <Compile Include="FreeDVReporter/Maidenhead.cs" />
     <Compile Include="BrickRttyCodec.cs" />
     <Compile Include="BrickCwCodec.cs" />
     <Compile Include="BrickModePanels.cs" />

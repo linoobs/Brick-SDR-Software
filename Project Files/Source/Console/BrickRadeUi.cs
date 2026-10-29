@@ -22,6 +22,8 @@ namespace BrickSDR
         {
             public string Call = "";
             public bool V2Rx1, V2Rx2, VoiceModes, Noise, Agc, Eq;
+            public string Grid = "", ReporterMessage = "";
+            public bool Reporting, IgnoreQsy, Utc = true, OverlayRx1 = true, OverlayRx2 = true, OverlayTx = true;
             public int MicDb, Rx1Db, Rx2Db, AgcTarget = -23;
             public double BassF = 100, BassG, MidF = 1000, MidG, MidQ = 0.7, TrebleF = 5000, TrebleG, EqVol;
         }
@@ -55,6 +57,14 @@ namespace BrickSDR
                             case "noise": _rs.Noise = b; break;
                             case "agc": _rs.Agc = b; break;
                             case "eq": _rs.Eq = b; break;
+                            case "grid": _rs.Grid = v.Trim().ToUpperInvariant(); break;
+                            case "repmsg": _rs.ReporterMessage = v; break;
+                            case "reporting": _rs.Reporting = b; break;
+                            case "ignoreqsy": _rs.IgnoreQsy = b; break;
+                            case "utc": _rs.Utc = v != "0"; break;
+                            case "ovrx1": _rs.OverlayRx1 = v != "0"; break;
+                            case "ovrx2": _rs.OverlayRx2 = v != "0"; break;
+                            case "ovtx": _rs.OverlayTx = v != "0"; break;
                             case "mic": if (num) _rs.MicDb = (int)Math.Max(-40, Math.Min(40, d)); break;
                             case "rx1": if (num) _rs.Rx1Db = (int)Math.Max(-100, Math.Min(40, d)); break;
                             case "rx2": if (num) _rs.Rx2Db = (int)Math.Max(-100, Math.Min(40, d)); break;
@@ -85,7 +95,9 @@ namespace BrickSDR
                     "call=" + _rs.Call, "v2rx1=" + o(_rs.V2Rx1), "v2rx2=" + o(_rs.V2Rx2), "voice=" + o(_rs.VoiceModes),
                     "noise=" + o(_rs.Noise), "agc=" + o(_rs.Agc), "eq=" + o(_rs.Eq), "mic=" + _rs.MicDb, "rx1=" + _rs.Rx1Db, "rx2=" + _rs.Rx2Db,
                     "agct=" + _rs.AgcTarget, "bassf=" + f(_rs.BassF), "bassg=" + f(_rs.BassG), "midf=" + f(_rs.MidF), "midg=" + f(_rs.MidG),
-                    "midq=" + f(_rs.MidQ), "treblef=" + f(_rs.TrebleF), "trebleg=" + f(_rs.TrebleG), "eqvol=" + f(_rs.EqVol)
+                    "midq=" + f(_rs.MidQ), "treblef=" + f(_rs.TrebleF), "trebleg=" + f(_rs.TrebleG), "eqvol=" + f(_rs.EqVol),
+                    "grid=" + _rs.Grid, "repmsg=" + (_rs.ReporterMessage ?? "").Replace('\r', ' ').Replace('\n', ' '), "reporting=" + o(_rs.Reporting), "ignoreqsy=" + o(_rs.IgnoreQsy),
+                    "utc=" + o(_rs.Utc), "ovrx1=" + o(_rs.OverlayRx1), "ovrx2=" + o(_rs.OverlayRx2), "ovtx=" + o(_rs.OverlayTx)
                 });
             }
             catch { }
@@ -96,6 +108,10 @@ namespace BrickSDR
         {
             RadeCallsign = _rs.Call;
             RadeVoiceModes = _rs.VoiceModes;
+            RadeIgnoreQsyRequest = _rs.IgnoreQsy;
+            RadeReporterTimesUtc = _rs.Utc;
+            RadeMeasureRx1 = _rs.OverlayRx1; RadeMeasureRx2 = _rs.OverlayRx2; RadeMeasureTx = _rs.OverlayTx;
+            FreeDVReporter.FreeDVReporterManager.Configure(this, _rs.Call, _rs.Grid, _rs.ReporterMessage, _rs.Reporting);
             try
             {
                 Rade.SetRadaeProtocolV2(0, _rs.V2Rx1 ? 1 : 0);
@@ -131,14 +147,14 @@ namespace BrickSDR
             private readonly HeardPanel heard;
             private readonly LevelBar rxBar, micBar;
             private readonly TextBox call;
+            private TextBox grid, repMsg;
+            private CheckBox chkReport, chkQsy, chkUtc, chkOv1, chkOv2, chkOvTx;
+            private Button bReporter;
             private readonly NumericUpDown mic, rxLevel, agcTarget, bassF, bassG, midF, midG, midQ, trebleF, trebleG, eqVol;
             private readonly ComboBox mode;
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 50 };
             private int rx;
             private bool syncing;
-            private readonly int[] callSeq = { -1, -1 };
-            private readonly string[] heardCall = { "", "" };
-            private readonly DateTime[] heardAt = new DateTime[2];
             private int holdStatus;
 
             public BrickRadeForm(Console console)
@@ -207,12 +223,45 @@ namespace BrickSDR
                 y += 28;
                 Controls.Add(lbl("Volume", 12, y + 4));
                 eqVol = nud(172, y, -20, 20, 1, 0, v => c._rs.EqVol = v);
+                int yEq = y;
 
-                footer = new Label { Left = 340, Top = y - 76, Width = 248, Height = 100, ForeColor = cMuted };
+                // FreeDV Reporter (qso.freedv.org) and the panadapter overlay
+                y += 40;
+                bReporter = mk("Reporter", 12, y, 100, 28, () => FreeDVReporter.FreeDVReporterManager.ShowWindow(c));
+                bReporter.FlatAppearance.BorderColor = cLine;
+                Controls.Add(bReporter);
+                Controls.Add(lbl("Grid", 126, y + 6));
+                grid = new TextBox { Left = 158, Top = y + 3, Width = 64, MaxLength = 6, CharacterCasing = CharacterCasing.Upper, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
+                grid.TextChanged += (s, e) => { if (!syncing) { c._rs.Grid = grid.Text.Trim(); c.radeSettingsChanged(); } };
+                Controls.Add(grid);
+                Controls.Add(lbl("Message", 236, y + 6));
+                repMsg = new TextBox { Left = 296, Top = y + 3, Width = 292, MaxLength = 64, BackColor = cField, ForeColor = cText, BorderStyle = BorderStyle.FixedSingle };
+                repMsg.TextChanged += (s, e) => { if (!syncing) { c._rs.ReporterMessage = repMsg.Text; c.radeSettingsChanged(); } };
+                Controls.Add(repMsg);
+                y += 32;
+                chkReport = chk("Report my station while RADE is on", 12, y, 250, v => c._rs.Reporting = v);
+                chkQsy = chk("Ignore QSY requests", 270, y, 160, v => c._rs.IgnoreQsy = v);
+                chkUtc = chk("Times in UTC", 440, y, 140, v => c._rs.Utc = v);
+                y += 26;
+                Controls.Add(lbl("Status on the panadapter:", 12, y + 3));
+                chkOv1 = chk("RX1", 170, y, 56, v => c._rs.OverlayRx1 = v);
+                chkOv2 = chk("RX2", 232, y, 56, v => c._rs.OverlayRx2 = v);
+                chkOvTx = chk("Transmit", 294, y, 90, v => c._rs.OverlayTx = v);
+                ClientSize = new Size(600, y + 40);
+
+                footer = new Label { Left = 340, Top = yEq - 76, Width = 248, Height = 100, ForeColor = cMuted };
                 Controls.AddRange(new Control[] { bOn, bV1, bV2, bRx1, bRx2, status, statusPanel, heard, rxBar, micBar, footer, bNoise, bAgc, bEq });
 
                 timer.Tick += (s, e) => tick();
                 showReceiver(!c.RadeEnabledOn(0) && c.RadeEnabledOn(1) ? 1 : 0);
+            }
+
+            private CheckBox chk(string text, int x, int y, int w, Action<bool> set)
+            {
+                CheckBox b = new CheckBox { Text = text, Left = x, Top = y, Width = w, ForeColor = cText, BackColor = cBg, FlatStyle = FlatStyle.Standard };
+                b.CheckedChanged += (s, e) => { if (!syncing) { set(b.Checked); c.radeSettingsChanged(); } };
+                Controls.Add(b);
+                return b;
             }
 
             private Label lbl(string t, int x, int y)
@@ -271,7 +320,7 @@ namespace BrickSDR
             private void showReceiver(int r)
             {
                 rx = r;
-                heard.SetHeard(heardCall[r], heardAt[r]);
+                heard.SetHeard(c._radeHeardCall[r], c._radeHeardAt[r]);
                 statusPanel.SetState(false, false, 0, 0);
                 sync();
             }
@@ -299,6 +348,9 @@ namespace BrickSDR
                     light(bRx1, rx == 0); light(bRx2, rx == 1);
                     light(bNoise, c._rs.Noise); light(bAgc, c._rs.Agc); light(bEq, c._rs.Eq);
                     call.Text = c._rs.Call;
+                    grid.Text = c._rs.Grid; repMsg.Text = c._rs.ReporterMessage ?? "";
+                    chkReport.Checked = c._rs.Reporting; chkQsy.Checked = c._rs.IgnoreQsy; chkUtc.Checked = c._rs.Utc;
+                    chkOv1.Checked = c._rs.OverlayRx1; chkOv2.Checked = c._rs.OverlayRx2; chkOvTx.Checked = c._rs.OverlayTx;
                     mic.Value = Math.Max(mic.Minimum, Math.Min(mic.Maximum, c._rs.MicDb));
                     rxLevel.Value = Math.Max(rxLevel.Minimum, Math.Min(rxLevel.Maximum, rx == 0 ? c._rs.Rx1Db : c._rs.Rx2Db));
                     mode.SelectedIndex = c._rs.VoiceModes ? 1 : 0;
@@ -349,22 +401,8 @@ namespace BrickSDR
                             micClip = c.RadeMicClip;
                         }
                     }
-                    for (int i = 0; i < 2; i++)
-                    {
-                        int seq = c.RadeCallsignSeqOn(i);
-                        if (seq == callSeq[i]) continue;
-                        if (callSeq[i] != -1)
-                        {
-                            string cs = c.RadeRemoteCallsignOn(i);
-                            if (cs.Length > 0)
-                            {
-                                heardCall[i] = cs;
-                                heardAt[i] = DateTime.Now;
-                                if (i == r) heard.SetHeard(cs, heardAt[i]);
-                            }
-                        }
-                        callSeq[i] = seq;
-                    }
+                    c.radePollCalls();
+                    heard.SetHeard(c._radeHeardCall[r], c._radeHeardAt[r]);
                 }
                 catch { }
 
@@ -373,15 +411,8 @@ namespace BrickSDR
                 micBar.SetLevel(micl, micClip);
                 heard.Invalidate();
 
-                string text;
                 Color color;
-                if (!on) { text = "Off"; color = kTextDim; }
-                else if (!power) { text = "Radio off"; color = kTextDim; }
-                else if (c.MOX && c.RadeTxReceiver != r) { text = "Transmitting from RX" + (c.RadeTxReceiver + 1); color = cMuted; }
-                else if (c.RadeSendingEoo) { text = "Sending end-of-over"; color = cAccent; }
-                else if (c.MOX) { text = c.RadeTransmitting ? "Transmitting RADE" : "Transmitting voice"; color = cTx; }
-                else if (sync) { text = "Receiving RADE"; color = kGreen; }
-                else { text = "Listening"; color = cMuted; }
+                string text = c.radeStatusText(r, on, power, sync, out color);
                 if (holdStatus > 0) holdStatus--;
                 else
                 {
@@ -543,7 +574,7 @@ namespace BrickSDR
             }
 
             // a horizontal level meter, -60 .. 0 dBFS, with a held peak; red while the source reports clipping
-            private sealed class LevelBar : Control
+            internal sealed class LevelBar : Control
             {
                 public string Label = "";
                 private double db = -120, peak = -120;
@@ -585,6 +616,42 @@ namespace BrickSDR
                         g.DrawString(text, f, b, new RectangleF(bar.Right, 3, 62, Height), sf);
                 }
             }
+        }
+
+        // the callsigns heard in end-of-over frames, collected on both receivers (the FreeDV window and the strip read them)
+        internal readonly string[] _radeHeardCall = { "", "" };
+        internal readonly DateTime[] _radeHeardAt = new DateTime[2];
+        private readonly int[] _radeCallSeq = { -1, -1 };
+
+        internal void radePollCalls()
+        {
+            try
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    int seq = RadeCallsignSeqOn(i);
+                    if (seq == _radeCallSeq[i]) continue;
+                    if (_radeCallSeq[i] != -1)
+                    {
+                        string cs = RadeRemoteCallsignOn(i);
+                        if (cs.Length > 0) { _radeHeardCall[i] = cs; _radeHeardAt[i] = DateTime.Now; }
+                    }
+                    _radeCallSeq[i] = seq;
+                }
+            }
+            catch { }
+        }
+
+        // what RADE is doing on a receiver, in words, and the colour for it
+        internal string radeStatusText(int r, bool on, bool power, bool sync, out Color color)
+        {
+            if (!on) { color = kTextDim; return "Off"; }
+            if (!power) { color = kTextDim; return "Radio off"; }
+            if (MOX && RadeTxReceiver != r) { color = cMuted; return "Transmitting from RX" + (RadeTxReceiver + 1); }
+            if (RadeSendingEoo) { color = cAccent; return "Sending end-of-over"; }
+            if (MOX) { color = cTx; return RadeTransmitting ? "Transmitting RADE" : "Transmitting voice"; }
+            if (sync) { color = kGreen; return "Receiving RADE"; }
+            color = cMuted; return "Listening";
         }
 
         private void radeSettingsChanged()

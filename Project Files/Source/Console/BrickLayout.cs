@@ -1549,6 +1549,7 @@ namespace BrickSDR
             Panel dispCard = brickCard(pnlCenter);
             dispCard.Dock = DockStyle.Fill;
             dispCard.Padding = new Padding(4);
+            brickDispCard = dispCard;
 
             // pan and zoom of the second receiver, below the bottom waterfall (only while RX2 runs)
             pnlRx2View = new Panel { Dock = DockStyle.Bottom, Height = 30, BackColor = cCard, Visible = false };

@@ -24632,8 +24632,9 @@ namespace BrickSDR
             if (lb.Items.Count == 0) return 0;
 
             MeterType t = mtci.MeterType;
-            int block = -1;
-            if ( ((int)t > (int)MeterType.NONE) && ((int)t <= (int)MeterType.ESTIMATED_PBSNR) || (int)t == (int)MeterType.ACG_MAX_MAG)
+            int block = radeMeterBlock(t);   // RADE meters (BrickRadeSetup.cs)
+            if (block >= 0) { }
+            else if ( ((int)t > (int)MeterType.NONE) && ((int)t <= (int)MeterType.ESTIMATED_PBSNR) || (int)t == (int)MeterType.ACG_MAX_MAG)
             {
                 block = 0;
             }
@@ -24712,6 +24713,7 @@ namespace BrickSDR
             chkLockContainer_CheckedChanged(this, EventArgs.Empty); // force it
 
             chkContainer_hidewhennotused.Checked = MeterManager.ContainerHidesWhenRXNotUsed(cci.ID); //needs to be before the rx2/rx1 data radios below
+if (chkContainer_hideRADEnotenabled != null) chkContainer_hideRADEnotenabled.Checked = MeterManager.ContainerHidesWhenRADENotEnabled(cci.ID); // BrickRadeSetup.cs
 
             int rx = MeterManager.GetContainerRX(cci.ID);
             switch (rx)

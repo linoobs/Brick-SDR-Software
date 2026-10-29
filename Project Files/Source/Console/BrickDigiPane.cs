@@ -22,7 +22,7 @@ namespace BrickSDR
             private readonly BrickField type, my, their;
             private readonly Label status, title, lblMy, lblTheir;
             private readonly Panel settings;
-            private readonly BrickBtn bRx1, bRx2, bTx, bEnd, bAbort, bClear, bPop, bClose;
+            private readonly BrickBtn bTx, bEnd, bAbort, bClear, bPop, bClose;
             private readonly List<BrickBtn> macroButtons = new List<BrickBtn>();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 80 };
             private readonly MeterBar meter = new MeterBar();
@@ -55,8 +55,6 @@ namespace BrickSDR
                 Size = new Size(760, 270);
 
                 title = new Label { AutoSize = false, Left = 8, Top = 6, Width = 54, Height = 26, Font = new Font("Segoe UI Semibold", 12f), ForeColor = cAccent, TextAlign = ContentAlignment.MiddleLeft, BackColor = cCard };
-                bRx1 = mk("RX1", 46, 26, () => { c._digiRx = 0; c.digiSaveSettings(); sync(); });
-                bRx2 = mk("RX2", 46, 26, () => { c._digiRx = 1; c.digiSaveSettings(); sync(); });
                 lblMy = lbl("My call"); lblTheir = lbl("Their call");
                 my = new BrickField(); their = new BrickField();
                 my.CharacterCasing = CharacterCasing.Upper; their.CharacterCasing = CharacterCasing.Upper;
@@ -107,7 +105,7 @@ namespace BrickSDR
                     macroButtons.Add(mk(m[0], 64, 28, () => macro(text)));
                 }
 
-                Controls.AddRange(new Control[] { title, bRx1, bRx2, lblMy, my, lblTheir, their, bClear, bPop, bClose, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
+                Controls.AddRange(new Control[] { title, lblMy, my, lblTheir, their, bClear, bPop, bClose, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
                 foreach (BrickBtn b in macroButtons) Controls.Add(b);
                 settings.Controls.AddRange(new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
                 Resize += (s, e) => layout();
@@ -154,8 +152,6 @@ namespace BrickSDR
 
             private void sync()
             {
-                bRx1.On = c._digiRx == 0;
-                bRx2.On = c._digiRx == 1;
             }
 
             private void layoutSettings()
@@ -188,9 +184,8 @@ namespace BrickSDR
                 bClose.SetBounds(w - 8 - bClose.Width, 6, bClose.Width, 26);
                 bPop.SetBounds(bClose.Left - 6 - bPop.Width, 6, bPop.Width, 26);
                 bClear.SetBounds(bPop.Left - 6 - bClear.Width, 6, bClear.Width, 26);
-                bRx1.SetBounds(66, 6, 46, 26); bRx2.SetBounds(116, 6, 46, 26);
-                lblMy.Location = new Point(178, 11); my.SetBounds(228, 6, 96, 26);
-                lblTheir.Location = new Point(334, 11); their.SetBounds(404, 6, 96, 26);
+                lblMy.Location = new Point(74, 11); my.SetBounds(124, 6, 96, 26);
+                lblTheir.Location = new Point(230, 11); their.SetBounds(300, 6, 96, 26);
                 // row 2: the settings
                 settings.Location = new Point(8, 36);
                 layoutSettings();
@@ -287,6 +282,7 @@ namespace BrickSDR
                     hintText = c.CwSending ? "SENDING" : (ok ? "" : "Use CWL / CWU");
                     status.ForeColor = c.CwSending ? cTx : cMuted;
                 }
+                if (c._digiRx == 1) hintText = "RX2   " + hintText;
                 string text = hintText.Length > 0 ? (stats.Length > 0 ? hintText + "   " + stats : hintText) : stats;
                 if (problem != null && !c.PowerOn) text = problem;
                 if (status.Text != text) status.Text = text;

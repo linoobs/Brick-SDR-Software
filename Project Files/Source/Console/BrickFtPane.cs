@@ -21,7 +21,9 @@ namespace BrickSDR
             public string Heading = "";
             public bool Compact;                    // no DT column: the QSO list is the narrower one
             public Func<FtRow, bool> Accept = r => true;
-            public event Action<FtRow> Picked;
+            public event Action<FtRow> Picked;                 // a click: the station is selected
+            public event Action<FtRow> Activated;              // a double click: select and enable the transmitter
+            public Func<FtRow, bool> Mark = r => false;        // rows of the station selected as DX
             private int top;                            // first row shown
             private bool follow = true;
             private const int RowH = 18, HeadH = 20, Max = 600;
@@ -57,11 +59,24 @@ namespace BrickSDR
                 base.OnMouseWheel(e);
             }
 
+            private FtRow rowAt(int y)
+            {
+                int i = top + (y - HeadH) / RowH;
+                return y >= HeadH && i >= 0 && i < Items.Count ? Items[i] : null;
+            }
+
+            protected override void OnMouseClick(MouseEventArgs e)
+            {
+                base.OnMouseClick(e);
+                FtRow r = rowAt(e.Y);
+                if (r != null && Picked != null) { Picked(r); Invalidate(); }
+            }
+
             protected override void OnMouseDoubleClick(MouseEventArgs e)
             {
                 base.OnMouseDoubleClick(e);
-                int i = top + (e.Y - HeadH) / RowH;
-                if (e.Y >= HeadH && i >= 0 && i < Items.Count && Picked != null) Picked(Items[i]);
+                FtRow r = rowAt(e.Y);
+                if (r != null && Activated != null) { Activated(r); Invalidate(); }
             }
 
             protected override void OnResize(EventArgs e)
@@ -85,6 +100,7 @@ namespace BrickSDR
                     Color fore = r.Sent ? cTx : r.ToMe ? Color.FromArgb(255, 120, 90) : r.Cq ? kGreen : cText;
                     if (r.ToMe) using (Brush b = new SolidBrush(Color.FromArgb(60, 255, 90, 60))) g.FillRectangle(b, 0, y, Width, RowH);
                     else if (r.Sent) using (Brush b = new SolidBrush(Color.FromArgb(40, 255, 60, 60))) g.FillRectangle(b, 0, y, Width, RowH);
+                    if (!r.Sent && Mark(r)) using (Brush b = new SolidBrush(Color.FromArgb(70, cAccent))) g.FillRectangle(b, 0, y, Width, RowH);
                     if (newSlot) using (Pen p = new Pen(cLine)) g.DrawLine(p, 0, y, Width, y);
                     Rectangle c0 = new Rectangle(6, y, 52, RowH);
                     TextRenderer.DrawText(g, r.Utc.ToString("HHmmss"), font, c0, kTextDim, fl);
@@ -104,11 +120,11 @@ namespace BrickSDR
         internal sealed class BrickFtPane : Panel
         {
             private readonly Console c;
-            private readonly BrickBtn bFt8, bFt4, bRx1, bRx2, bClose, bAuto, bTx, bHalt, bCq, bClear;
+            private readonly BrickBtn bFt8, bFt4, bClose, bAuto, bTx, bHalt, bCq, bClear, bLog;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
-            private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, lblDrive, status, clock;
-            private readonly BrickNum rxHz, txHz, power;
+            private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
+            private readonly BrickNum rxHz, txHz;
             private readonly FtList activity, qso;
             private readonly MeterBar slotBar = new MeterBar(), inBar = new MeterBar();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 100 };
@@ -126,10 +142,9 @@ namespace BrickSDR
 
                 bFt8 = mk("FT8", 50, 26, () => { c.brickFtSetMode("FT8"); activity.Clear(); qso.Clear(); sync(); });
                 bFt4 = mk("FT4", 50, 26, () => { c.brickFtSetMode("FT4"); activity.Clear(); qso.Clear(); sync(); });
-                bRx1 = mk("RX1", 46, 26, () => { c._digiRx = 0; c.digiSaveSettings(); });
-                bRx2 = mk("RX2", 46, 26, () => { c._digiRx = 1; c.digiSaveSettings(); });
                 bClose = mk("Close", 60, 26, () => c.brickFtClose());
                 bClear = mk("Clear", 60, 26, () => { activity.Clear(); qso.Clear(); });
+                bLog = mk("Log", 50, 26, () => c.FtShowLog());
                 lblMy = lbl("My call"); lblGrid = lbl("Grid"); lblDx = lbl("DX call");
                 my = new BrickField { CharacterCasing = CharacterCasing.Upper, Width = 90 };
                 grid = new BrickField { CharacterCasing = CharacterCasing.Upper, Width = 64, MaxLength = 6 };
@@ -148,26 +163,27 @@ namespace BrickSDR
                     {
                         FtRow r = activity.Items[i];
                         if (r.Sent) continue;
-                        if (c.FtSender(r) == call) { c.FtPick(r); return; }
+                        if (c.FtSender(r) == call) { c.FtPick(r, true); return; }
                     }
                     c.FtStatus = call.Length > 0 ? call + " not in the list" : "";
                 };
 
-                lblRxHz = lbl("Rx"); lblTxHz = lbl("Tx"); lblDrive = lbl("Drive");
+                lblRxHz = lbl("Rx"); lblTxHz = lbl("Tx");
                 rxHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftRxHz };
                 txHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftTxHz };
-                power = new BrickNum { Minimum = 0, Maximum = 100, Increment = 1, Suffix = " %", Width = 90, Height = 24, Value = c.PWR };
                 rxHz.ValueChanged += (s, e) => { if (setting) return; c._ftRxHz = (int)rxHz.Value; c.digiSaveSettings(); };
                 txHz.ValueChanged += (s, e) => { if (setting) return; c._ftTxHz = (int)txHz.Value; c.digiSaveSettings(); };
-                power.ValueChanged += (s, e) => { if (setting) return; c.PWR = (int)power.Value; };
                 bAuto = mk("Auto-sequence", 112, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
 
                 activity = new FtList { Heading = "Band activity      dB    DT   Hz   message" };
                 qso = new FtList { Heading = "Your QSO        dB   Hz   message", Compact = true };
                 qso.Accept = r => r.Sent || r.ToMe || (c._ftDx.Length > 0 && r.Text.Contains(c._ftDx));
-                activity.Picked += r => c.FtPick(r);
-                qso.Picked += r => c.FtPick(r);
+                activity.Picked += r => c.FtPick(r, false);
+                qso.Picked += r => c.FtPick(r, false);
+                activity.Activated += r => c.FtPick(r, true);
+                qso.Activated += r => c.FtPick(r, true);
+                activity.Mark = qso.Mark = r => c._ftDx.Length > 0 && c.FtSender(r) == c._ftDx;
 
                 slotBar.Height = 6; inBar.Height = 6;
                 status = new Label { AutoSize = false, Height = 18, ForeColor = cMuted, BackColor = cCard, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
@@ -190,8 +206,8 @@ namespace BrickSDR
                 bHalt = mk("Halt", 64, 28, () => { c.FtHalt(); sync(); });
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
-                Controls.AddRange(new Control[] { bFt8, bFt4, bRx1, bRx2, lblMy, my, lblGrid, grid, lblDx, dx, bClear, bClose,
-                    lblRxHz, rxHz, lblTxHz, txHz, lblDrive, power, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
+                Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, bClose,
+                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
@@ -236,7 +252,6 @@ namespace BrickSDR
             private void sync()
             {
                 bFt8.On = c._ftMode == "FT8"; bFt4.On = c._ftMode == "FT4";
-                bRx1.On = c._digiRx == 0; bRx2.On = c._digiRx == 1;
                 bTx.On = c._ftTxEnable;
                 bTx.Text = c._ftTxEnable ? "TX enabled" : "Enable TX";
                 bCq.On = c._ftMsgNo == 6 && c._ftCustom.Length == 0;
@@ -248,20 +263,19 @@ namespace BrickSDR
             {
                 int w = Width, h = Height;
                 if (w < 300 || h < 120) return;
-                // row 1: mode, receiver, calls
+                // row 1: mode, calls
                 bClose.SetBounds(w - 8 - 60, 6, 60, 26);
                 bClear.SetBounds(bClose.Left - 6 - 60, 6, 60, 26);
+                bLog.SetBounds(bClear.Left - 6 - 50, 6, 50, 26);
                 bFt8.SetBounds(8, 6, 50, 26); bFt4.SetBounds(62, 6, 50, 26);
-                bRx1.SetBounds(124, 6, 46, 26); bRx2.SetBounds(174, 6, 46, 26);
-                int x = 232;
+                int x = 124;
                 lblMy.Location = new Point(x, 11); x += lblMy.PreferredWidth + 4; my.SetBounds(x, 6, 90, 26); x += 98;
                 lblGrid.Location = new Point(x, 11); x += lblGrid.PreferredWidth + 4; grid.SetBounds(x, 6, 64, 26); x += 72;
                 lblDx.Location = new Point(x, 11); x += lblDx.PreferredWidth + 4; dx.SetBounds(x, 6, 100, 26);
-                // row 2: frequencies, drive, auto
+                // row 2: frequencies, auto
                 x = 8;
                 lblRxHz.Location = new Point(x, 40); x += lblRxHz.PreferredWidth + 4; rxHz.Location = new Point(x, 37); x += rxHz.Width + 12;
                 lblTxHz.Location = new Point(x, 40); x += lblTxHz.PreferredWidth + 4; txHz.Location = new Point(x, 37); x += txHz.Width + 12;
-                lblDrive.Location = new Point(x, 40); x += lblDrive.PreferredWidth + 4; power.Location = new Point(x, 37); x += power.Width + 12;
                 bAuto.Location = new Point(x, 37);
                 // bottom: messages and TX
                 int rowY = h - 34;
@@ -308,9 +322,8 @@ namespace BrickSDR
                 if (status.Text != text) status.Text = text;
                 DateTime u = DateTime.UtcNow;
                 u = u.AddSeconds(-c.FtClock);
-                clock.Text = u.ToString("HH:mm:ss") + " UTC" + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
+                clock.Text = u.ToString("HH:mm:ss") + " UTC" + (c._digiRx == 1 ? "  RX2" : "") + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
                 bTx.On = c._ftTxEnable || tx;
-                if (c.PWR != (int)power.Value) { setting = true; power.Value = c.PWR; setting = false; }
                 if (!msg.Box.Focused && msg.Text != c.FtNextMessage) msg.Text = c.FtNextMessage;
                 if (tx) { slotBar.Invalidate(); }
             }

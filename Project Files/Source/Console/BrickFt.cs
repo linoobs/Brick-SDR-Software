@@ -34,8 +34,8 @@ namespace BrickSDR
         private string _ftMode = "FT8";                 // "FT8" or "FT4", the one the window is set to
         private string _ftGrid = "";
         private int _ftRxHz = 1500, _ftTxHz = 1500;
-        // the level of the transmit audio is fixed (about 10 W with Drive at 100: the output stays linear up to there); the power is the main Drive slider
-        private const double FtAudioDb = -11.5;
+        // The level of the transmit audio has no control in the window: the power is the main Drive slider (-11.5 dB gives about 10 W at Drive 98 on a Brick2 15W).
+        private double _ftLevel = -11.5;       // dB, digital.txt "ftlevel"
         private bool _ftAuto = true;
         private volatile bool _ftRun;
         private Thread _ftThread;
@@ -355,7 +355,7 @@ namespace BrickSDR
                 string err;
                 float[] a = Mfsk.Encode(_ftMode == "FT4" ? Mfsk.FT4 : Mfsk.FT8, msg, txRate, _ftTxHz, out err);
                 if (a == null) { _ftStatus = "Can't send \"" + msg + "\": " + err; _ftTxEnable = false; return; }
-                float amp = (float)Math.Pow(10, FtAudioDb / 20.0);
+                float amp = (float)Math.Pow(10, _ftLevel / 20.0);
                 for (int i = 0; i < a.Length; i++) a[i] *= amp;
                 _ftTxAudio = a;
                 _ftTxPos = 0;
@@ -469,14 +469,14 @@ namespace BrickSDR
             return (s < 0 ? "-" : "+") + Math.Abs(s).ToString("00");
         }
 
-        private void ftAutoSequence(string text, float snr, bool even, float hz)
+        private void ftAutoSequence(string text, float snr, bool even, float hz, bool force = false)
         {
             if (!_ftAuto || _digiMyCall.Length == 0 || !_ftRun) return;
             string[] t = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length < 3 || ftBase(t[0]) != _digiMyCall) return;
             string from = ftBase(t[1]), what = t[2];
             if (_ftDx.Length > 0 && from != _ftDx) return;                                   // someone else while we're busy
-            if (_ftDx.Length == 0 && !_ftTxEnable) return;
+            if (_ftDx.Length == 0 && !_ftTxEnable && !force) return;
             if (_ftDx.Length == 0 || _ftLogged) { _ftQsoStart = DateTime.UtcNow; _ftLogged = false; }
             bool changed = true;
             if (GridRe.IsMatch(what) && what != "RR73")
@@ -531,41 +531,48 @@ namespace BrickSDR
         }
 
         // a double click on a decoded message
-        internal void FtPick(FtRow row)
+        internal void FtPick(FtRow row, bool enable)
         {
+            if (row.Sent) return;
             string[] t = row.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length < 2) return;
+            string who = row.ToMe ? ftBase(t[1]) : FtSender(row);
+            if (who.Length == 0) return;
+            if (!enable && who == _ftDx) return;                                              // the same station again: leave the QSO as it is
             _ftCustom = "";
             _ftLogged = false;
             _ftQsoStart = DateTime.UtcNow;
-            _ftTxEven = !row.Even;
-            if (row.Cq)
-            {
-                int i = 1;
-                if (t.Length > 3 && t[1].Length <= 4 && !t[1].Any(char.IsDigit)) i = 2;       // CQ DX K1ABC FN42
-                _ftDx = ftBase(t[i]);
-                _ftDxGrid = t.Length > i + 1 && GridRe.IsMatch(t[i + 1]) ? t[i + 1] : "";
-                _ftRptSent = ""; _ftRptRcvd = "";
-                _ftMsgNo = 1;
-                _ftTxHz = Math.Max(200, Math.Min(3000, (int)Math.Round(row.Hz)));
-                _ftRxHz = _ftTxHz;
-                _ftTries = 0;
-                FtEnableTx(true);
-            }
-            else if (row.ToMe)
+            _ftTxEven = !row.Even;                                                            // answer in the other slot
+            _ftRxHz = (int)Math.Round(row.Hz);
+            _ftTries = 0;
+            if (row.ToMe)
             {
                 _ftDx = "";
-                ftAutoSequence(row.Text, row.Snr, row.Even, row.Hz);
-                _ftRxHz = (int)Math.Round(row.Hz);
-                FtEnableTx(true);
+                ftAutoSequence(row.Text, row.Snr, row.Even, row.Hz, true);
+                if (_ftDx.Length == 0) { _ftDx = who; _ftMsgNo = 1; }
             }
             else
             {
-                _ftDx = ftBase(t[1]);
-                _ftDxGrid = ""; _ftRptSent = ""; _ftRptRcvd = ""; _ftMsgNo = 1;
-                _ftRxHz = (int)Math.Round(row.Hz);
+                _ftDx = who;
+                int i = row.Cq && t.Length > 3 && t[1].Length <= 4 && !t[1].Any(char.IsDigit) ? 3 : 2;       // CQ DX K1ABC FN42
+                _ftDxGrid = row.Cq && t.Length > i && GridRe.IsMatch(t[i]) ? t[i] : "";
+                _ftRptSent = ""; _ftRptRcvd = "";
+                _ftMsgNo = 1;
+                _ftTxHz = Math.Max(200, Math.Min(3000, _ftRxHz));
             }
+            if (enable) FtEnableTx(true);
             if (_ftPane != null) _ftPane.Refresh2();
+        }
+
+        // the folder of the log, with the file selected
+        internal void FtShowLog()
+        {
+            try
+            {
+                if (File.Exists(FtLogFile)) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + FtLogFile + "\"");
+                else { _ftStatus = "No QSO logged yet. The log is " + FtLogFile; System.Diagnostics.Process.Start("explorer.exe", "\"" + AppDataPath + "\""); }
+            }
+            catch { }
         }
 
         // ---- the log (ADIF) ----

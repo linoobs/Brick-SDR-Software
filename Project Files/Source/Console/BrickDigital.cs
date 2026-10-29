@@ -33,7 +33,7 @@ namespace BrickSDR
         private int _digiRx;
         private double _rttyShift = 170, _rttyBaud = 45.45;
         private bool _rttyReverse, _rttyAfc = true;
-        private int _rttySql = 15, _rttyLevel = -10, _cwSql = 20;
+        private int _rttySql = 15, _rttyLevel = 0, _cwSql = 20;
 
         // engine state
         private Thread _digiThread;
@@ -58,6 +58,7 @@ namespace BrickSDR
             try
             {
                 if (!File.Exists(DigiFile)) return;
+                bool lvl2 = false;
                 foreach (string line in File.ReadAllLines(DigiFile))
                 {
                     int e = line.IndexOf('=');
@@ -78,6 +79,7 @@ namespace BrickSDR
                         case "csql": if (num) _cwSql = (int)Math.Max(0, Math.Min(100, d)); break;
                         case "pop": _digiPopped = v == "1"; break;
                         case "open": _digiOpenKey = v.Trim(); break;
+                        case "lvl": lvl2 = v == "3"; break;
                         case "grid": _ftGrid = v.Trim().ToUpperInvariant(); break;
                         case "ftmode": if (v == "FT4") _ftMode = "FT4"; break;
                         case "ftrx": if (num) _ftRxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
@@ -86,6 +88,8 @@ namespace BrickSDR
                         case "ftlevel": if (num) _ftLevel = Math.Max(-40, Math.Min(0, d)); break;
                     }
                 }
+                // before level scheme 3 the TX audio of RTTY and FT8 was set low (-10 dB): the Drive slider did not give what it gives in CW
+                if (!lvl2) { _rttyLevel = 0; _ftLevel = 0; }
             }
             catch { }
         }
@@ -100,7 +104,7 @@ namespace BrickSDR
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
                     "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
-                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture)
+                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
                 });
             }
             catch { }

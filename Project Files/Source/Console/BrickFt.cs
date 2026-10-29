@@ -34,8 +34,8 @@ namespace BrickSDR
         private string _ftMode = "FT8";                 // "FT8" or "FT4", the one the window is set to
         private string _ftGrid = "";
         private int _ftRxHz = 1500, _ftTxHz = 1500;
-        // The level of the transmit audio has no control in the window: the power is the main Drive slider (-11.5 dB gives about 10 W at Drive 98 on a Brick2 15W).
-        private double _ftLevel = -11.5;       // dB, digital.txt "ftlevel"
+        // The transmit audio level has no control in the window: it is full scale (0 dB), enough for the TX leveler to saturate, so the main Drive slider sets the power as it does in CW.
+        private double _ftLevel = 0;            // dB, digital.txt "ftlevel"
         private bool _ftAuto = true;
         private volatile bool _ftRun;
         private Thread _ftThread;

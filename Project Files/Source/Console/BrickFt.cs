@@ -34,6 +34,8 @@ namespace BrickSDR
         private string _ftMode = "FT8";                 // "FT8" or "FT4", the one the window is set to
         private string _ftGrid = "";
         private int _ftRxHz = 1500, _ftTxHz = 1500;
+        private bool _ftPsk;                              // PSK Reporter spotting (Setup - General - DIGI MODES - FT8/FT4), digital.txt "psk"
+        private PskReporter _psk;
         // The transmit audio level has no control in the window: it is full scale (0 dB), enough for the TX leveler to saturate, so the main Drive slider sets the power as it does in CW.
         private double _ftLevel = 0;            // dB, digital.txt "ftlevel"
         private bool _ftAuto = true;
@@ -138,6 +140,7 @@ namespace BrickSDR
 
         private void ftStopEngine()
         {
+            try { if (_psk != null) { _psk.FlushIfDue(); _psk.Stop(); } } catch { }
             _ftRun = false;
             if (_ftThread != null) _ftThread.Join(800);
             _ftThread = null;
@@ -330,7 +333,7 @@ namespace BrickSDR
                     _ftRows.Enqueue(row);
                 }
                 ftTrackClock(rows);
-                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz); }));
+                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz); ftPskAdd(rows, period, mode); }));
             }
             catch (Exception ex) { _ftStatus = "Decoder: " + ex.Message; }
         }
@@ -618,6 +621,54 @@ namespace BrickSDR
             {
                 if (File.Exists(FtLogFile)) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + FtLogFile + "\"");
                 else { _ftStatus = "No QSO logged yet. The log is " + FtLogFile; System.Diagnostics.Process.Start("explorer.exe", "\"" + AppDataPath + "\""); }
+            }
+            catch { }
+        }
+
+
+        // ---- PSK Reporter ----
+
+        internal bool FtPskEnabled { get { if (!_digiLoaded) digiLoadSettings(); return _ftPsk; } }
+
+        internal string FtPskStatus
+        {
+            get
+            {
+                if (!FtPskEnabled) return "Off";
+                if (_digiMyCall.Length < 3 || _ftGrid.Length < 4) return "Enter your call sign and grid in the FT8 / FT4 window";
+                return _psk != null && _psk.Running ? _psk.Status : "Waiting for FT8 / FT4 decodes";
+            }
+        }
+
+        internal void FtSetPsk(bool on)
+        {
+            _ftPsk = on;
+            digiSaveSettings();
+            if (!on && _psk != null) _psk.Stop();
+        }
+
+        // the stations of one decoded period go to the reporter (UI thread): call sign and locator from the message, the dial frequency plus the audio frequency, the SNR
+        private void ftPskAdd(List<Mfsk.Decoder.Row> rows, long period, string mode)
+        {
+            try
+            {
+                if (!_ftPsk || _digiMyCall.Length < 3 || _ftGrid.Length < 4) return;
+                if (_psk == null) _psk = new PskReporter();
+                if (!_psk.Running) _psk.Start(_digiMyCall, _ftGrid, "Brick-SDR " + BrickBranding.Version);
+                if (!_psk.Running) return;
+                double dial = (_digiRx == 1 ? VFOBFreq : VFOAFreq) * 1e6;
+                double T = mode == "FT4" ? 7.5 : 15.0;
+                DateTime start = FtEpoch.AddSeconds(period * T);
+                foreach (var r in rows)
+                {
+                    FtRow tmp = new FtRow { Text = r.Text };
+                    ftClassify(tmp);
+                    string call = FtSender(tmp);
+                    string[] t = r.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    int at = Array.IndexOf(t, call);
+                    string grid = at >= 0 && at + 1 < t.Length && GridRe.IsMatch(t[at + 1]) && t[at + 1] != "RR73" ? t[at + 1] : "";
+                    _psk.Add(call, grid, (long)Math.Round(dial + r.Hz), (int)Math.Round(r.Snr), mode, start);
+                }
             }
             catch { }
         }

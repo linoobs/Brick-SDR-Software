@@ -14,6 +14,7 @@ namespace BrickSDR
         public void BrickSimplifyNR()
         {
             BrickAddRadeMeterOption();
+            BrickAddDigiModesTab();
             grpRNnoise.Visible = false;
             groupBoxTS55.Text = "NNR (NR3 / NR4) RX1";
             groupBoxTS56.Text = "NNR (NR3 / NR4) RX2";

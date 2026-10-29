@@ -480,6 +480,8 @@
     <Compile Include="BrickMfsk.cs" />
     <Compile Include="BrickFt.cs" />
     <Compile Include="BrickFtPane.cs" />
+    <Compile Include="BrickDigiSetup.cs" />
+    <Compile Include="BrickPskReporter.cs" />
     <Compile Include="BrickUi.cs" />
     <Compile Include="BrickModeStep.cs" />
     <Compile Include="BrickDigiPane.cs" />

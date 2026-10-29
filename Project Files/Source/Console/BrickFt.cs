@@ -33,7 +33,9 @@ namespace BrickSDR
         private BrickFtPane _ftPane;
         private string _ftMode = "FT8";                 // "FT8" or "FT4", the one the window is set to
         private string _ftGrid = "";
-        private int _ftRxHz = 1500, _ftTxHz = 1500, _ftLevel = -10;
+        private int _ftRxHz = 1500, _ftTxHz = 1500;
+        // the level of the transmit audio is fixed (about 10 W with Drive at 100: the output stays linear up to there); the power is the main Drive slider
+        private const double FtAudioDb = -11.5;
         private bool _ftAuto = true;
         private volatile bool _ftRun;
         private Thread _ftThread;
@@ -241,10 +243,14 @@ namespace BrickSDR
                                 long from = endIdx - len;
                                 if (from >= 0 && total - from < ring.Length && lastSlot != _ftSkipSlot && !_ftTxActive)
                                 {
+                                    // the audio is at whatever level the receiver gives (AGC); fit the slot's peak to 90 % of full scale
+                                    float peak = 0;
+                                    for (int i = 0; i < len; i++) { float a = Math.Abs(ring[(int)((from + i) % ring.Length)]); if (a > peak) peak = a; }
+                                    float scale = peak > 1e-6f ? Math.Max(0.02f, Math.Min(50f, 0.9f / peak)) * 32767f : 0f;
                                     short[] s = new short[len];
                                     for (int i = 0; i < len; i++)
                                     {
-                                        float v = ring[(int)((from + i) % ring.Length)] * 32767f;
+                                        float v = ring[(int)((from + i) % ring.Length)] * scale;
                                         s[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
                                     }
                                     long period = lastSlot;
@@ -349,7 +355,7 @@ namespace BrickSDR
                 string err;
                 float[] a = Mfsk.Encode(_ftMode == "FT4" ? Mfsk.FT4 : Mfsk.FT8, msg, txRate, _ftTxHz, out err);
                 if (a == null) { _ftStatus = "Can't send \"" + msg + "\": " + err; _ftTxEnable = false; return; }
-                float amp = (float)Math.Pow(10, _ftLevel / 20.0);
+                float amp = (float)Math.Pow(10, FtAudioDb / 20.0);
                 for (int i = 0; i < a.Length; i++) a[i] *= amp;
                 _ftTxAudio = a;
                 _ftTxPos = 0;
@@ -437,6 +443,8 @@ namespace BrickSDR
         internal void FtCallCq()
         {
             _ftDx = ""; _ftDxGrid = ""; _ftRptSent = ""; _ftRptRcvd = ""; _ftCustom = ""; _ftMsgNo = 6; _ftLogged = false;
+            _ftQsoStart = default(DateTime);
+            if (_ftPane != null) _ftPane.Refresh2();
             FtEnableTx(true);
         }
 
@@ -469,6 +477,7 @@ namespace BrickSDR
             string from = ftBase(t[1]), what = t[2];
             if (_ftDx.Length > 0 && from != _ftDx) return;                                   // someone else while we're busy
             if (_ftDx.Length == 0 && !_ftTxEnable) return;
+            if (_ftDx.Length == 0 || _ftLogged) { _ftQsoStart = DateTime.UtcNow; _ftLogged = false; }
             bool changed = true;
             if (GridRe.IsMatch(what) && what != "RR73")
             {
@@ -510,6 +519,15 @@ namespace BrickSDR
                 _ftTxHz = Math.Max(200, Math.Min(3000, (int)Math.Round(hz)));
                 if (_ftPane != null) _ftPane.Refresh2();
             }
+        }
+
+        // who sent a decoded message: the call after CQ (and its DX / region modifier), else the second call
+        internal string FtSender(FtRow row)
+        {
+            string[] t = row.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (t.Length < 2) return "";
+            if (row.Cq) return ftBase(t.Length > 3 && t[1].Length <= 4 && !t[1].Any(char.IsDigit) ? t[2] : t[1]);
+            return ftBase(t[1]);
         }
 
         // a double click on a decoded message

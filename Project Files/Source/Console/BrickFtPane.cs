@@ -19,6 +19,7 @@ namespace BrickSDR
         {
             public readonly List<FtRow> Items = new List<FtRow>();
             public string Heading = "";
+            public bool Compact;                    // no DT column: the QSO list is the narrower one
             public Func<FtRow, bool> Accept = r => true;
             public event Action<FtRow> Picked;
             private int top;                            // first row shown
@@ -90,11 +91,11 @@ namespace BrickSDR
                     if (!r.Sent)
                     {
                         TextRenderer.DrawText(g, r.Snr.ToString("0", CultureInfo.InvariantCulture).PadLeft(3), font, new Rectangle(66, y, 40, RowH), fore, fl);
-                        TextRenderer.DrawText(g, r.Dt.ToString("0.0", CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(108, y, 44, RowH), kTextDim, fl);
+                        if (!Compact) TextRenderer.DrawText(g, r.Dt.ToString("0.0", CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(108, y, 44, RowH), kTextDim, fl);
                     }
                     else TextRenderer.DrawText(g, "Tx", bold, new Rectangle(66, y, 40, RowH), fore, fl);
-                    TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(158, y, 44, RowH), kTextDim, fl);
-                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle(212, y, Math.Max(10, Width - 212), RowH), fore, fl | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 106 : 158, y, 44, RowH), kTextDim, fl);
+                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), fore, fl | TextFormatFlags.EndEllipsis);
                 }
                 using (Pen p = new Pen(cLine)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
             }
@@ -106,8 +107,8 @@ namespace BrickSDR
             private readonly BrickBtn bFt8, bFt4, bRx1, bRx2, bClose, bAuto, bTx, bHalt, bCq, bClear;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
-            private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, lblLevel, status, clock;
-            private readonly BrickNum rxHz, txHz, level;
+            private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, lblDrive, status, clock;
+            private readonly BrickNum rxHz, txHz, power;
             private readonly FtList activity, qso;
             private readonly MeterBar slotBar = new MeterBar(), inBar = new MeterBar();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 100 };
@@ -137,19 +138,33 @@ namespace BrickSDR
                 my.TextChangedX += (s, e) => { if (setting) return; c._digiMyCall = my.Text.Trim().ToUpperInvariant(); c.digiSaveSettings(); };
                 grid.TextChangedX += (s, e) => { if (setting) return; c._ftGrid = grid.Text.Trim().ToUpperInvariant(); c.digiSaveSettings(); };
                 dx.TextChangedX += (s, e) => { if (setting) return; c._ftDx = dx.Text.Trim().ToUpperInvariant(); c._ftLogged = false; };
+                // a call sign and Enter: answer the last message that station sent, as a double click on it would
+                dx.KeyPressX += (s, e) =>
+                {
+                    if (e.KeyChar != (char)Keys.Enter) return;
+                    e.Handled = true;
+                    string call = dx.Text.Trim().ToUpperInvariant();
+                    for (int i = activity.Items.Count - 1; call.Length > 0 && i >= 0; i--)
+                    {
+                        FtRow r = activity.Items[i];
+                        if (r.Sent) continue;
+                        if (c.FtSender(r) == call) { c.FtPick(r); return; }
+                    }
+                    c.FtStatus = call.Length > 0 ? call + " not in the list" : "";
+                };
 
-                lblRxHz = lbl("Rx"); lblTxHz = lbl("Tx"); lblLevel = lbl("Level");
+                lblRxHz = lbl("Rx"); lblTxHz = lbl("Tx"); lblDrive = lbl("Drive");
                 rxHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftRxHz };
                 txHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftTxHz };
-                level = new BrickNum { Minimum = -40, Maximum = 0, Increment = 1, Suffix = " dB", Width = 94, Height = 24, Value = c._ftLevel };
+                power = new BrickNum { Minimum = 0, Maximum = 100, Increment = 1, Suffix = " %", Width = 90, Height = 24, Value = c.PWR };
                 rxHz.ValueChanged += (s, e) => { if (setting) return; c._ftRxHz = (int)rxHz.Value; c.digiSaveSettings(); };
                 txHz.ValueChanged += (s, e) => { if (setting) return; c._ftTxHz = (int)txHz.Value; c.digiSaveSettings(); };
-                level.ValueChanged += (s, e) => { if (setting) return; c._ftLevel = (int)level.Value; c.digiSaveSettings(); };
+                power.ValueChanged += (s, e) => { if (setting) return; c.PWR = (int)power.Value; };
                 bAuto = mk("Auto-sequence", 112, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
 
                 activity = new FtList { Heading = "Band activity      dB    DT   Hz   message" };
-                qso = new FtList { Heading = "Your QSO" };
+                qso = new FtList { Heading = "Your QSO        dB   Hz   message", Compact = true };
                 qso.Accept = r => r.Sent || r.ToMe || (c._ftDx.Length > 0 && r.Text.Contains(c._ftDx));
                 activity.Picked += r => c.FtPick(r);
                 qso.Picked += r => c.FtPick(r);
@@ -176,7 +191,7 @@ namespace BrickSDR
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
                 Controls.AddRange(new Control[] { bFt8, bFt4, bRx1, bRx2, lblMy, my, lblGrid, grid, lblDx, dx, bClear, bClose,
-                    lblRxHz, rxHz, lblTxHz, txHz, lblLevel, level, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
+                    lblRxHz, rxHz, lblTxHz, txHz, lblDrive, power, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
@@ -201,7 +216,7 @@ namespace BrickSDR
                 setting = true;
                 bFt8.On = mode == "FT8"; bFt4.On = mode == "FT4";
                 my.Text = c._digiMyCall; grid.Text = c._ftGrid;
-                rxHz.Value = c._ftRxHz; txHz.Value = c._ftTxHz; level.Value = c._ftLevel;
+                rxHz.Value = c._ftRxHz; txHz.Value = c._ftTxHz;
                 setting = false;
                 activity.Clear(); qso.Clear();
                 sync();
@@ -242,11 +257,11 @@ namespace BrickSDR
                 lblMy.Location = new Point(x, 11); x += lblMy.PreferredWidth + 4; my.SetBounds(x, 6, 90, 26); x += 98;
                 lblGrid.Location = new Point(x, 11); x += lblGrid.PreferredWidth + 4; grid.SetBounds(x, 6, 64, 26); x += 72;
                 lblDx.Location = new Point(x, 11); x += lblDx.PreferredWidth + 4; dx.SetBounds(x, 6, 100, 26);
-                // row 2: frequencies, level, auto
+                // row 2: frequencies, drive, auto
                 x = 8;
                 lblRxHz.Location = new Point(x, 40); x += lblRxHz.PreferredWidth + 4; rxHz.Location = new Point(x, 37); x += rxHz.Width + 12;
                 lblTxHz.Location = new Point(x, 40); x += lblTxHz.PreferredWidth + 4; txHz.Location = new Point(x, 37); x += txHz.Width + 12;
-                lblLevel.Location = new Point(x, 40); x += lblLevel.PreferredWidth + 4; level.Location = new Point(x, 37); x += level.Width + 12;
+                lblDrive.Location = new Point(x, 40); x += lblDrive.PreferredWidth + 4; power.Location = new Point(x, 37); x += power.Width + 12;
                 bAuto.Location = new Point(x, 37);
                 // bottom: messages and TX
                 int rowY = h - 34;
@@ -263,7 +278,7 @@ namespace BrickSDR
                 inBar.SetBounds(slotBar.Right + 8, rowY - 30, w - 8 - (slotBar.Right + 8), 6);
                 // the lists
                 int top = 70, bot = slotBar.Top - 4;
-                int lw = (int)((w - 24) * 0.62);
+                int lw = (int)((w - 24) * 0.5);
                 activity.SetBounds(8, top, lw, Math.Max(40, bot - top));
                 qso.SetBounds(8 + lw + 8, top, w - 24 - lw, Math.Max(40, bot - top));
             }
@@ -286,16 +301,16 @@ namespace BrickSDR
                 if (tx) { text = "TRANSMITTING   " + c.FtNextMessage; status.ForeColor = cTx; }
                 else
                 {
-                    status.ForeColor = c.FtClip ? cTx : cMuted;
+                    status.ForeColor = cMuted;
                     if (text.Length == 0 || problem != null && !c._ftTxEnable) text = problem ?? "";
                     if (text.Length == 0) text = c._ftTxEnable ? "Waiting for the " + (c._ftTxEven ? "even" : "odd") + " slot: " + c.FtNextMessage : "Listening";
-                    if (c.FtClip) text = "Receive audio is clipping - lower the AF gain.   " + text;
                 }
                 if (status.Text != text) status.Text = text;
                 DateTime u = DateTime.UtcNow;
                 u = u.AddSeconds(-c.FtClock);
                 clock.Text = u.ToString("HH:mm:ss") + " UTC" + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
                 bTx.On = c._ftTxEnable || tx;
+                if (c.PWR != (int)power.Value) { setting = true; power.Value = c.PWR; setting = false; }
                 if (!msg.Box.Focused && msg.Text != c.FtNextMessage) msg.Text = c.FtNextMessage;
                 if (tx) { slotBar.Invalidate(); }
             }

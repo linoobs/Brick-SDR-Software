@@ -140,6 +140,7 @@ namespace BrickSDR
                 foreach (Control k in new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblLevel, rlevel, rsql }) k.Visible = r;
                 foreach (Control k in new Control[] { lblWpm, wpm, csql }) k.Visible = !r;
                 lblSql.Visible = true;
+                if (!r && c.DeepCwAvailable) { lblSql.Visible = false; csql.Visible = false; }        // the network has no squelch
                 bTx.Visible = r;
                 bEnd.Text = r ? "RX" : "STOP";
                 if (!r) { try { wpm.Value = Math.Max(wpm.Minimum, Math.Min(wpm.Maximum, c.CWXForm.WPM)); } catch { } }
@@ -272,10 +273,17 @@ namespace BrickSDR
                 else
                 {
                     CwDecoder d = c._cwDecoder;
-                    if (d != null)
+                    DeepCwDecoder dd = c._cwDeep;
+                    if (dd != null)
+                    {
+                        meter.Value = dd.Level;
+                        stats = "DeepCW   " + dd.Status;
+                    }
+                    else if (d != null)
                     {
                         meter.Value = d.Level;
                         stats = string.Format(CultureInfo.InvariantCulture, "{0:0} WPM   tone {1:0} Hz   S/N {2:0.0}{3}", d.Wpm, d.TonePitch, d.Snr, d.KeyDown ? "   key down" : "");
+                        if (c.DeepCwError != null) stats += "   (DeepCW is not available: " + c.DeepCwError + ")";
                     }
                     hintText = c.CwSending ? "SENDING" : (ok ? "" : "Use CWL / CWU");
                     status.ForeColor = c.CwSending ? cTx : cMuted;

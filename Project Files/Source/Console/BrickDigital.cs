@@ -42,6 +42,10 @@ namespace BrickSDR
         private RttyDemod _rttyDemod;
         private RttyMod _rttyMod;
         private CwDecoder _cwDecoder;
+        private DeepCwDecoder _cwDeep;                  // the CW decoder in use when DeepCW (neural network) loads; _cwDecoder is the basic one kept as the fallback
+        private static DeepCwEngine _deepEngine;
+        private static string _deepError;
+        private static bool _deepTried;
         private readonly ConcurrentQueue<KeyValuePair<char, bool>> _digiOut = new ConcurrentQueue<KeyValuePair<char, bool>>();     // char, sent
         private readonly ConcurrentQueue<char> _rttyTxQueue = new ConcurrentQueue<char>();
         private readonly ConcurrentQueue<char> _cwEcho = new ConcurrentQueue<char>();
@@ -148,6 +152,7 @@ namespace BrickSDR
         {
             try
             {
+                string logFile = FtLogFile;       // makes the digi_modes folder (and moves an old ft_log.adi into it)
                 digiLoadSettings();
                 brickEnsureSsbLeveler();
                 // the TX profile and the saved state may still be loading: look again
@@ -249,8 +254,24 @@ namespace BrickSDR
             catch { }
         }
 
+        // the DeepCW network, loaded once; null (and the reason in _deepError) when the model or ONNX Runtime can't be loaded
+        private static DeepCwEngine deepCwEngine()
+        {
+            if (!_deepTried)
+            {
+                _deepTried = true;
+                try { _deepEngine = DeepCwEngine.Create(Path.Combine(System.Windows.Forms.Application.StartupPath, "deepcw", "model.onnx"), out _deepError); }
+                catch (Exception ex) { _deepError = ex.Message; }
+            }
+            return _deepEngine;
+        }
+
+        internal bool DeepCwAvailable { get { return deepCwEngine() != null; } }
+        internal string DeepCwError { get { return _deepError; } }
+
         private void digiStopEngine()
         {
+            if (_cwDeep != null) { _cwDeep.Dispose(); _cwDeep = null; }
             _digiRun = false;
             if (_digiThread != null) _digiThread.Join(500);
             _digiThread = null;
@@ -323,19 +344,33 @@ namespace BrickSDR
                         }
                         else if (mode == "CW")
                         {
-                            _cwDecoder = new CwDecoder(rate);
-                            _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+                            DeepCwEngine de = deepCwEngine();
+                            if (de != null)
+                            {
+                                _cwDeep = new DeepCwDecoder(de, rate);
+                                _cwDeep.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+                                _cwDecoder = null;
+                            }
+                            else
+                            {
+                                _cwDecoder = new CwDecoder(rate);
+                                _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+                            }
                         }
                     }
                     if (mode == "RTTY") rttyApplyParams();
-                    else if (mode == "CW" && _cwDecoder != null) { _cwDecoder.Pitch = CWPitch; _cwDecoder.Squelch = _cwSql / 100.0; }
+                    else if (mode == "CW")
+                    {
+                        if (_cwDeep != null) _cwDeep.Pitch = CWPitch;
+                        else if (_cwDecoder != null) { _cwDecoder.Pitch = CWPitch; _cwDecoder.Squelch = _cwSql / 100.0; }
+                    }
 
                     int n;
                     while ((n = KDigi.KDigiRxRead(rx, buf, buf.Length)) > 0)
                     {
                         if (_mox) continue;
                         if (mode == "RTTY" && _rttyDemod != null) _rttyDemod.Process(buf, n);
-                        else if (mode == "CW" && _cwDecoder != null) _cwDecoder.Process(buf, n);
+                        else if (mode == "CW") { if (_cwDeep != null) _cwDeep.Process(buf, n); else if (_cwDecoder != null) _cwDecoder.Process(buf, n); }
                     }
 
                     // RTTY transmit: keep ~0.2 s of audio queued ahead of the radio

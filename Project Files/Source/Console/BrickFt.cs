@@ -620,7 +620,7 @@ namespace BrickSDR
             try
             {
                 if (File.Exists(FtLogFile)) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + FtLogFile + "\"");
-                else { _ftStatus = "No QSO logged yet. The log is " + FtLogFile; System.Diagnostics.Process.Start("explorer.exe", "\"" + AppDataPath + "\""); }
+                else { _ftStatus = "No QSO logged yet. The log is " + FtLogFile; System.Diagnostics.Process.Start("explorer.exe", "\"" + DigiModesFolder + "\""); }
             }
             catch { }
         }
@@ -675,7 +675,31 @@ namespace BrickSDR
 
         // ---- the log (ADIF) ----
 
-        private string FtLogFile { get { return Path.Combine(AppDataPath, "ft_log.adi"); } }
+        // the QSO logs (ADIF) of the digital modes are kept in the digi_modes folder of the data folder
+        internal string DigiModesFolder
+        {
+            get
+            {
+                string d = Path.Combine(AppDataPath, "digi_modes");
+                try { Directory.CreateDirectory(d); } catch { }
+                return d;
+            }
+        }
+
+        private string FtLogFile
+        {
+            get
+            {
+                string f = Path.Combine(DigiModesFolder, "ft_log.adi");
+                try
+                {
+                    string old = Path.Combine(AppDataPath, "ft_log.adi");      // where it was before: move it over once
+                    if (File.Exists(old) && !File.Exists(f)) File.Move(old, f);
+                }
+                catch { }
+                return f;
+            }
+        }
 
         private void ftLogQso()
         {

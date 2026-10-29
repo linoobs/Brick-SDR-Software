@@ -120,7 +120,7 @@ namespace BrickSDR
         internal sealed class BrickFtPane : Panel
         {
             private readonly Console c;
-            private readonly BrickBtn bFt8, bFt4, bClose, bAuto, bTx, bHalt, bCq, bClear, bLog;
+            private readonly BrickBtn bFt8, bFt4, bAuto, bTx, bHalt, bCq, bClear, bLog;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
             private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
@@ -142,7 +142,6 @@ namespace BrickSDR
 
                 bFt8 = mk("FT8", 50, 26, () => { c.brickFtSetMode("FT8"); activity.Clear(); qso.Clear(); sync(); });
                 bFt4 = mk("FT4", 50, 26, () => { c.brickFtSetMode("FT4"); activity.Clear(); qso.Clear(); sync(); });
-                bClose = mk("Close", 60, 26, () => c.brickFtClose());
                 bClear = mk("Clear", 60, 26, () => { activity.Clear(); qso.Clear(); });
                 bLog = mk("Log", 50, 26, () => c.FtShowLog());
                 lblMy = lbl("My call"); lblGrid = lbl("Grid"); lblDx = lbl("DX call");
@@ -206,7 +205,7 @@ namespace BrickSDR
                 bHalt = mk("Halt", 64, 28, () => { c.FtHalt(); sync(); });
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
-                Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, bClose,
+                Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear,
                     lblRxHz, rxHz, lblTxHz, txHz, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
@@ -264,8 +263,7 @@ namespace BrickSDR
                 int w = Width, h = Height;
                 if (w < 300 || h < 120) return;
                 // row 1: mode, calls
-                bClose.SetBounds(w - 8 - 60, 6, 60, 26);
-                bClear.SetBounds(bClose.Left - 6 - 60, 6, 60, 26);
+                bClear.SetBounds(w - 8 - 60, 6, 60, 26);
                 bLog.SetBounds(bClear.Left - 6 - 50, 6, 50, 26);
                 bFt8.SetBounds(8, 6, 50, 26); bFt4.SetBounds(62, 6, 50, 26);
                 int x = 124;

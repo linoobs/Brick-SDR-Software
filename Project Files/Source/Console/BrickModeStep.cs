@@ -5,6 +5,7 @@
 
 using System;
 using System.IO;
+using System.Windows.Forms;
 
 namespace BrickSDR
 {
@@ -90,6 +91,22 @@ namespace BrickSDR
                 }
                 catch { }
             }));
+        }
+
+        // The VAC gains, sample rate and Stereo of the digital mode panel (left column, under the input card) are not shown while FT8 / FT4, FreeDV or RTTY
+        // is in use: they are not needed there and the card goes away with them. Plain DIGL / DIGU keeps the panel.
+        private Panel brickModeCard;
+        private void brickHideDigitalSettings()
+        {
+            try
+            {
+                if (brickModeCard == null) return;
+                bool digitalMode = RX1DSPMode == DSPMode.DIGU || RX1DSPMode == DSPMode.DIGL;
+                bool inUse = brickDockKey == "ft" || _digiMode == "RTTY" || RadeEnabledOn(0) || RadeEnabledOn(1) || brickDockKey == "rade";
+                bool hide = digitalMode && inUse;
+                if (brickModeCard.Visible == hide) brickModeCard.Visible = !hide;
+            }
+            catch { }
         }
 
         // The TX leveler is on by default in SSB, without it the microphone is quiet. Thetis switches it off while a digital mode is selected

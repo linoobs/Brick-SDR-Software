@@ -80,6 +80,12 @@ namespace BrickSDR
 
         // ---- opening and closing ----
 
+        // FreeDV is switched off when a terminal or FT8 / FT4 takes the receiver (the mode of FreeDV and of RTTY is the same, so no mode change does it); the DIGI menu calls it before it sets the mode, because switching FreeDV off puts the receiver back in the mode it had
+        internal void ftRadeOffForTerminal()
+        {
+            try { for (int i = 0; i < 2; i++) if (RadeEnabledOn(i)) SetRadeEnabled(i, false); } catch { }
+        }
+
         internal void brickFtOpen(string mode)
         {
             if (!Mfsk.Available()) { MessageBox.Show(this, "mfsk.dll is missing next to the program.", "FT8 / FT4", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }

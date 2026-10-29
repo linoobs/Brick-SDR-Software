@@ -154,7 +154,7 @@ namespace BrickSDR
                 lv.Tick += (s, e) => { lv.Stop(); lv.Dispose(); brickEnsureSsbLeveler(); };
                 lv.Start();
                 if (_digiOpenKey == "RTTY" || _digiOpenKey == "CW") brickDigitalOpen(_digiOpenKey);
-                else if (_digiOpenKey == "RADE") brickRadeOpen();
+                else if (_digiOpenKey == "RADE") brickRadeOpen(RadeEnabledOn(1) && !RadeEnabledOn(0) ? 1 : 0);
                 else if (_digiOpenKey == "FT8" || _digiOpenKey == "FT4") brickFtOpen(_digiOpenKey);
             }
             catch { }

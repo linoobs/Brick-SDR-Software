@@ -1,6 +1,6 @@
 /*  BrickRadeStrip.cs
 
-    The FreeDV strip docked under the panadapter: RADE on / off, version, receiver, sync, SNR, offset, the last callsign
+    The FreeDV strip docked under the panadapter: FreeDV on / off, version, sync, SNR, offset, the last callsign
     heard and the levels. Settings, mic processing and the Reporter are in the FreeDV window (Settings button).
     The status panels follow the FreeDV window of Kainos (K7JUS, GPL v3).
 */
@@ -18,7 +18,7 @@ namespace BrickSDR
         internal sealed class BrickRadeStrip : Panel
         {
             private readonly Console c;
-            private readonly BrickBtn bOn, bV1, bV2, bRx1, bRx2, bSet, bRep, bClose;
+            private readonly BrickBtn bOn, bV1, bV2, bSet, bRep;
             private readonly Label status;
             private readonly BrickRadeForm.LevelBar rxBar, micBar;
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 60 };
@@ -35,18 +35,15 @@ namespace BrickSDR
                 BackColor = cCard;
                 DoubleBuffered = true;
                 Size = new Size(760, 118);
-                bOn = mk("RADE", 8, 8, 70, 28, () => toggle());
+                bOn = mk("FreeDV", 8, 8, 70, 28, () => toggle());
                 bV1 = mk("V1", 84, 8, 36, 28, () => setVersion(false));
                 bV2 = mk("V2", 124, 8, 36, 28, () => setVersion(true));
-                bRx1 = mk("RX1", 168, 8, 44, 28, () => { rx = 0; sync_(); });
-                bRx2 = mk("RX2", 216, 8, 44, 28, () => { rx = 1; sync_(); });
                 bSet = mk("Settings", 8, 42, 86, 28, () => c.brickRadeSettings());
                 bRep = mk("Reporter", 100, 42, 86, 28, () => FreeDVReporter.FreeDVReporterManager.ShowWindow(c));
-                bClose = mk("Close", 192, 42, 68, 28, () => c.brickRadeClose());
                 status = new Label { Left = 8, Top = 80, Width = 252, Height = 24, ForeColor = cMuted, Font = new Font("Segoe UI Semibold", 10.5f), TextAlign = ContentAlignment.MiddleLeft };
                 rxBar = new BrickRadeForm.LevelBar { Label = "RX", Height = 22 };
                 micBar = new BrickRadeForm.LevelBar { Label = "Mic", Height = 22 };
-                Controls.AddRange(new Control[] { bOn, bV1, bV2, bRx1, bRx2, bSet, bRep, bClose, status, rxBar, micBar });
+                Controls.AddRange(new Control[] { bOn, bV1, bV2, bSet, bRep, status, rxBar, micBar });
                 Resize += (s, e) => place();
                 VisibleChanged += (s, e) => { if (Visible) { sync_(); place(); timer.Start(); } else timer.Stop(); };
                 timer.Tick += (s, e) => tick();
@@ -66,11 +63,14 @@ namespace BrickSDR
             private void place()
             {
                 int w = Width;
-                int bw = Math.Max(110, Math.Min(260, w - 8 - (276 + 210 + 140)));
+                int bw = Math.Max(110, Math.Min(260, w - 8 - (200 + 210 + 140)));
                 rxBar.SetBounds(w - 8 - bw, 14, bw, 22);
                 micBar.SetBounds(w - 8 - bw, 44, bw, 22);
                 Invalidate();
             }
+
+            // the receiver comes from the DIGI menu that opened the strip
+            public void SetRx(int r) { rx = r == 1 ? 1 : 0; sync_(); }
 
             private void toggle()
             {
@@ -91,7 +91,6 @@ namespace BrickSDR
                 light(bOn, c.RadeEnabledOn(rx));
                 bool v2 = rx == 0 ? c._rs.V2Rx1 : c._rs.V2Rx2;
                 light(bV1, !v2); light(bV2, v2);
-                light(bRx1, rx == 0); light(bRx2, rx == 1);
             }
 
             private void tick()
@@ -134,7 +133,7 @@ namespace BrickSDR
                 Graphics g = e.Graphics;
                 g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                int x0 = 276;
+                int x0 = 200;
                 bool show = active && sync;
                 // sync lamp
                 Color lamp = !active ? kGrid : sync ? kGreen : Color.FromArgb(0x5a, 0x24, 0x20);
@@ -193,9 +192,10 @@ namespace BrickSDR
             }
         }
 
-        internal void brickRadeOpen()
+        internal void brickRadeOpen(int rx = -1)
         {
             if (_radeStrip == null || _radeStrip.IsDisposed) _radeStrip = new BrickRadeStrip(this);
+            if (rx >= 0) _radeStrip.SetRx(rx);
             brickDockRelease("rade");        // a terminal under the panadapter makes room
             brickDockShow("rade", _radeStrip);
             _digiOpenKey = "RADE"; digiSaveSettings();

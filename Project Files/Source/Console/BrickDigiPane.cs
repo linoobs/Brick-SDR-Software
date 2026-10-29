@@ -22,7 +22,7 @@ namespace BrickSDR
             private readonly BrickField type, my, their;
             private readonly Label status, title, lblMy, lblTheir;
             private readonly Panel settings;
-            private readonly BrickBtn bTx, bEnd, bAbort, bClear, bPop, bClose;
+            private readonly BrickBtn bTx, bEnd, bAbort, bClear, bPop;
             private readonly List<BrickBtn> macroButtons = new List<BrickBtn>();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 80 };
             private readonly MeterBar meter = new MeterBar();
@@ -62,7 +62,6 @@ namespace BrickSDR
                 my.TextChangedX += (s, e) => { c._digiMyCall = my.Text.Trim().ToUpperInvariant(); c.digiSaveSettings(); };
                 bClear = mk("Clear", 60, 26, () => rx.Clear());
                 bPop = mk("Pop out", 70, 26, () => c.digiTogglePop());
-                bClose = mk("Close", 60, 26, () => c.digiClose());
 
                 settings = new Panel { BackColor = cCard, Height = 28 };
                 shift = new BrickDropDown { Width = 62, Height = 24 };
@@ -105,7 +104,7 @@ namespace BrickSDR
                     macroButtons.Add(mk(m[0], 64, 28, () => macro(text)));
                 }
 
-                Controls.AddRange(new Control[] { title, lblMy, my, lblTheir, their, bClear, bPop, bClose, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
+                Controls.AddRange(new Control[] { title, lblMy, my, lblTheir, their, bClear, bPop, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
                 foreach (BrickBtn b in macroButtons) Controls.Add(b);
                 settings.Controls.AddRange(new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
                 Resize += (s, e) => layout();
@@ -181,8 +180,7 @@ namespace BrickSDR
                 int w = Width, h = Height;
                 if (w < 100 || h < 100) return;
                 // row 1: title, receiver, call signs; the window buttons at the right
-                bClose.SetBounds(w - 8 - bClose.Width, 6, bClose.Width, 26);
-                bPop.SetBounds(bClose.Left - 6 - bPop.Width, 6, bPop.Width, 26);
+                bPop.SetBounds(w - 8 - bPop.Width, 6, bPop.Width, 26);
                 bClear.SetBounds(bPop.Left - 6 - bClear.Width, 6, bClear.Width, 26);
                 lblMy.Location = new Point(74, 11); my.SetBounds(124, 6, 96, 26);
                 lblTheir.Location = new Point(230, 11); their.SetBounds(300, 6, 96, 26);

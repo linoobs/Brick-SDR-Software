@@ -1,6 +1,6 @@
 /*  BrickRadeSetup.cs
 
-    Setup side of the RADE meters (from Kainos / Thetis-RADE): the "Hide if no RADE" option of a meter container and
+    Setup side of the RADE meters (from Kainos / Thetis-RADE): the "Hide if no FreeDV" option of a meter container and
     the place of the RADE meters in the list of meter types.
 */
 
@@ -14,7 +14,7 @@ namespace BrickSDR
     {
         private CheckBox chkContainer_hideRADEnotenabled;
 
-        // Meter containers (Setup - Appearance - Meters/Gadgets): "Hide if no RADE". A plain CheckBox: the setting belongs
+        // Meter containers (Setup - Appearance - Meters/Gadgets): "Hide if no FreeDV". A plain CheckBox: the setting belongs
         // to the selected container, which saves it itself.
         public void BrickAddRadeMeterOption()
         {
@@ -22,14 +22,14 @@ namespace BrickSDR
             chkContainer_hideRADEnotenabled = new CheckBox
             {
                 Name = "chkContainer_hideRADEnotenabled",
-                Text = "Hide if\r\nno RADE",
+                Text = "Hide if\r\nno FreeDV",
                 AutoSize = true,
                 CheckAlign = chkContainer_hidewhennotused.CheckAlign,
                 TextAlign = chkContainer_hidewhennotused.TextAlign,
                 RightToLeft = chkContainer_hidewhennotused.RightToLeft,
                 Font = chkContainer_hidewhennotused.Font
             };
-            toolTip1.SetToolTip(chkContainer_hideRADEnotenabled, "Hide this container while its receiver (RX1 or RX2 data) doesn't have RADE on.");
+            toolTip1.SetToolTip(chkContainer_hideRADEnotenabled, "Hide this container while its receiver (RX1 or RX2 data) doesn't have FreeDV on.");
             chkContainer_hideRADEnotenabled.CheckedChanged += (s, e) =>
             {
                 if (initializing) return;

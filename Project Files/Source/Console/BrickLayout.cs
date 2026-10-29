@@ -945,6 +945,7 @@ namespace BrickSDR
 
             // ---- transmitter settings of the current mode
             Panel mp = brickCard(pnlLeft);
+            brickModeCard = mp;
             mp.SetBounds(8, y, cw, 172);
             brickLeftBottom = mp.Bottom;
             foreach (Panel p in new Panel[] { panelModeSpecificPhone, panelModeSpecificCW, panelModeSpecificDigital, panelModeSpecificFM })
@@ -1459,7 +1460,7 @@ namespace BrickSDR
         {
             string c = brickDigiChoice;
             DSPMode m = RX1DSPMode;
-            if (RadeEnabledOn(0)) return "RADE";
+            if (RadeEnabledOn(0)) return "FreeDV";
             if (c == "RADE") c = m == DSPMode.DIGL ? "DIGL" : "DIGU";   // RADE was switched off: the mode it left
             // the real mode wins when it contradicts the choice (e.g. the mode was changed elsewhere)
             if (m == DSPMode.DIGL && (c == "DIGU" || c == "FT8" || c == "FT4" || c == "CW")) return "DIGL";
@@ -1505,11 +1506,11 @@ namespace BrickSDR
             add("DIGL", cur == DSPMode.DIGL, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "DIGL"; }, true);
             add("DIGU", cur == DSPMode.DIGU, () => { brickDigiSet(rx2, DSPMode.DIGU, null); brickDigiChoice = "DIGU"; }, true);
             m.Items.Add(new ToolStripSeparator());
-            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT8", () => { brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickDigiChoice = "FT8"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT8"); }, ft != null);
-            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT4", () => { brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickDigiChoice = "FT4"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT4"); }, ft != null);
-            add("FreeDV RADE", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(); SetRadeEnabled(rx2 ? 1 : 0, true); if (!rx2) brickDigiChoice = "RADE"; }, true);
-            add("RTTY", false, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
-            add("CW", false, () => { brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
+            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT8", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickDigiChoice = "FT8"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT8"); }, ft != null);
+            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT4", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickDigiChoice = "FT4"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT4"); }, ft != null);
+            add("FreeDV", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(rx2 ? 1 : 0); SetRadeEnabled(rx2 ? 1 : 0, true); if (!rx2) brickDigiChoice = "RADE"; }, true);
+            add("RTTY", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
+            add("CW", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
             m.Items.Add(new ToolStripSeparator());
             add("DX", false, () => { try { System.Diagnostics.Process.Start("https://www.dxsummit.fi/"); } catch { } }, true);
             add("POTA", false, () => { try { System.Diagnostics.Process.Start("https://pota.app/#/"); } catch { } }, true);
@@ -1959,6 +1960,7 @@ namespace BrickSDR
         // the meter is repainted by the old code only on rx data, keep it moving while transmitting
         private void brickTick(object sender, EventArgs e)
         {
+            brickHideDigitalSettings();
             if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
             if (!initializing && !IsSetupFormNull)
             {

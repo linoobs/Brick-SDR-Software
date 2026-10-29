@@ -141,7 +141,7 @@ namespace BrickSDR
         internal sealed class BrickRadeForm : Form
         {
             private readonly Console c;
-            private readonly BrickBtn bOn, bV1, bV2, bRx1, bRx2, bNoise, bAgc, bEq;
+            private readonly BrickBtn bOn, bV1, bV2, bNoise, bAgc, bEq;
             private readonly Label status, footer;
             private readonly StatusPanel statusPanel;
             private readonly HeardPanel heard;
@@ -161,7 +161,7 @@ namespace BrickSDR
             {
                 c = console;
                 c.radeLoadSettings();
-                Text = "Brick-SDR - FreeDV RADE";
+                Text = "Brick-SDR - FreeDV";
                 BackColor = cCard;
                 ForeColor = cText;
                 Font = new Font("Segoe UI", 9f);
@@ -172,11 +172,9 @@ namespace BrickSDR
                 ClientSize = new Size(600, 548);
                 try { Icon = c.Icon; } catch { }
 
-                bOn = mk("RADE", 12, 12, 84, 30, () => toggle());
+                bOn = mk("FreeDV", 12, 12, 84, 30, () => toggle());
                 bV1 = mk("V1", 106, 12, 42, 30, () => { if (!syncing) setVersion(false); });
                 bV2 = mk("V2", 152, 12, 42, 30, () => { if (!syncing) setVersion(true); });
-                bRx1 = mk("RX1", 210, 12, 48, 30, () => showReceiver(0));
-                bRx2 = mk("RX2", 262, 12, 48, 30, () => showReceiver(1));
                 status = new Label { Left = 320, Top = 14, Width = 268, Height = 26, TextAlign = ContentAlignment.MiddleRight, Font = new Font("Segoe UI Semibold", 11f), ForeColor = cMuted };
 
                 statusPanel = new StatusPanel { Left = 12, Top = 54, Width = 282, Height = 150 };
@@ -238,7 +236,7 @@ namespace BrickSDR
                 repMsg.TextChangedX += (s, e) => { if (!syncing) { c._rs.ReporterMessage = repMsg.Text; c.radeSettingsChanged(); } };
                 Controls.Add(repMsg);
                 y += 32;
-                chkReport = chk("Report my station while RADE is on", 12, y, 250, v => c._rs.Reporting = v);
+                chkReport = chk("Report my station while FreeDV is on", 12, y, 250, v => c._rs.Reporting = v);
                 chkQsy = chk("Ignore QSY requests", 270, y, 160, v => c._rs.IgnoreQsy = v);
                 chkUtc = chk("Times in UTC", 440, y, 140, v => c._rs.Utc = v);
                 y += 26;
@@ -249,7 +247,7 @@ namespace BrickSDR
                 ClientSize = new Size(600, y + 40);
 
                 footer = new Label { Left = 340, Top = yEq - 76, Width = 248, Height = 100, ForeColor = cMuted };
-                Controls.AddRange(new Control[] { bOn, bV1, bV2, bRx1, bRx2, status, statusPanel, heard, rxBar, micBar, footer, bNoise, bAgc, bEq });
+                Controls.AddRange(new Control[] { bOn, bV1, bV2, status, statusPanel, heard, rxBar, micBar, footer, bNoise, bAgc, bEq });
 
                 timer.Tick += (s, e) => tick();
                 showReceiver(!c.RadeEnabledOn(0) && c.RadeEnabledOn(1) ? 1 : 0);
@@ -290,6 +288,7 @@ namespace BrickSDR
 
             public void ShowAt()
             {
+                showReceiver(c._radeStrip != null && !c._radeStrip.IsDisposed ? c._radeStrip.Rx : (!c.RadeEnabledOn(0) && c.RadeEnabledOn(1) ? 1 : 0));      // the receiver the DIGI menu opened FreeDV on
                 if (!Visible)
                 {
                     Rectangle r = c.Bounds;
@@ -334,7 +333,6 @@ namespace BrickSDR
                     light(bOn, c.RadeEnabledOn(rx));
                     bool v2 = rx == 0 ? c._rs.V2Rx1 : c._rs.V2Rx2;
                     light(bV1, !v2); light(bV2, v2);
-                    light(bRx1, rx == 0); light(bRx2, rx == 1);
                     light(bNoise, c._rs.Noise); light(bAgc, c._rs.Agc); light(bEq, c._rs.Eq);
                     call.Text = c._rs.Call;
                     grid.Text = c._rs.Grid; repMsg.Text = c._rs.ReporterMessage ?? "";
@@ -355,7 +353,7 @@ namespace BrickSDR
                     }
                     else
                     {
-                        footer.Text = "Sending " + c._rs.Call + " at the end of each over.\r\nRADE: FreeDV Radio Autoencoder, ported from Thetis-RADE by SV1EIA.";
+                        footer.Text = "Sending " + c._rs.Call + " at the end of each over.\r\nFreeDV RADE (Radio Autoencoder), ported from Thetis-RADE by SV1EIA.";
                         footer.ForeColor = cMuted;
                     }
                 }
@@ -638,8 +636,8 @@ namespace BrickSDR
             if (!power) { color = kTextDim; return "Radio off"; }
             if (MOX && RadeTxReceiver != r) { color = cMuted; return "Transmitting from RX" + (RadeTxReceiver + 1); }
             if (RadeSendingEoo) { color = cAccent; return "Sending end-of-over"; }
-            if (MOX) { color = cTx; return RadeTransmitting ? "Transmitting RADE" : "Transmitting voice"; }
-            if (sync) { color = kGreen; return "Receiving RADE"; }
+            if (MOX) { color = cTx; return RadeTransmitting ? "Transmitting FreeDV" : "Transmitting voice"; }
+            if (sync) { color = kGreen; return "Receiving FreeDV"; }
             color = cMuted; return "Listening";
         }
 

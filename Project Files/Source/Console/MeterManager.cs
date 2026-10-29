@@ -2304,13 +2304,13 @@ namespace BrickSDR
                 case MeterType.CFC_GAIN: return "CFC Compression Gain";
                 case MeterType.MAGIC_EYE: return "Magic Eye";
                 case MeterType.ESTIMATED_PBSNR: return "Estimated PBSNR";
-                case MeterType.RADAE_SYNC: return "RADE Sync";
-                case MeterType.RADAE_SNR_DB: return "RADE SNR";
-                case MeterType.RADAE_RX_LEVEL_DB: return "RADE RX Level";
-                case MeterType.RADAE_CLIP: return "RADE Clip";
-                case MeterType.RADAE_EOO_DECODE: return "RADE Last Callsign";
-                case MeterType.RADAE_TX_MIC_LEVEL_DB: return "RADE TX Mic Level";
-                case MeterType.RADAE_TX_MIC_CLIP: return "RADE TX Mic Clip";
+                case MeterType.RADAE_SYNC: return "FreeDV Sync";
+                case MeterType.RADAE_SNR_DB: return "FreeDV SNR";
+                case MeterType.RADAE_RX_LEVEL_DB: return "FreeDV RX Level";
+                case MeterType.RADAE_CLIP: return "FreeDV Clip";
+                case MeterType.RADAE_EOO_DECODE: return "FreeDV Last Callsign";
+                case MeterType.RADAE_TX_MIC_LEVEL_DB: return "FreeDV TX Mic Level";
+                case MeterType.RADAE_TX_MIC_CLIP: return "FreeDV TX Mic Clip";
                 case MeterType.ANANMM: return "Anan Multi Meter";
                 case MeterType.CROSS: return "Cross Meter";
                 case MeterType.SWR: return "SWR";
@@ -41325,9 +41325,9 @@ namespace BrickSDR
                 {
                     // title: left-aligned at the top, same scaling as the other measurement titles (scale FontSize 20 base)
                     float titleSize = (rect.Width / 52f) * (20f / 16f);
-                    SizeF szTitle = measureString("RADE last call", t.FontFamily, t.Style, titleSize);
+                    SizeF szTitle = measureString("FreeDV last call", t.FontFamily, t.Style, titleSize);
                     SharpDX.RectangleF titleRect = new SharpDX.RectangleF(x + (w * 0.02f), y, szTitle.Width, szTitle.Height);
-                    _renderTarget.DrawText("RADE last call", getDXTextFormatForFont(t.FontFamily, titleSize, t.Style), titleRect, getDXBrushForColour(t.LabelColour, 255));
+                    _renderTarget.DrawText("FreeDV last call", getDXTextFormatForFont(t.FontFamily, titleSize, t.Style), titleRect, getDXBrushForColour(t.LabelColour, 255));
                 }
 
                 // callsign: centred, near the top, kept fully inside the item area (no overlap with the next meter)

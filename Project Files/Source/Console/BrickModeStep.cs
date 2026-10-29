@@ -3,10 +3,36 @@
     The tuning step follows the mode: 500 Hz for LSB / USB, 10 Hz for CW and the digital modes, 1 kHz for AM / SAM / FM / DRM.
 */
 
+using System;
+
 namespace BrickSDR
 {
     public partial class Console
     {
+        // A receiver changed its mode: what depended on the old one goes away. RADE is switched off (the audio comes back),
+        // and the RTTY / CW terminal or the FreeDV strip under the panadapter closes when the new mode isn't theirs.
+        private void brickDigitalModeChanged(int rx)
+        {
+            if (rx < 1 || rx > 2) return;
+            BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    int i = rx - 1;
+                    DSPMode m = rxMode(i);
+                    bool digital = m == DSPMode.DIGU || m == DSPMode.DIGL;
+                    if (RadeEnabledOn(i) && m != _radeForcedMode[i]) SetRadeEnabled(i, false);
+                    if (_digiMode != "" && _digiRx == i)
+                    {
+                        bool fits = _digiMode == "RTTY" ? digital : (m == DSPMode.CWL || m == DSPMode.CWU);
+                        if (!fits) digiClose();
+                    }
+                    if (_radeStrip != null && brickDockKey == "rade" && _radeStrip.Rx == i && !digital && !(RadeEnabledOn(i) && m == _radeForcedMode[i])) brickRadeClose();
+                }
+                catch { }
+            }));
+        }
+
         private void brickApplyModeStep(DSPMode mode)
         {
             string name;

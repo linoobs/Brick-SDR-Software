@@ -1456,6 +1456,8 @@ namespace BrickSDR
         {
             string c = brickDigiChoice;
             DSPMode m = RX1DSPMode;
+            if (RadeEnabledOn(0)) return "RADE";
+            if (c == "RADE") c = m == DSPMode.DIGL ? "DIGL" : "DIGU";   // RADE was switched off: the mode it left
             // the real mode wins when it contradicts the choice (e.g. the mode was changed elsewhere)
             if (m == DSPMode.DIGL && (c == "DIGU" || c == "FT8" || c == "FT4" || c == "CW")) return "DIGL";
             if (m == DSPMode.DIGU && (c == "DIGL" || c == "RTTY" || c == "CW")) return "DIGU";
@@ -1501,9 +1503,9 @@ namespace BrickSDR
             m.Items.Add(new ToolStripSeparator());
             add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => { brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickDigiChoice = "FT8"; }, ft != null);
             add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), false, () => { brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickDigiChoice = "FT4"; }, ft != null);
-            add("FreeDV RADE", false, () => brickDigiSet(rx2, DSPMode.DIGU, null), false);
-            add("RTTY", false, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; }, true);
-            add("CW", false, () => { brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; }, true);
+            add("FreeDV RADE", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(); SetRadeEnabled(rx2 ? 1 : 0, true); if (!rx2) brickDigiChoice = "RADE"; }, true);
+            add("RTTY", false, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; brickDigitalOpen("RTTY"); }, true);
+            add("CW", false, () => { brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; brickDigitalOpen("CW"); }, true);
             m.Items.Add(new ToolStripSeparator());
             add("DX", false, () => { try { System.Diagnostics.Process.Start("https://www.dxsummit.fi/"); } catch { } }, true);
             add("POTA", false, () => { try { System.Diagnostics.Process.Start("https://pota.app/#/"); } catch { } }, true);

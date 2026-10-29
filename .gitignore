@@ -414,3 +414,8 @@ BrickSDR-Setup*.exe
 BrickSDR-Setup*.zip
 Project Files/build/
 Project Files/lib/*.pdb
+
+# RADE libraries: CMake build tree (build_rade_libs.bat)
+Project Files/lib/opus_dnn/cmake-build/
+# opus_dnn needs its (placeholder) arm source lists present even on x64
+!Project Files/lib/opus_dnn/**/arm/

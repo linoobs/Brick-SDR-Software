@@ -1069,6 +1069,14 @@ namespace BrickSDR
 
         public static void CMSetTXAPanelGain1(int channel)
         {
+            // while RADE is on, WDSP's transmit chain carries the modem signal, already at the right level, so the VAC/mic
+            // gain must not scale it; RADE's Mic level sets the input
+            if (Rade.GetRadaeTxEnabled() != 0)
+            {
+                Audio.console.radio.GetDSPTX(0).MicGain = 1.0;
+                return;
+            }
+
             double gain = 1.0;
             DSPMode mode = Audio.TXDSPMode;
             if ((!Audio.VACEnabled &&

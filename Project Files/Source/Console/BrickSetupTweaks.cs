@@ -6,6 +6,9 @@ namespace BrickSDR
 {
     public partial class Setup
     {
+        // CFC on/off as set in Setup - Transmit (restored after a RADE over)
+        internal bool TXCFCOn { get { return chkCFCEnable.Checked; } }
+
         // NR3 / NR4 are both served by the neural noise reduction (NNR) of WDSP 2.11,
         // only the reduction depth is adjustable
         public void BrickSimplifyNR()

@@ -352,7 +352,9 @@ namespace BrickSDR
             get { return mox; }
             set
             {
+                bool was_mox = mox;
                 mox = value;
+                Rade.OnMox(was_mox, mox); // RADE per-over keying (BrickRadeCore.cs)
 
                 if (mox)
                 {

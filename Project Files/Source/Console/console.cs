@@ -25451,6 +25451,7 @@ namespace BrickSDR
         {
             while (chkPower.Checked)
             {
+                if (radePollTick()) { await Task.Delay(1); continue; } // RADE end-of-over (BrickRade.cs)
                 int dotdashptt = NetworkIO.nativeGetDotDashPTT();
                 DSPMode tx_mode = chkVFOBTX.Checked && chkRX2.Checked ? _rx2_dsp_mode : _rx1_dsp_mode;
 
@@ -29350,6 +29351,7 @@ namespace BrickSDR
         }
         private void chkMOX_CheckedChanged2(object sender, System.EventArgs e)
         {
+            if (radeInterceptMox()) return; // RADE end-of-over (BrickRade.cs)
             if(chkMOX.Checked && _ganymede_pa_issue)
             {
                 // abort the change if there is a ganymede pa issue

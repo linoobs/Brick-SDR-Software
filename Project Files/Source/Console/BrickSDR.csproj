@@ -475,6 +475,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Compile Include="BrickLayout.cs" />
+    <Compile Include="BrickDigital.cs" />
+    <Compile Include="BrickRadeCore.cs" />
+    <Compile Include="BrickRade.cs" />
+    <Compile Include="BrickRadeUi.cs" />
+    <Compile Include="BrickRttyCodec.cs" />
+    <Compile Include="BrickCwCodec.cs" />
     <Compile Include="BrickModePanels.cs" />
     <Compile Include="BrickProgrammer.cs" />
     <Compile Include="BrickProfiles.cs" />

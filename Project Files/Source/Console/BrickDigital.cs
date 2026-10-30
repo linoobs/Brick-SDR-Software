@@ -43,6 +43,9 @@ namespace BrickSDR
         private RttyMod _rttyMod;
         private CwDecoder _cwDecoder;
         private DeepCwDecoder _cwDeep;                  // the CW decoder in use when DeepCW (neural network) loads; _cwDecoder is the basic one kept as the fallback
+        private GgMorseDecoder _cwGg;                  // the third CW decoder (Goertzel and a cost function, after ggmorse)
+        internal volatile int _cwKind = 1;              // which one is in use: 0 basic, 1 DeepCW, 2 Goertzel (ggmorse); switched in the CW window, digital.txt "cwdec"
+        private int _cwKindAsked = -1;
         private static DeepCwEngine _deepEngine;
         private static string _deepError;
         private static bool _deepTried;
@@ -90,6 +93,7 @@ namespace BrickSDR
                         case "fttx": if (num) _ftTxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
                         case "ftauto": _ftAuto = v != "0"; break;
                         case "psk": _ftPsk = v == "1"; break;
+                        case "cwdec": if (num) _cwKind = (int)Math.Max(0, Math.Min(2, d)); break;
                         case "ftlevel": if (num) _ftLevel = Math.Max(-40, Math.Min(0, d)); break;
                     }
                 }
@@ -109,7 +113,7 @@ namespace BrickSDR
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
                     "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
-                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
+                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "cwdec=" + _cwKind, "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
                 });
             }
             catch { }
@@ -266,6 +270,34 @@ namespace BrickSDR
             return _deepEngine;
         }
 
+        // the CW decoder chosen in the window (_cwKind); DeepCW falls back to the basic one when it can't be loaded
+        private void cwBuild(int rate)
+        {
+            if (_cwDeep != null) { _cwDeep.Dispose(); _cwDeep = null; }
+            _cwDecoder = null; _cwGg = null;
+            int asked = _cwKind, kind = asked;
+            _cwKindAsked = asked;
+            if (kind == 1)
+            {
+                DeepCwEngine de = deepCwEngine();
+                if (de != null)
+                {
+                    _cwDeep = new DeepCwDecoder(de, rate);
+                    _cwDeep.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+                    return;
+                }
+                kind = 0;
+            }
+            if (kind == 2)
+            {
+                _cwGg = new GgMorseDecoder(rate);
+                _cwGg.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+                return;
+            }
+            _cwDecoder = new CwDecoder(rate);
+            _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
+        }
+
         internal bool DeepCwAvailable { get { return deepCwEngine() != null; } }
         internal string DeepCwError { get { return _deepError; } }
 
@@ -277,7 +309,7 @@ namespace BrickSDR
             _digiThread = null;
             try { if (_digiTapRx >= 0) digiTap(_digiTapRx, 0); } catch { }
             _digiTapRx = -1;
-            _rttyDemod = null; _cwDecoder = null;
+            _rttyDemod = null; _cwDecoder = null; _cwGg = null; _cwKindAsked = -1;
         }
 
         // USB / DIGU put mark above space in the audio; LSB / DIGL (RTTY's usual) below
@@ -342,26 +374,15 @@ namespace BrickSDR
                             _rttyDemod = new RttyDemod(rate);
                             _rttyDemod.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
                         }
-                        else if (mode == "CW")
-                        {
-                            DeepCwEngine de = deepCwEngine();
-                            if (de != null)
-                            {
-                                _cwDeep = new DeepCwDecoder(de, rate);
-                                _cwDeep.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
-                                _cwDecoder = null;
-                            }
-                            else
-                            {
-                                _cwDecoder = new CwDecoder(rate);
-                                _cwDecoder.Decoded += c => _digiOut.Enqueue(new KeyValuePair<char, bool>(c, false));
-                            }
-                        }
+                        else if (mode == "CW") cwBuild(rate);
                     }
+                    // the decoder was switched in the CW window
+                    if (mode == "CW" && rate > 0 && _cwKind != _cwKindAsked) { cwBuild(rate); _digiOut.Enqueue(new KeyValuePair<char, bool>('\n', false)); }
                     if (mode == "RTTY") rttyApplyParams();
                     else if (mode == "CW")
                     {
                         if (_cwDeep != null) _cwDeep.Pitch = CWPitch;
+                        else if (_cwGg != null) { }
                         else if (_cwDecoder != null) { _cwDecoder.Pitch = CWPitch; _cwDecoder.Squelch = _cwSql / 100.0; }
                     }
 
@@ -370,7 +391,7 @@ namespace BrickSDR
                     {
                         if (_mox) continue;
                         if (mode == "RTTY" && _rttyDemod != null) _rttyDemod.Process(buf, n);
-                        else if (mode == "CW") { if (_cwDeep != null) _cwDeep.Process(buf, n); else if (_cwDecoder != null) _cwDecoder.Process(buf, n); }
+                        else if (mode == "CW") { if (_cwDeep != null) _cwDeep.Process(buf, n); else if (_cwGg != null) _cwGg.Process(buf, n); else if (_cwDecoder != null) _cwDecoder.Process(buf, n); }
                     }
 
                     // RTTY transmit: keep ~0.2 s of audio queued ahead of the radio

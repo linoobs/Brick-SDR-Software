@@ -154,14 +154,14 @@ namespace BrickSDR
             lock (_ftDecLock) { if (_ftDecoder != null) { _ftDecoder.Dispose(); _ftDecoder = null; } _ftDecoderKey = -1; }
         }
 
-        internal bool FtModeOk { get { DSPMode m = digiRxMode; return m == DSPMode.USB || m == DSPMode.DIGU; } }
+        internal bool FtModeOk { get { return digiRxMode == DSPMode.DIGU; } }
 
         internal string FtStartProblem
         {
             get
             {
                 if (!PowerOn) return "The radio is off";
-                if (!FtModeOk) return "Use DIGU or USB";
+                if (!FtModeOk) return "Use DIGU";
                 if (_digiRx == 1 && !chkVFOBTX.Checked) return "RX2 is selected but VFO A transmits";
                 if (_digiMyCall.Length < 3) return "Enter your call sign first";
                 if (_ftGrid.Length < 4) return "Enter your grid square first";

@@ -486,6 +486,7 @@
     <Compile Include="BrickDigiSetup.cs" />
     <Compile Include="BrickPskReporter.cs" />
     <Compile Include="BrickDeepCw.cs" />
+    <Compile Include="BrickGgMorse.cs" />
     <Compile Include="BrickUi.cs" />
     <Compile Include="BrickModeStep.cs" />
     <Compile Include="BrickDigiPane.cs" />

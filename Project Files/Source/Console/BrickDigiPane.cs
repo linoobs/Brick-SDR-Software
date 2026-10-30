@@ -32,11 +32,12 @@ namespace BrickSDR
 
             // RTTY settings
             private readonly BrickDropDown shift, baud;
+            private readonly BrickDropDown decoder;                 // CW: which decoder reads the signal, switched while running
             private readonly BrickBtn rev, afc;
             private readonly BrickNum rsql, rlevel;
             // CW settings
             private readonly BrickNum csql, wpm;
-            private readonly Label lblShift, lblBaud, lblSql, lblLevel, lblWpm;
+            private readonly Label lblShift, lblBaud, lblSql, lblLevel, lblWpm, lblDec;
 
             private static readonly string[][] Macros =
             {
@@ -74,6 +75,11 @@ namespace BrickSDR
                 rlevel = num(-40, 0, 1, c._rttyLevel, " dB");
                 csql = num(0, 100, 5, c._cwSql, "");
                 wpm = num(5, 60, 1, 20, " WPM");
+                decoder = new BrickDropDown { Width = 164, Height = 24 };
+                decoder.Items.AddRange(new[] { "Basic (envelope)", "DeepCW (neural network)", "Goertzel (ggmorse)" });
+                decoder.SelectedIndex = Math.Max(0, Math.Min(2, c._cwKind));
+                decoder.SelectedChanged += (s, e) => { if (decoder.SelectedIndex >= 0) { c._cwKind = decoder.SelectedIndex; c.digiSaveSettings(); SetMode(mode); } };
+                lblDec = lbl("Decoder");
                 lblShift = lbl("Shift"); lblBaud = lbl("Baud"); lblSql = lbl("SQL"); lblLevel = lbl("TX level"); lblWpm = lbl("TX speed");
                 shift.SelectedChanged += (s, e) => { c._rttyShift = double.Parse(shift.Items[shift.SelectedIndex], CultureInfo.InvariantCulture); c.digiSaveSettings(); };
                 baud.SelectedChanged += (s, e) => { c._rttyBaud = double.Parse(baud.Items[baud.SelectedIndex], CultureInfo.InvariantCulture); c.digiSaveSettings(); };
@@ -106,7 +112,7 @@ namespace BrickSDR
 
                 Controls.AddRange(new Control[] { title, lblMy, my, lblTheir, their, bClear, bPop, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
                 foreach (BrickBtn b in macroButtons) Controls.Add(b);
-                settings.Controls.AddRange(new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
+                settings.Controls.AddRange(new Control[] { lblDec, decoder, lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
                 VisibleChanged += (s, e) => { if (Visible) { layout(); timer.Start(); } else timer.Stop(); };
@@ -140,7 +146,8 @@ namespace BrickSDR
                 foreach (Control k in new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblLevel, rlevel, rsql }) k.Visible = r;
                 foreach (Control k in new Control[] { lblWpm, wpm, csql }) k.Visible = !r;
                 lblSql.Visible = true;
-                if (!r && c.DeepCwAvailable) { lblSql.Visible = false; csql.Visible = false; }        // the network has no squelch
+                foreach (Control k in new Control[] { lblDec, decoder }) k.Visible = !r;
+                if (!r) { bool basic = c._cwKind == 0; lblSql.Visible = basic; csql.Visible = basic; }        // only the basic decoder has a squelch
                 bTx.Visible = r;
                 bEnd.Text = r ? "RX" : "STOP";
                 if (!r) { try { wpm.Value = Math.Max(wpm.Minimum, Math.Min(wpm.Maximum, c.CWXForm.WPM)); } catch { } }
@@ -171,6 +178,7 @@ namespace BrickSDR
                 }
                 else
                 {
+                    put(lblDec, 4); put(decoder, 14);
                     put(lblSql, 4); put(csql, 14); put(lblWpm, 4); put(wpm, 0);
                 }
                 settings.Width = Math.Max(x, 10);
@@ -274,10 +282,16 @@ namespace BrickSDR
                 {
                     CwDecoder d = c._cwDecoder;
                     DeepCwDecoder dd = c._cwDeep;
+                    GgMorseDecoder gg = c._cwGg;
                     if (dd != null)
                     {
                         meter.Value = dd.Level;
                         stats = "DeepCW   " + dd.Status;
+                    }
+                    else if (gg != null)
+                    {
+                        meter.Value = gg.Level;
+                        stats = string.Format(CultureInfo.InvariantCulture, "Goertzel   {0:0} WPM   tone {1:0} Hz   cost {2:0.00}   {3}", gg.Wpm, gg.Pitch, gg.Cost, gg.Decoding ? "decoding" : "no signal");
                     }
                     else if (d != null)
                     {

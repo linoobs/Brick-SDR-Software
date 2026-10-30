@@ -85,7 +85,7 @@ namespace BrickSDR
                         bool fits = _digiMode == "RTTY" ? digital : (m == DSPMode.CWL || m == DSPMode.CWU);
                         if (!fits) digiClose();
                     }
-                    if (brickDockKey == "ft" && _digiRx == i && m != DSPMode.USB && m != DSPMode.DIGU) brickFtClose();
+                    if (brickDockKey == "ft" && _digiRx == i && m != DSPMode.DIGU) brickFtClose();       // LSB / USB and the rest take the receiver away from FT8 / FT4
                     if (_radeStrip != null && brickDockKey == "rade" && _radeStrip.Rx == i && !digital && !(RadeEnabledOn(i) && m == _radeForcedMode[i])) brickRadeClose();
                     brickEnsureSsbLeveler();
                 }

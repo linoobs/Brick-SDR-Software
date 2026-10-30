@@ -4234,6 +4234,9 @@ namespace BrickSDR
                     _bNoiseFloorAlreadyCalculatedRX1 = false; // keeps track of noise floor processing, only want to do it once, even if pana + water shown
                     _bNoiseFloorAlreadyCalculatedRX2 = false;
 
+                    // a minimized window has no height (or width): nothing to draw, and several calculations below divide by these
+                    if (displayTargetWidth < 4 || displayTargetHeight < 4) return;
+
                     _d2dRenderTarget.BeginDraw();
 
                     if (_paused_display && _pause_bitmap != null)
@@ -4260,9 +4263,9 @@ namespace BrickSDR
                         {
                             float imageWidth = _bitmapBackground.PixelSize.Width;
                             float imageHeight = _bitmapBackground.PixelSize.Height;
-                            float aspectRatio = imageWidth / imageHeight;
+                            float aspectRatio = imageWidth / Math.Max(1f, imageHeight);
 
-                            float targetAspectRatio = displayTargetWidth / displayTargetHeight;
+                            float targetAspectRatio = (float)displayTargetWidth / Math.Max(1, displayTargetHeight);
 
                             if (aspectRatio > targetAspectRatio)
                             {

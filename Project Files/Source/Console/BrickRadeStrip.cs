@@ -201,7 +201,7 @@ namespace BrickSDR
             _digiOpenKey = "RADE"; digiSaveSettings();
         }
 
-        internal void brickRadeClose() { brickDockHide("rade"); _digiOpenKey = ""; digiSaveSettings(); }
+        internal void brickRadeClose() { brickDockHide("rade"); if (_digiOpenKey == "RADE") { _digiOpenKey = ""; digiSaveSettings(); } }
 
         // the FreeDV window: settings, mic processing, Reporter options
         internal void brickRadeSettings()

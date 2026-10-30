@@ -146,6 +146,16 @@ namespace BrickSDR
             RadaeEnabledChangedHandlers?.Invoke(rx + 1, on);       // meter containers that hide without RADE
             FreeDVReporter.FreeDVReporterManager.Update(this);     // report while RADE is on, if asked to
             RadeEnabledChanged?.Invoke(this, EventArgs.Empty);
+            // the strip under the panadapter follows RADE whoever switches it (the FreeDV button of the window too, not only the DIGI menu)
+            try
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    if (RadeEnabledOn(rx)) { if (brickDockKey != "rade" || _radeStrip == null || _radeStrip.Rx != rx) brickRadeOpen(rx); }
+                    else if (brickDockKey == "rade" && _radeStrip != null && _radeStrip.Rx == rx && !RadeAnyEnabled) brickRadeClose();
+                }));
+            }
+            catch { }
             return true;
         }
 

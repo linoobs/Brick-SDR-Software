@@ -1,6 +1,6 @@
 # Brick-SDR
 
-Brick-SDR is a restyled fork of [Thetis](https://github.com/ramdor/Thetis) 2.10.3.x (SDR console for OpenHPSDR / ANAN radios) with a new dark interface, MAC-based Brick2/Brick3 detection and the official WDSP 2.11 (including the new NNR noise reduction).
+Brick-SDR is a restyled fork of Thetis 2.10.3.x (SDR console for OpenHPSDR / ANAN radios) with a new dark interface, MAC-based Brick2/Brick3 detection, and the official WDSP 2.11 (including the new NNR noise reduction). It provides out-of-the-box support for Brick2 SDR 14-bit (15W and 50W versions), Brick2 SDR 16-bit, and Brick3 SDR dual 16-bit, as well as built-in firmware flashing and static IP address assignment.
 
 Windows, .NET Framework 4.8, x64.
 

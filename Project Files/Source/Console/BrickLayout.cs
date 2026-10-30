@@ -367,15 +367,12 @@ namespace BrickSDR
             btnHidden.SetBounds(-1000, -1000, 1, 1);
             btnHidden.Visible = true;
 
-            // spectrum background: a picture (default picDisplay.png) on a slightly lighter base
-            Display.DisplayBackgroundColor = Color.FromArgb(Display.DisplayBackgroundColor.A, 24, 30, 42);
+            // spectrum background: a picture (default picDisplay.png) on a slightly lighter base; "Ignore spectral area image" in Setup turns the
+            // picture off for good (the choice is kept) and leaves a plain black spectrum
             brickLoadBackground();
+            brickApplyBackgroundBase();
 
             Display.LineColourMode = brickLineMode();
-
-            // plain dark spectrum, no world map behind it
-            DisableBackgroundImage = false;
-            if (!IsSetupFormNull) SetupForm.chkDisablePicDisplayBackgroundImage.Checked = false;
 
             // the S-meter shows the averaged signal
             for (int i = 0; i < comboMeterRXMode.Items.Count; i++)
@@ -594,6 +591,12 @@ namespace BrickSDR
             brickLoadBackground();
         }
 
+        // the base colour under the picture: lighter blue-grey with the picture, black without it
+        internal void brickApplyBackgroundBase()
+        {
+            try { Display.DisplayBackgroundColor = DisableBackgroundImage ? Color.FromArgb(Display.DisplayBackgroundColor.A, 0, 0, 0) : Color.FromArgb(Display.DisplayBackgroundColor.A, 24, 30, 42); } catch { }
+        }
+
         private void brickLoadBackground()
         {
             string path = BrickBackgroundPath;
@@ -617,7 +620,6 @@ namespace BrickSDR
                     else bmp = new Bitmap(src);
                     PnlDisplayBackgroundImage = bmp;
                 }
-                DisableBackgroundImage = false;
             }
             catch { }
         }

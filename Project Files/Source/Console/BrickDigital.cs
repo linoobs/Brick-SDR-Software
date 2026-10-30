@@ -163,6 +163,12 @@ namespace BrickSDR
                 System.Windows.Forms.Timer lv = new System.Windows.Forms.Timer { Interval = 4000 };
                 lv.Tick += (s, e) => { lv.Stop(); lv.Dispose(); brickEnsureSsbLeveler(); };
                 lv.Start();
+                // a window comes back only when the receiver is still in a mode that suits it (the program may have been closed in SSB with the window open)
+                DSPMode rm = digiRxMode;
+                bool fits = _digiOpenKey == "RTTY" ? (rm == DSPMode.DIGU || rm == DSPMode.DIGL)
+                          : _digiOpenKey == "CW" ? (rm == DSPMode.CWL || rm == DSPMode.CWU)
+                          : (_digiOpenKey == "FT8" || _digiOpenKey == "FT4") ? rm == DSPMode.DIGU : true;
+                if (!fits && _digiOpenKey.Length > 0) { _digiOpenKey = ""; digiSaveSettings(); }
                 if (_digiOpenKey == "RTTY" || _digiOpenKey == "CW") brickDigitalOpen(_digiOpenKey);
                 else if (_digiOpenKey == "RADE") brickRadeOpen(RadeEnabledOn(1) && !RadeEnabledOn(0) ? 1 : 0);
                 else if (_digiOpenKey == "FT8" || _digiOpenKey == "FT4") brickFtOpen(_digiOpenKey);

@@ -43961,6 +43961,7 @@ namespace BrickSDR
                 m_bDisableBackgroundImage = value;
 
                 setBackground();
+                if (brickActive) brickApplyBackgroundBase();
             }
         }
         public Image PnlDisplayBackgroundImage

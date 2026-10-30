@@ -642,7 +642,7 @@ namespace BrickSDR
             if (span > 1) span = 1;
             bool on = this.Enabled;
             Color accent = on ? BrickAccent : Color.FromArgb(110, 80, 50);
-            Color knob = on ? Color.FromArgb(235, 238, 245) : Color.FromArgb(120, 124, 136);
+            Color knob = on ? (m_bGreenThumb ? Color.FromArgb(60, 214, 96) : Color.FromArgb(235, 238, 245)) : Color.FromArgb(120, 124, 136);        // green while Auto AGC is on
             const int r = 9;
 
             if (orientation == Orientation.Horizontal)

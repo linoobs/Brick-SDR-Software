@@ -34,11 +34,11 @@ namespace BrickSDR
                 TextBox t = new TextBox { Location = new Point(x + 90, y), Width = w, Text = val, UseSystemPasswordChar = pass };
                 g.Controls.Add(t); return t;
             };
-            Label hint = new Label { AutoSize = false, Location = new Point(12, 6), Size = new Size(670, 30), ForeColor = SystemColors.GrayText,
+            Label hint = new Label { AutoSize = false, Location = new Point(12, 6), Size = new Size(660, 44), ForeColor = SystemColors.GrayText,
                 Text = "Every QSO logged in any mode (FT8 / FT4 automatically, the others with Log QSO in the DIGI menu or the RTTY / CW window) is sent to the services switched on here. Keys and passwords are stored encrypted for this Windows user." };
             pg.Controls.Add(hint);
 
-            GroupBox gq = grp("QRZ.com Logbook", 40, 78, 0);
+            GroupBox gq = grp("QRZ.com Logbook", 54, 78, 0);
             CheckBox cq = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Qrz };
             TextBox tq = field(gq, "API key", 90, 22, 190, c.QrzKey, true);
             Button bq = new Button { Text = "Check key", Location = new Point(400, 20), Size = new Size(90, 25) };
@@ -53,7 +53,7 @@ namespace BrickSDR
                 System.Threading.Tasks.Task.Run(() => { string r = OnlineLogs.QrzCheck(key); try { BeginInvoke(new Action(() => { lq.Text = r; bq.Enabled = true; })); } catch { } });
             };
 
-            GroupBox ge = grp("eQSL.cc", 126, 78, 0);
+            GroupBox ge = grp("eQSL.cc", 140, 80, 0);
             CheckBox ce = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Eqsl };
             TextBox teu = field(ge, "User", 90, 22, 110, c.EqslUser, false);
             Label lp = new Label { Text = "Password", AutoSize = true, Location = new Point(310, 25) };
@@ -66,24 +66,24 @@ namespace BrickSDR
             tep.TextChanged += (s, e) => { c.EqslPass = tep.Text; OnlineLogs.Save(); };
             ten.TextChanged += (s, e) => { c.EqslNick = ten.Text.Trim(); OnlineLogs.Save(); };
 
-            GroupBox gc = grp("Club Log", 212, 78, 0);
+            GroupBox gc = grp("Club Log", 226, 130, 0);
             CheckBox cc = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Club };
-            TextBox tct = field(gc, "API token", 90, 22, 190, c.ClubToken, true);
-            Label lcc = new Label { Text = "Call sign", AutoSize = true, Location = new Point(310, 25) };
-            TextBox tcc = new TextBox { Location = new Point(380, 22), Width = 110, Text = c.ClubCall };
-            Label lcn = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(650, 22), ForeColor = SystemColors.GrayText,
+            TextBox tct = field(gc, "API token", 90, 22, 300, c.ClubToken, true);
+            Label lcc = new Label { Text = "Call sign", AutoSize = true, Location = new Point(90, 53) };
+            TextBox tcc = new TextBox { Location = new Point(180, 50), Width = 110, Text = c.ClubCall };
+            Label lcn = new Label { AutoSize = false, Location = new Point(16, 78), Size = new Size(640, 44), ForeColor = SystemColors.GrayText,
                 Text = "The token is made in Club Log: Settings - API keys. The call sign is the one of your Club Log logbook (empty = the call sign of the FT8 / RTTY window)." };
             gc.Controls.AddRange(new Control[] { cc, lcc, tcc, lcn });
             cc.CheckedChanged += (s, e) => { c.Club = cc.Checked; OnlineLogs.Save(); };
             tct.TextChanged += (s, e) => { c.ClubToken = tct.Text.Trim(); OnlineLogs.Save(); };
             tcc.TextChanged += (s, e) => { c.ClubCall = tcc.Text.Trim().ToUpperInvariant(); OnlineLogs.Save(); };
 
-            GroupBox gl = grp("LoTW (through TQSL)", 298, 104, 0);
+            GroupBox gl = grp("LoTW (through TQSL)", 366, 128, 0);
             CheckBox cl = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Lotw };
             TextBox tlp = field(gl, "TQSL", 90, 22, 300, string.IsNullOrEmpty(c.TqslPath) ? OnlineLogs.FindTqsl() : c.TqslPath, false);
             TextBox tll = field(gl, "Station location", 90, 50, 190, c.TqslLocation, false);
             Button bl = new Button { Text = "Station locations...", Location = new Point(500, 48), Size = new Size(130, 25) };
-            Label ll = new Label { AutoSize = false, Location = new Point(16, 78), Size = new Size(650, 20), ForeColor = SystemColors.GrayText,
+            Label ll = new Label { AutoSize = false, Location = new Point(16, 78), Size = new Size(640, 44), ForeColor = SystemColors.GrayText,
                 Text = "Needs TQSL with your certificate and a Station Location (name it above). TQSL signs and uploads; a password-protected certificate can't be used here." };
             gl.Controls.AddRange(new Control[] { cl, bl, ll });
             cl.CheckedChanged += (s, e) => { c.Lotw = cl.Checked; OnlineLogs.Save(); };
@@ -95,7 +95,7 @@ namespace BrickSDR
                 try { if (System.IO.File.Exists(exe)) System.Diagnostics.Process.Start(exe, "-s"); } catch { }
             };
 
-            Label st = new Label { AutoSize = false, Location = new Point(12, 410), Size = new Size(670, 70) };
+            Label st = new Label { AutoSize = false, Location = new Point(12, 502), Size = new Size(640, 70) };
             pg.Controls.Add(st);
             Timer tm = new Timer { Interval = 1000 };
             tm.Tick += (s, e) =>

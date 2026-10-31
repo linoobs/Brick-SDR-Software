@@ -48,7 +48,7 @@ using System.Xml;
 
 namespace BrickSDR
 {
-    internal static class CountryData
+    internal static partial class CountryData
     {
         //pre-processed data from https://www.country-files.com/cty-dat-format/
         //CTY-3612 – 17 March 2026        
@@ -94,8 +94,19 @@ namespace BrickSDR
             }
             catch
             {
-                _prefixDataList = null;
+                _prefixDataList = null;        // the built-in table is serialized with the type names of Thetis and does not load here
             }
+            LoadUpdatedTable();                // Brick-SDR: the table downloaded with the Update button, else cty.csv next to the program
+        }
+
+        // every country name of the table, sorted (the FT8 / FT4 list of countries that are not answered is chosen from it)
+        public static List<string> AllCountries()
+        {
+            List<string> l = new List<string>();
+            if (_prefixDataList == null) return l;
+            foreach (PrefixData d in _prefixDataList) if (!string.IsNullOrEmpty(d.Country) && !l.Contains(d.Country)) l.Add(d.Country);
+            l.Sort(StringComparer.OrdinalIgnoreCase);
+            return l;
         }
 
         public static PrefixData GetCallsignData(string callsign)

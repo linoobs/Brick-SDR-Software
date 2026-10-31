@@ -28,9 +28,13 @@ namespace BrickSDR
             public float Snr, Dt, Hz;
             public string Text = "";
             public bool Even, Sent, ToMe, Cq;
+            public string Sender = "", Country = "";            // who sent it and from which country (from the call sign)
         }
 
         private BrickFtPane _ftPane;
+        private bool _ftBlockUnknown;                       // also do not answer a station whose country the table does not know (digital.txt "blockunknown")
+        internal bool FtBlockUnknown { get { if (!_digiLoaded) digiLoadSettings(); return _ftBlockUnknown; } set { _ftBlockUnknown = value; digiSaveSettings(); if (_ftPane != null) _ftPane.Refresh2(); } }
+        private readonly HashSet<string> _ftBlocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);     // countries that are not answered, digital.txt "blocked"
         private string _ftMode = "FT8";                 // "FT8" or "FT4", the one the window is set to
         private string _ftGrid = "";
         private int _ftRxHz = 1500, _ftTxHz = 1500;
@@ -196,6 +200,7 @@ namespace BrickSDR
             long total = 0, startIdx = 0;
             int rate = 0;
             long lastSlot = long.MinValue, earlySlot = long.MinValue;
+            long lastSpecAt = 0;
             int lastRateWarn = 0;
             double smooth = -120;
             while (_ftRun)
@@ -241,6 +246,7 @@ namespace BrickSDR
                             _ftInDb = (float)smooth;
                             _ftClip = pk >= 0.98;
                         }
+                        if (total - lastSpecAt >= rate * 3 / 10 && total >= SpecN) { lastSpecAt = total; ftSpectrum(ring, total, rate); }       // a line of the close-up waterfall about every 0.3 s
                         double now = ftUtcSeconds() - _ftClock;
                         long slot = (long)Math.Floor(now / T);
                         double into = now - slot * T;
@@ -355,6 +361,8 @@ namespace BrickSDR
             string[] t = row.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             row.Cq = t.Length > 0 && t[0] == "CQ";
             row.ToMe = _digiMyCall.Length > 0 && t.Length > 0 && ftBase(t[0]) == _digiMyCall;
+            row.Sender = FtSender(row);
+            row.Country = FtCountryOf(row.Sender);
         }
 
         private static string ftBase(string call) { return call.Trim('<', '>'); }
@@ -464,6 +472,7 @@ namespace BrickSDR
                 string p = FtStartProblem;
                 if (p != null) { _ftStatus = p; return; }
                 if (ftCurrentMessage().Length == 0) { _ftStatus = "Choose a station or press CQ first"; return; }
+                if (_ftDx.Length > 0 && FtIsBlockedCall(_ftDx)) { _ftStatus = _ftDx + " is not answered (" + FtBlockReason(_ftDx, FtCountryOf(_ftDx)) + ")"; return; }
                 _ftTries = 0;
                 if (_ftDx.Length == 0 && !_ftTxEnable) ftTxInSoonestSlot();                      // CQ: no station to keep step with
                 _ftTxEnable = true;
@@ -525,6 +534,7 @@ namespace BrickSDR
             string[] t = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length < 3 || ftBase(t[0]) != _digiMyCall) return;
             string from = ftBase(t[1]), what = t[2];
+            if (FtIsBlockedCall(from)) return;                                              // a country that is not answered
             if (_ftDx.Length > 0 && from != _ftDx) return;                                   // someone else while we're busy
             if (_ftDx.Length == 0 && !_ftTxEnable && !force) return;
             if (_ftDx.Length == 0 || _ftLogged) { _ftQsoStart = DateTime.UtcNow; _ftLogged = false; }
@@ -584,6 +594,7 @@ namespace BrickSDR
         internal void FtPick(FtRow row, bool enable)
         {
             if (row.Sent) return;
+            if (FtIsBlocked(row)) { _ftStatus = row.Sender + " is not answered (" + FtBlockReason(row) + ")"; return; }
             string[] t = row.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length < 2) return;
             string who = row.ToMe ? ftBase(t[1]) : FtSender(row);
@@ -625,6 +636,106 @@ namespace BrickSDR
             catch { }
         }
 
+
+
+        // ---- countries that are not answered ----
+
+        // the country of a call sign from the prefix table; a /P, /M, /QRP or a number after the slash doesn't count, a short prefix before the slash does
+        internal static string FtCountryOf(string call)
+        {
+            if (string.IsNullOrEmpty(call)) return "";
+            try
+            {
+                string c = call.Trim().Trim('<', '>').ToUpperInvariant();
+                if (c.Contains("/"))
+                {
+                    string[] p = c.Split('/');
+                    string best = p[0];
+                    foreach (string s in p) if (s.Length > best.Length) best = s;
+                    if (p.Length == 2 && p[0].Length >= 1 && p[0].Length <= 3 && p[0].Any(char.IsLetter) && p[0].Any(char.IsDigit) || p.Length == 2 && p[0].Length >= 1 && p[0].Length <= 2 && p[0].Any(char.IsLetter)) best = p[0];
+                    c = best;
+                }
+                CountryData.PrefixData d = CountryData.GetCallsignData(c);
+                return d != null && d.Country != null ? d.Country : "";
+            }
+            catch { return ""; }
+        }
+
+        // why a station is not answered: the entry of the list that matches it, or null. An entry is a country name of the table, or a call sign pattern:
+        // "3Y0K" is that call only, "UA*" is every call starting with UA (for prefixes the table doesn't know yet, and for expedition calls)
+        // the parts of a call sign that can name a country: "UA/DL1ABC" has two, "W1AW/P" one (P, M, QRP and the like are no prefixes)
+        private static readonly HashSet<string> NotAPrefix = new HashSet<string> { "P", "M", "MM", "AM", "QRP", "A", "B", "R", "T", "LH", "LGT", "MOBILE", "QRPP" };
+        private static List<string> ftSegments(string c)
+        {
+            List<string> l = new List<string>();
+            foreach (string s in c.Split('/')) if (s.Length >= 2 && !NotAPrefix.Contains(s) && s.Any(char.IsLetter)) l.Add(s);
+            if (l.Count == 0 && c.Length > 0) l.Add(c);
+            return l;
+        }
+
+        internal string FtBlockReason(string call, string country)
+        {
+            string c = (call ?? "").Trim().Trim('<', '>').ToUpperInvariant();
+            bool unknownCall = c.Length == 0 || c == "..." || c.Contains("...");              // a hashed call the decoder could not resolve
+            if (_ftBlocked.Count == 0 && !_ftBlockUnknown) return null;
+            if (unknownCall) return _ftBlockUnknown ? "unknown call sign" : null;
+            List<string> segs = ftSegments(c);
+            bool anyCountry = country.Length > 0;
+            if (country.Length > 0 && _ftBlocked.Contains(country)) return country;
+            // every part is looked up. All parts in blocked countries: blocked. Only some of them (UR/DL1ABC): not clear, so not blocked, only marked (FtWarnReason)
+            if (segs.Count > 1)
+            {
+                List<string> ks = new List<string>();
+                foreach (string s in segs) { string k = FtCountryOf(s); if (k.Length > 0 && !ks.Contains(k)) ks.Add(k); }
+                if (ks.Count > 0) anyCountry = true;
+                if (ks.Count > 0 && ks.TrueForAll(k => _ftBlocked.Contains(k))) return ks[0];
+            }
+            foreach (string e in _ftBlocked)
+            {
+                if (e.IndexOf(' ') >= 0) continue;                                            // a country name
+                string p = e.ToUpperInvariant();
+                bool star = p.EndsWith("*");
+                string q = star ? p.Substring(0, p.Length - 1) : p;
+                // the whole call only: "UR*" blocks UR1ABC, not UR/DL1ABC (that one is only marked); "3Y0K" is also 3Y0K/P
+                if (star ? c.StartsWith(q, StringComparison.Ordinal) : (c == q || c.StartsWith(q + "/", StringComparison.Ordinal) || c.EndsWith("/" + q, StringComparison.Ordinal))) return e;
+            }
+            if (_ftBlockUnknown && !anyCountry) return "unknown country";
+            return null;
+        }
+
+        // a call sign with a prefix that is a blocked country and a base call of another one (UR/DL1ABC): not blocked, but marked in another colour
+        internal string FtWarnReason(FtRow r)
+        {
+            if (r == null || r.Sent || _ftBlocked.Count == 0 || r.Sender.Length == 0 || FtBlockReason(r) != null) return null;
+            string c = r.Sender.Trim('<', '>').ToUpperInvariant();
+            if (!c.Contains("/")) return null;
+            List<string> segs = ftSegments(c);
+            if (segs.Count < 2) return null;
+            foreach (string s in segs) { string k = FtCountryOf(s); if (k.Length > 0 && _ftBlocked.Contains(k)) return "check: " + k + " in " + c; }
+            return null;
+        }
+
+        internal string FtBlockReason(FtRow r) { return r == null || r.Sent ? null : FtBlockReason(r.Sender, r.Country); }
+        internal bool FtIsBlocked(FtRow r) { return FtBlockReason(r) != null; }
+        internal bool FtIsBlockedCall(string call) { return FtBlockReason(call, FtCountryOf(call)) != null; }
+        internal List<string> FtBlockedCountries { get { if (!_digiLoaded) digiLoadSettings(); List<string> l = new List<string>(_ftBlocked); l.Sort(StringComparer.OrdinalIgnoreCase); return l; } }
+
+        internal void FtBlockAdd(string country)
+        {
+            if (string.IsNullOrWhiteSpace(country)) return;
+            if (!_digiLoaded) digiLoadSettings();
+            _ftBlocked.Add(country.Trim());
+            digiSaveSettings();
+            if (_ftPane != null) _ftPane.Refresh2();
+        }
+
+        internal void FtBlockRemove(string country)
+        {
+            if (!_digiLoaded) digiLoadSettings();
+            _ftBlocked.Remove(country);
+            digiSaveSettings();
+            if (_ftPane != null) _ftPane.Refresh2();
+        }
 
         // ---- PSK Reporter ----
 

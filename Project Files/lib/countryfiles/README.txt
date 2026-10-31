@@ -1,0 +1,1 @@
+cty.csv: Big CTY country file from https://www.country-files.com/ (Jim Reisert AD1C), downloaded 2026-10-31. Used by the FT8 / FT4 window for the countries that are not answered; the Update prefix table button in Setup downloads a newer one.

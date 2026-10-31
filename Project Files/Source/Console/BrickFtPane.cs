@@ -24,6 +24,10 @@ namespace BrickSDR
             public event Action<FtRow> Picked;                 // a click: the station is selected
             public event Action<FtRow> Activated;              // a double click: select and enable the transmitter
             public Func<FtRow, bool> Mark = r => false;        // rows of the station selected as DX
+            public Func<FtRow, bool> Dim = r => false;         // rows that can't be answered (a country in the blocked list): grey, no click
+            public Func<FtRow, string> Why = r => "";
+            public Func<FtRow, string> Warn = r => null;        // not blocked but unclear (a blocked prefix with another country's call): another colour
+            private string Reason(FtRow r) { string s = Why(r); return string.IsNullOrEmpty(s) ? r.Country : s; }
             private int top;                            // first row shown
             private bool follow = true;
             private const int RowH = 18, HeadH = 20, Max = 600;
@@ -69,6 +73,7 @@ namespace BrickSDR
             {
                 base.OnMouseClick(e);
                 FtRow r = rowAt(e.Y);
+                if (r != null && Dim(r)) { if (Picked != null) Picked(r); return; }          // the engine says why it is not possible
                 if (r != null && Picked != null) { Picked(r); Invalidate(); }
             }
 
@@ -76,6 +81,7 @@ namespace BrickSDR
             {
                 base.OnMouseDoubleClick(e);
                 FtRow r = rowAt(e.Y);
+                if (r != null && Dim(r)) return;
                 if (r != null && Activated != null) { Activated(r); Invalidate(); }
             }
 
@@ -97,8 +103,11 @@ namespace BrickSDR
                 {
                     FtRow r = Items[i];
                     bool newSlot = i > 0 && Items[i - 1].Utc != r.Utc;
-                    Color fore = r.Sent ? cTx : r.ToMe ? Color.FromArgb(255, 120, 90) : r.Cq ? kGreen : cText;
-                    if (r.ToMe) using (Brush b = new SolidBrush(Color.FromArgb(60, 255, 90, 60))) g.FillRectangle(b, 0, y, Width, RowH);
+                    bool dim = Dim(r);
+                    bool warn = !dim && Warn(r) != null;
+                    Color fore = dim ? Color.FromArgb(95, 100, 115) : warn ? Color.FromArgb(255, 190, 60) : r.Sent ? cTx : r.ToMe ? Color.FromArgb(255, 120, 90) : r.Cq ? kGreen : cText;
+                    if (dim) { }
+                    else if (r.ToMe) using (Brush b = new SolidBrush(Color.FromArgb(60, 255, 90, 60))) g.FillRectangle(b, 0, y, Width, RowH);
                     else if (r.Sent) using (Brush b = new SolidBrush(Color.FromArgb(40, 255, 60, 60))) g.FillRectangle(b, 0, y, Width, RowH);
                     if (!r.Sent && Mark(r)) using (Brush b = new SolidBrush(Color.FromArgb(70, cAccent))) g.FillRectangle(b, 0, y, Width, RowH);
                     if (newSlot) using (Pen p = new Pen(cLine)) g.DrawLine(p, 0, y, Width, y);
@@ -111,6 +120,8 @@ namespace BrickSDR
                     }
                     else TextRenderer.DrawText(g, "Tx", bold, new Rectangle(66, y, 40, RowH), fore, fl);
                     TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 106 : 158, y, 44, RowH), kTextDim, fl);
+                    if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
+                    if (dim) TextRenderer.DrawText(g, Reason(r), font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), Color.FromArgb(120, 70, 70), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
                     TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), fore, fl | TextFormatFlags.EndEllipsis);
                 }
                 using (Pen p = new Pen(cLine)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
@@ -126,6 +137,7 @@ namespace BrickSDR
             private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
             private readonly BrickNum rxHz, txHz;
             private readonly FtList activity, qso;
+            private readonly FtWaterfall wf = new FtWaterfall();
             private readonly MeterBar slotBar = new MeterBar(), inBar = new MeterBar();
             private readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = 100 };
             private bool setting;
@@ -175,6 +187,17 @@ namespace BrickSDR
                 bAuto = mk("Auto-sequence", 112, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
 
+                wf.RxHz = () => c._ftRxHz; wf.TxHz = () => c._ftTxHz;
+                wf.Dim = r => c.FtIsBlocked(r);
+                wf.Warn = r => c.FtWarnReason(r);
+                wf.FreqClicked += (hz, btn) =>
+                {
+                    int v = (int)Math.Max(200, Math.Min(3000, Math.Round(hz / 10.0) * 10));
+                    if (btn == MouseButtons.Left) { c._ftRxHz = v; if (rxHz.Value != v) rxHz.Value = v; }
+                    else if (btn == MouseButtons.Right) { c._ftTxHz = v; if (txHz.Value != v) txHz.Value = v; }
+                    wf.Invalidate();
+                };
+                wf.StationClicked += r => c.FtPick(r, false);
                 activity = new FtList { Heading = "Band activity      dB    DT   Hz   message" };
                 qso = new FtList { Heading = "Your QSO        dB   Hz   message", Compact = true };
                 qso.Accept = r => r.Sent || r.ToMe || (c._ftDx.Length > 0 && r.Text.Contains(c._ftDx));
@@ -182,6 +205,9 @@ namespace BrickSDR
                 qso.Picked += r => c.FtPick(r, false);
                 activity.Activated += r => c.FtPick(r, true);
                 qso.Activated += r => c.FtPick(r, true);
+                activity.Dim = qso.Dim = r => c.FtIsBlocked(r);
+                activity.Why = qso.Why = r => c.FtBlockReason(r);
+                activity.Warn = qso.Warn = r => c.FtWarnReason(r);
                 activity.Mark = qso.Mark = r => c._ftDx.Length > 0 && c.FtSender(r) == c._ftDx;
 
                 slotBar.Height = 6; inBar.Height = 6;
@@ -205,7 +231,7 @@ namespace BrickSDR
                 bHalt = mk("Halt", 64, 28, () => { c.FtHalt(); sync(); });
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
-                Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear,
+                Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, wf,
                     lblRxHz, rxHz, lblTxHz, txHz, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
@@ -289,7 +315,10 @@ namespace BrickSDR
                 slotBar.SetBounds(8, rowY - 30, (w - 24) / 2, 6);
                 inBar.SetBounds(slotBar.Right + 8, rowY - 30, w - 8 - (slotBar.Right + 8), 6);
                 // the lists
-                int top = 70, bot = slotBar.Top - 4;
+                int wfH = Math.Max(0, Math.Min(150, (slotBar.Top - 4 - 70) - 96));
+                int top = 70 + (wfH > 40 ? wfH + 4 : 0), bot = slotBar.Top - 4;
+                wf.Visible = wfH > 40;
+                if (wfH > 40) wf.SetBounds(8, 70, w - 16, wfH);
                 int lw = (int)((w - 24) * 0.5);
                 activity.SetBounds(8, top, lw, Math.Max(40, bot - top));
                 qso.SetBounds(8 + lw + 8, top, w - 24 - lw, Math.Max(40, bot - top));
@@ -301,6 +330,20 @@ namespace BrickSDR
                 FtRow r;
                 int guard = 0;
                 while (guard++ < 200 && c.FtTryRow(out r)) { activity.Add(r); qso.Add(r); }
+                float[] line; int lines = 0;
+                while (lines++ < 12 && c.FtTrySpec(out line)) wf.Push(line, c.FtSpecLo, c.FtSpecHi);
+                if (wf.Visible)
+                {
+                    List<FtRow> recent = new List<FtRow>();
+                    DateTime newest = activity.Items.Count > 0 ? activity.Items[activity.Items.Count - 1].Utc : DateTime.MinValue;
+                    for (int i = activity.Items.Count - 1; i >= 0 && recent.Count < 40; i--)
+                    {
+                        FtRow x = activity.Items[i];
+                        if ((newest - x.Utc).TotalSeconds > c.FtSlotLength * 1.5) break;
+                        if (!x.Sent) recent.Add(x);
+                    }
+                    wf.Stations = recent;
+                }
                 double T = c.FtSlotLength;
                 slotBar.Value = Math.Max(0, Math.Min(1, c.FtSlotPos / T));
                 double lvl = Math.Max(0, Math.Min(1, (c.FtInDb + 60) / 60.0));

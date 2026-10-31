@@ -483,6 +483,8 @@
     <Compile Include="BrickMfsk.cs" />
     <Compile Include="BrickFt.cs" />
     <Compile Include="BrickFtPane.cs" />
+    <Compile Include="BrickFtWaterfall.cs" />
+    <Compile Include="BrickCtyUpdate.cs" />
     <Compile Include="BrickDigiSetup.cs" />
     <Compile Include="BrickPskReporter.cs" />
     <Compile Include="BrickDeepCw.cs" />
@@ -1383,6 +1385,7 @@ copy /Y "..\..\..\lib\Brick-SDR-resources\Brick*.xml" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_small.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\NR_Algorithms_x64\rnnoise_weights_large.bin" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\mfsk\mfsk.dll" "$(ProjectDir)$(OutDir)"
+copy /Y "..\..\..\lib\countryfiles\cty.csv" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\onnxruntime\onnxruntime.dll" "$(ProjectDir)$(OutDir)"
 copy /Y "..\..\..\lib\onnxruntime\onnxruntime_providers_shared.dll" "$(ProjectDir)$(OutDir)"
 xcopy /Y /I /Q "..\..\..\lib\deepcw\*" "$(ProjectDir)$(OutDir)deepcw\"

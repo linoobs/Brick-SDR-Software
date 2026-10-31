@@ -161,7 +161,7 @@ namespace BrickSDR
             catch { }
         }
 
-        private enum R { Ok, Duplicate, Retry, Fail }
+        private enum R { Ok, Duplicate, Retry, Fail, Manual }
 
         private static void Work()
         {
@@ -198,6 +198,7 @@ namespace BrickSDR
                     case R.Ok: SetStatus(svc, DateTime.Now.ToString("HH:mm") + "  " + call + " sent"); break;
                     case R.Duplicate: SetStatus(svc, DateTime.Now.ToString("HH:mm") + "  " + call + " already there"); break;
                     case R.Retry: SetStatus(svc, DateTime.Now.ToString("HH:mm") + "  " + call + " will be sent later (" + msg + ")"); keep.Add(line); retry = true; break;
+                    case R.Manual: SetStatus(svc, DateTime.Now.ToString("HH:mm") + "  " + call + " put into qrz_manual.adi (" + ManualCount + " QSOs waiting for a manual import)"); break;
                     default:
                         SetStatus(svc, DateTime.Now.ToString("HH:mm") + "  " + call + " refused: " + msg);
                         try { File.AppendAllText(FailedFile, svc + "\t" + DateTime.Now.ToString("s") + "\t" + msg + "\t" + adif + "\r\n"); } catch { }
@@ -286,9 +287,43 @@ namespace BrickSDR
             msg = reason ?? res ?? ("HTTP " + code);
             if (res == "OK") return R.Ok;
             if (res == "REPLACE") return R.Duplicate;
+            // no paid QRZ subscription: the API can't be used, the QSO goes to a file that is imported by hand on the QRZ website
+            if (res == "AUTH" && reason != null && reason.IndexOf("subscription", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                AddManual(adif);
+                msg = "no QRZ subscription";
+                return R.Manual;
+            }
             if (res == "FAIL" && reason != null && reason.IndexOf("duplicate", StringComparison.OrdinalIgnoreCase) >= 0) return R.Duplicate;
             if (code >= 500) return R.Retry;
             return R.Fail;
+        }
+
+        // ---- QRZ without a subscription: a file for the manual import (QRZ logbook - Import ADIF is free for every user) ----
+
+        public static string ManualFile { get { return Path.Combine(folder, "qrz_manual.adi"); } }
+
+        public static int ManualCount
+        {
+            get { try { return File.Exists(ManualFile) ? Regex.Matches(File.ReadAllText(ManualFile), "<EOR>", RegexOptions.IgnoreCase).Count : 0; } catch { return 0; } }
+        }
+
+        private static void AddManual(string adif)
+        {
+            lock (gate)
+            {
+                bool fresh = !File.Exists(ManualFile);
+                File.AppendAllText(ManualFile, (fresh ? "Brick-SDR QSOs for the QRZ import\r\n<ADIF_VER:5>3.1.4 <PROGRAMID:9>Brick-SDR <EOH>\r\n" : "") + adif + "\r\n", Encoding.ASCII);
+            }
+        }
+
+        // after the import on the website: the file is kept under another name, the next QSOs start a new one
+        public static void ManualDone()
+        {
+            lock (gate)
+            {
+                try { if (File.Exists(ManualFile)) File.Move(ManualFile, Path.Combine(folder, "qrz_imported_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi")); } catch { }
+            }
         }
 
         // the check of the key in Setup: reads the numbers of the logbook, writes nothing

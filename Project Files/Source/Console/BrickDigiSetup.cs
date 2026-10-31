@@ -42,8 +42,22 @@ namespace BrickSDR
             CheckBox cq = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Qrz };
             TextBox tq = field(gq, "API key", 90, 22, 190, c.QrzKey, true);
             Button bq = new Button { Text = "Check key", Location = new Point(400, 20), Size = new Size(90, 25) };
-            Label lq = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(640, 46) };
-            gq.Controls.AddRange(new Control[] { cq, bq, lq });
+            Label lq = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(470, 46) };
+            // no paid QRZ subscription: the QSOs are collected in a file that is imported by hand (QRZ logbook - Import)
+            Button bqf = new Button { Text = "Import file (no subscription)", Location = new Point(500, 20), Size = new Size(160, 25) };
+            Button bqd = new Button { Text = "Imported, start new file", Location = new Point(500, 50), Size = new Size(160, 25) };
+            gq.Controls.AddRange(new Control[] { cq, bq, lq, bqf, bqd });
+            bqf.Click += (s, e) =>
+            {
+                try
+                {
+                    if (System.IO.File.Exists(OnlineLogs.ManualFile)) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + OnlineLogs.ManualFile + "\"");
+                    else lq.Text = "No QSOs are waiting. Without a subscription they are collected in qrz_manual.adi when they are logged.";
+                    System.Diagnostics.Process.Start("https://logbook.qrz.com/");
+                }
+                catch { }
+            };
+            bqd.Click += (s, e) => { OnlineLogs.ManualDone(); lq.Text = "The file is kept as qrz_imported_*.adi, the next QSOs start a new one."; };
             cq.CheckedChanged += (s, e) => { c.Qrz = cq.Checked; OnlineLogs.Save(); };
             tq.TextChanged += (s, e) => { c.QrzKey = tq.Text.Trim(); OnlineLogs.Save(); };
             bq.Click += (s, e) =>

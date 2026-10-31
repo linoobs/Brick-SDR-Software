@@ -1962,6 +1962,14 @@ namespace BrickSDR
         }
 
         // the meter is repainted by the old code only on rx data, keep it moving while transmitting
+        // right click on the display: the frequency / level box at the pointer (Setup "Show MHz on cursor", also shown with Shift)
+        private void brickToggleCursorInfo()
+        {
+            bool now = !Display.AlwaysShowCursorInfo;
+            if (!IsSetupFormNull) SetupForm.ShowDisplayMHzCursorInfo = now;
+            else Display.AlwaysShowCursorInfo = now;
+        }
+
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();

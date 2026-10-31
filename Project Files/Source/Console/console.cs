@@ -49885,6 +49885,11 @@ namespace BrickSDR
                             next_cursor = grabbing;
                         }
                     }
+                    else if (brickActive)
+                    {
+                        // Brick-SDR: a right click on the spectrum / waterfall switches the frequency box at the pointer on and off
+                        brickToggleCursorInfo();
+                    }
                     else if (!brickActive)
                     {
                         switch (current_click_tune_mode)

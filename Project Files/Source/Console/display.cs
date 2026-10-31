@@ -10721,6 +10721,8 @@ namespace BrickSDR
             }
         }
 
+        private const float textPaddingYMin = 4f;
+
         private static void DrawCursorInfoPanel(List<string> lines, int W, float yPos)
         {
             if (lines == null || lines.Count == 0)
@@ -10742,12 +10744,12 @@ namespace BrickSDR
 
             float panelWidth = maxWidth + (textPaddingX * 2f);
             float panelHeight = (lines.Count * lineHeight) + ((lines.Count - 1) * lineGap) + (textPaddingY * 2f);
-            int xPos = display_cursor_x + 12;
+            int xPos = display_cursor_x + 28;                              // Brick-SDR: a little further from the pointer (was 12)
             float rectX = xPos - textPaddingX;
             float rectY = yPos - textPaddingY;
             if (rectX + panelWidth > W)
             {
-                xPos -= (int)panelWidth + 24;
+                xPos -= (int)panelWidth + 56;
                 rectX = xPos - textPaddingX;
             }
 
@@ -10777,7 +10779,7 @@ namespace BrickSDR
                 AppendCursorInfoLines(lines, m_sMHzCursorDisplay);
                 AppendCursorInfoLines(lines, m_sOtherData1CursorDisplay);
                 AppendCursorInfoLines(lines, m_sOtherData2CursorDisplay);
-                DrawCursorInfoPanel(lines, W, display_cursor_y - 18);
+                DrawCursorInfoPanel(lines, W, Math.Max(textPaddingYMin, display_cursor_y - 36));
             }
             //
         }

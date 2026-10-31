@@ -4,6 +4,28 @@ Brick-SDR is a restyled fork of Thetis 2.10.3.x (SDR console for OpenHPSDR / ANA
 
 Windows, .NET Framework 4.8, x64.
 
+## Screenshots
+
+### Main window with RX1 and RX2
+![Main window, two receivers, 3D panadapter](img/2026-10-31_10-17-30.jpg)
+
+### FT8 / FT4
+Decoding and transmitting FT8 and FT4 under the panadapter (DIGI menu), with the band activity and your QSO lists.
+
+![FT8 window under the panadapter](img/2026-10-31_10-28-36.jpg)
+
+### CW with three decoders
+The CW window with the decoder switch: Basic, DeepCW (neural network) and Goertzel.
+
+![CW window with the decoder drop-down](img/2026-10-31_10-52-28.jpg)
+
+### Radio setup
+Setup - General - H/W Select: discover the radio, add it to the list, then program the firmware or set the IP address.
+
+| Radio settings | Discovered radios | Radio in the list |
+|---|---|---|
+| ![H/W Select](img/2026-10-31_10-17-52.jpg) | ![Discovered radios](img/2026-10-31_10-18-13.jpg) | ![Radio list with Program and IP Set](img/2026-10-31_10-18-21.jpg) |
+
 ## Install
 
 Download `BrickSDR-Setup.exe` from the [Releases](../../releases) page and run it (administrator rights are needed to create the firewall rule). Windows SmartScreen may warn about an unknown publisher because the installer is not code-signed: choose *More info → Run anyway*.

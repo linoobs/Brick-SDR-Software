@@ -484,7 +484,7 @@ namespace BrickSDR
             xitArrow.Click += (s, e) => brickShowOffsetPopup(xitArrow, "XIT", chkXIT, udXIT, btnXITReset);
             cardVfoFunc.Controls.Add(xitArrow);
             chkPanSwap.Visible = false;
-            btnIFtoVFO.Visible = false; btnZeroBeat.Visible = false;
+            btnIFtoVFO.Visible = false;
             panelVFO.Visible = false;
 
             // --- panadapter settings and RIT / XIT, second row

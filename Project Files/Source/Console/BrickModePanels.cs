@@ -120,6 +120,9 @@ namespace BrickSDR
             Put(lblCWPitchFreq, panelModeSpecificCW, 118, 143, 100, 17);
             lblCWPitchFreq.TextAlign = ContentAlignment.MiddleRight;
             brickValueStepper(panelModeSpecificCW, udCWPitch, 224, 139, 106);
+            // the Zero beat button of Thetis (the strongest peak of the passband goes to the CW pitch), it was hidden before (GitHub issue 2)
+            Put(btnZeroBeat, panelModeSpecificCW, 8, 139, 100, 24);
+            btnZeroBeat.Text = "Zero beat"; btnZeroBeat.Visible = true;
             grpSemiBreakIn.SetBounds(112, 92, 218, 45);
             Put(chkQSK, grpSemiBreakIn, 4, 16, 48, 23);
             Put(lblCWBreakInDelay, grpSemiBreakIn, 54, 21, 66, 17);

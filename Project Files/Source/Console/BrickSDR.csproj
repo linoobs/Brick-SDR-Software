@@ -406,6 +406,7 @@
     </Reference>
     <Reference Include="System.ValueTuple" />
     <Reference Include="System.Web" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Windows" />
     <Reference Include="System.Windows.Forms">
       <Name>System.Windows.Forms</Name>
@@ -481,6 +482,8 @@
     <Compile Include="BrickDigital.cs" />
     <Compile Include="BrickDock.cs" />
     <Compile Include="BrickMfsk.cs" />
+    <Compile Include="BrickQsoLog.cs" />
+    <Compile Include="BrickOnlineLogs.cs" />
     <Compile Include="BrickFt.cs" />
     <Compile Include="BrickFtPane.cs" />
     <Compile Include="BrickFtWaterfall.cs" />

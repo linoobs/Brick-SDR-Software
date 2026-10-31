@@ -844,19 +844,12 @@ namespace BrickSDR
             {
                 double mhz = _digiRx == 1 ? VFOBFreq : VFOAFreq;
                 DateTime on = _ftQsoStart == default(DateTime) ? DateTime.UtcNow : _ftQsoStart, off = DateTime.UtcNow;
-                StringBuilder sb = new StringBuilder();
-                Action<string, string> f = (k, v) => { if (!string.IsNullOrEmpty(v)) sb.Append("<" + k + ":" + v.Length + ">" + v + " "); };
-                f("CALL", _ftDx); f("GRIDSQUARE", _ftDxGrid);
-                f("MODE", _ftMode == "FT4" ? "MFSK" : "FT8");
-                if (_ftMode == "FT4") f("SUBMODE", "FT4");
-                f("RST_SENT", _ftRptSent); f("RST_RCVD", _ftRptRcvd);
-                f("FREQ", mhz.ToString("0.000000", CultureInfo.InvariantCulture));
-                f("QSO_DATE", off.ToString("yyyyMMdd")); f("TIME_ON", on.ToString("HHmmss")); f("TIME_OFF", off.ToString("HHmmss"));
-                f("STATION_CALLSIGN", _digiMyCall); f("MY_GRIDSQUARE", _ftGrid);
-                sb.Append("<EOR>\r\n");
-                bool fresh = !File.Exists(FtLogFile);
-                File.AppendAllText(FtLogFile, (fresh ? "Brick-SDR FT8 / FT4 log\r\n<ADIF_VER:5>3.1.4 <PROGRAMID:9>Brick-SDR <EOH>\r\n" : "") + sb);
-                _ftStatus = "Logged " + _ftDx;
+                Qso q = new Qso
+                {
+                    Call = _ftDx, Grid = _ftDxGrid, Mode = _ftMode == "FT4" ? "MFSK" : "FT8", Submode = _ftMode == "FT4" ? "FT4" : "",
+                    RstSent = _ftRptSent, RstRcvd = _ftRptRcvd, Mhz = mhz, On = on, Off = off
+                };
+                _ftStatus = QsoLogAdd(q);
             }
             catch { }
         }

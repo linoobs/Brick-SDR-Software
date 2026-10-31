@@ -162,6 +162,7 @@ namespace BrickSDR
             {
                 string logFile = FtLogFile;       // makes the digi_modes folder (and moves an old ft_log.adi into it)
                 digiLoadSettings();
+                OnlineLogsInit();                 // retries what could not be uploaded last time
                 brickEnsureSsbLeveler();
                 // the TX profile and the saved state may still be loading: look again
                 System.Windows.Forms.Timer lv = new System.Windows.Forms.Timer { Interval = 4000 };

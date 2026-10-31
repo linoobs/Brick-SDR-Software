@@ -668,6 +668,29 @@ namespace BrickSDR
 			lblVersion.Text = BasedOnText(_start_params.vers);
 			lblTimeRemaining.Text = "";
 			AddLogLine("WDSP 2.11 loaded");
+            ApplyHoliday();
+        }
+
+        // on a holiday of the world, Ukraine or Germany the splash shows a drawn scene for it (BrickHolidays.cs)
+        private void ApplyHoliday()
+        {
+            try
+            {
+                string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenHPSDR", "Brick-SDR-x64");
+                int advent;
+                Holiday h = BrickHolidays.Current(folder, out advent);
+                if (h == null) return;
+                Bitmap scene = BrickHolidays.Render(h, advent, ClientSize.Width, ClientSize.Height);
+                BackgroundImage = scene;
+                BackgroundImageLayout = ImageLayout.None;
+                foreach (Control c in new Control[] { picLogo, lblTitle, lblSubTitle, lblDescription, lblStatus, lblTimeRemaining, lblVersion }) c.BackColor = Color.Transparent;
+                lblStatus.ForeColor = Color.FromArgb(205, 210, 222); lblTimeRemaining.ForeColor = Color.FromArgb(205, 210, 222); lblVersion.ForeColor = Color.FromArgb(205, 210, 222);
+                lblSubTitle.ForeColor = Color.FromArgb(215, 220, 232);
+                AddLogLine(h.Name);
+                txtLog.Visible = false;          // the scene and its greeting are in the place of the log
+                Invalidate();
+            }
+            catch { }
         }
 
         // "Brick-SDR - based on Thetis 2.10.3.15, WDSP 2.11"

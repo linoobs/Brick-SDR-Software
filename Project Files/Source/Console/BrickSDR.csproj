@@ -485,6 +485,7 @@
     <Compile Include="BrickFtPane.cs" />
     <Compile Include="BrickFtWaterfall.cs" />
     <Compile Include="BrickCtyUpdate.cs" />
+    <Compile Include="BrickHolidays.cs" />
     <Compile Include="BrickDigiSetup.cs" />
     <Compile Include="BrickPskReporter.cs" />
     <Compile Include="BrickDeepCw.cs" />

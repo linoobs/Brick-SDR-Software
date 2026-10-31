@@ -121,7 +121,6 @@ namespace BrickSDR
                     else TextRenderer.DrawText(g, "Tx", bold, new Rectangle(66, y, 40, RowH), fore, fl);
                     TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 106 : 158, y, 44, RowH), kTextDim, fl);
                     if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
-                    if (dim) TextRenderer.DrawText(g, Reason(r), font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), Color.FromArgb(120, 70, 70), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
                     TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), fore, fl | TextFormatFlags.EndEllipsis);
                 }
                 using (Pen p = new Pen(cLine)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
@@ -188,7 +187,7 @@ namespace BrickSDR
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
 
                 wf.RxHz = () => c._ftRxHz; wf.TxHz = () => c._ftTxHz;
-                wf.Dim = r => c.FtIsBlocked(r);
+                wf.Dim = r => c.FtIsDimmed(r);
                 wf.Warn = r => c.FtWarnReason(r);
                 wf.FreqClicked += (hz, btn) =>
                 {
@@ -205,7 +204,7 @@ namespace BrickSDR
                 qso.Picked += r => c.FtPick(r, false);
                 activity.Activated += r => c.FtPick(r, true);
                 qso.Activated += r => c.FtPick(r, true);
-                activity.Dim = qso.Dim = r => c.FtIsBlocked(r);
+                activity.Dim = qso.Dim = r => c.FtIsDimmed(r);
                 activity.Why = qso.Why = r => c.FtBlockReason(r);
                 activity.Warn = qso.Warn = r => c.FtWarnReason(r);
                 activity.Mark = qso.Mark = r => c._ftDx.Length > 0 && c.FtSender(r) == c._ftDx;

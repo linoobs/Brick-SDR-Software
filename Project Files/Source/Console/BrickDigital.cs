@@ -64,7 +64,7 @@ namespace BrickSDR
             _digiLoaded = true;
             try
             {
-                if (!File.Exists(DigiFile)) return;
+                if (!File.Exists(DigiFile)) { foreach (string cn in new[] { "European Russia", "Asiatic Russia", "Kaliningrad" }) _ftBlocked.Add(cn); return; }
                 bool lvl2 = false;
                 foreach (string line in File.ReadAllLines(DigiFile))
                 {
@@ -94,13 +94,15 @@ namespace BrickSDR
                         case "ftauto": _ftAuto = v != "0"; break;
                         case "psk": _ftPsk = v == "1"; break;
                         case "blockunknown": _ftBlockUnknown = v == "1"; break;
-                        case "blocked": _ftBlocked.Clear(); foreach (string cn in v.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)) _ftBlocked.Add(cn.Trim()); break;
+                        case "blocked": _ftBlockedSeen = true; _ftBlocked.Clear(); foreach (string cn in v.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)) _ftBlocked.Add(cn.Trim()); break;
                         case "cwdec": if (num) _cwKind = (int)Math.Max(0, Math.Min(2, d)); break;
                         case "ftlevel": if (num) _ftLevel = Math.Max(-40, Math.Min(0, d)); break;
                     }
                 }
                 // before level scheme 3 the TX audio of RTTY and FT8 was set low (-10 dB): the Drive slider did not give what it gives in CW
                 if (!lvl2) { _rttyLevel = 0; _ftLevel = 0; }
+                // the first start (no list saved yet): Russia is not answered, the user can take it out of the list
+                if (!_ftBlockedSeen) { _ftBlocked.Clear(); foreach (string cn in new[] { "European Russia", "Asiatic Russia", "Kaliningrad" }) _ftBlocked.Add(cn); }
             }
             catch { }
         }

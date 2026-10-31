@@ -32,6 +32,7 @@ namespace BrickSDR
         }
 
         private BrickFtPane _ftPane;
+        private bool _ftBlockedSeen;                         // the list was saved before: on the first start it holds Russia (not answered by default)
         private bool _ftBlockUnknown;                       // also do not answer a station whose country the table does not know (digital.txt "blockunknown")
         internal bool FtBlockUnknown { get { if (!_digiLoaded) digiLoadSettings(); return _ftBlockUnknown; } set { _ftBlockUnknown = value; digiSaveSettings(); if (_ftPane != null) _ftPane.Refresh2(); } }
         private readonly HashSet<string> _ftBlocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);     // countries that are not answered, digital.txt "blocked"
@@ -737,6 +738,9 @@ namespace BrickSDR
 
         internal string FtBlockReason(FtRow r) { return r == null || r.Sent ? null : FtBlockReason(r.Sender, r.Country); }
         internal bool FtIsBlocked(FtRow r) { return FtBlockReason(r) != null; }
+        // what the lists and the waterfall dim: a CQ of a blocked station or its call to you. A message between two other stations (one of them blocked) is
+        // only activity on the band: it is shown as usual. Answering such a station stays impossible (FtPick, the auto-sequence).
+        internal bool FtIsDimmed(FtRow r) { return r != null && (r.Cq || r.ToMe) && FtBlockReason(r) != null; }
         internal bool FtIsBlockedCall(string call) { return FtBlockReason(call, FtCountryOf(call)) != null; }
         internal List<string> FtBlockedCountries { get { if (!_digiLoaded) digiLoadSettings(); List<string> l = new List<string>(_ftBlocked); l.Sort(StringComparer.OrdinalIgnoreCase); return l; } }
 

@@ -7,7 +7,7 @@ Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $work | Out-Null
 $stage = Join-Path $work 'stage'
 robocopy $rel $stage /E /XF *.pdb *.old.exe | Out-Null
-$ver = "1.3.5"
+$ver = "1.3.6"
 Set-Content (Join-Path $work 'version.txt') $ver -Encoding ASCII
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $work 'payload.zip'

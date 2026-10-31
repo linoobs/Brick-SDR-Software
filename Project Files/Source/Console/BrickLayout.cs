@@ -1514,6 +1514,7 @@ namespace BrickSDR
             add("RTTY", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
             add("CW", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
             m.Items.Add(new ToolStripSeparator());
+            add("Log bar", _digiLogBar, () => { _digiLogBar = !_digiLogBar; digiSaveSettings(); brickLogBarUpdate(); }, true);
             add("Log QSO...", false, () => brickLogQsoDialog("", rx2 ? 1 : 0), true);
             add("DX", false, () => { try { System.Diagnostics.Process.Start("https://www.dxsummit.fi/"); } catch { } }, true);
             add("POTA", false, () => { try { System.Diagnostics.Process.Start("https://pota.app/#/"); } catch { } }, true);
@@ -1964,7 +1965,7 @@ namespace BrickSDR
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();
-            try { radeAutoLevelTick(); digiTapAutoLevelTick(); } catch { }
+            try { radeAutoLevelTick(); digiTapAutoLevelTick(); brickLogBarUpdate(); } catch { }
             if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
             if (!initializing && !IsSetupFormNull)
             {

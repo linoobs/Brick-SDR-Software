@@ -789,7 +789,7 @@ namespace BrickSDR
             {
                 if (!_ftPsk || _digiMyCall.Length < 3 || _ftGrid.Length < 4) return;
                 if (_psk == null) _psk = new PskReporter();
-                if (!_psk.Running) _psk.Start(_digiMyCall, _ftGrid, "Brick-SDR " + BrickBranding.Version);
+                if (!_psk.Running) _psk.Start(_digiMyCall, _ftGrid, "Brick-SDR " + BrickBranding.Version, BrickHardware.Name);
                 if (!_psk.Running) return;
                 double dial = (_digiRx == 1 ? VFOBFreq : VFOAFreq) * 1e6;
                 double T = mode == "FT4" ? 7.5 : 15.0;

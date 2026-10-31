@@ -43,7 +43,7 @@ namespace BrickSDR
         private uint sequence;
         private int datagrams;
         private DateTime lastTemplates = DateTime.MinValue;
-        private string rxCall = "", rxGrid = "", software = "";
+        private string rxCall = "", rxGrid = "", software = "", rig = "";
 
         public int SpotsSent { get; private set; }
         public string Status { get; private set; }
@@ -64,10 +64,10 @@ namespace BrickSDR
             return call;
         }
 
-        public void Start(string myCall, string myGrid, string softwareName)
+        public void Start(string myCall, string myGrid, string softwareName, string rigName = "")
         {
             Stop();
-            rxCall = CleanCall(myCall); rxGrid = (myGrid ?? "").Trim(); software = softwareName ?? "";
+            rxCall = CleanCall(myCall); rxGrid = (myGrid ?? "").Trim(); software = softwareName ?? ""; rig = rigName ?? "";
             if (rxCall.Length == 0) { Status = "Enter your call sign"; return; }
             run = true;
             sequence = 0; datagrams = 0; lastTemplates = DateTime.MinValue;
@@ -153,7 +153,7 @@ namespace BrickSDR
         {
             if (udp == null) udp = new UdpClient(host, port);      // one socket, so one source port for every datagram
             bool templates = datagrams < 3 || (DateTime.UtcNow - lastTemplates).TotalMinutes >= 60;
-            byte[] d = Build(batch, templates, rxCall, rxGrid, software, domain, sequence, DateTime.UtcNow);
+            byte[] d = Build(batch, templates, rxCall, rxGrid, software, rig, domain, sequence, DateTime.UtcNow);
             udp.Send(d, d.Length);
             sequence += (uint)batch.Count;
             datagrams++;
@@ -167,10 +167,11 @@ namespace BrickSDR
 
         private static readonly byte[] ReceiverTemplate =
         {
-            0x00, 0x03, 0x00, 0x24, 0x99, 0x92, 0x00, 0x03, 0x00, 0x01,          // set 3, 36 bytes, template 0x9992, 3 fields, 1 scope field
+            0x00, 0x03, 0x00, 0x2C, 0x99, 0x92, 0x00, 0x04, 0x00, 0x01,          // set 3, 44 bytes, template 0x9992, 4 fields, 1 scope field
             0x80, 0x02, 0xFF, 0xFF, 0x00, 0x00, 0x76, 0x8F,                      // receiverCallsign (30351.2), variable length
             0x80, 0x04, 0xFF, 0xFF, 0x00, 0x00, 0x76, 0x8F,                      // receiverLocator (30351.4)
             0x80, 0x08, 0xFF, 0xFF, 0x00, 0x00, 0x76, 0x8F,                      // decodingSoftware (30351.8)
+            0x80, 0x0D, 0xFF, 0xFF, 0x00, 0x00, 0x76, 0x8F,                      // rigInformation (30351.13): the radio, e.g. "Brick3 15W"
             0x00, 0x00
         };
 
@@ -207,7 +208,7 @@ namespace BrickSDR
             m.Position = end;
         }
 
-        internal static byte[] Build(List<Spot> spots, bool templates, string rxCall, string rxGrid, string software, uint domain, uint sequence, DateTime nowUtc)
+        internal static byte[] Build(List<Spot> spots, bool templates, string rxCall, string rxGrid, string software, string rig, uint domain, uint sequence, DateTime nowUtc)
         {
             MemoryStream m = new MemoryStream();
             u16(m, 10);                                      // IPFIX version
@@ -220,7 +221,7 @@ namespace BrickSDR
             // receiver record: your call sign, locator and the program
             long rs = m.Position;
             u16(m, 0x9992); u16(m, 0);
-            str(m, rxCall); str(m, rxGrid); str(m, software);
+            str(m, rxCall); str(m, rxGrid); str(m, software); str(m, rig);
             while ((m.Position - rs) % 4 != 0) m.WriteByte(0);
             patchLength(m, rs + 2, rs);
 

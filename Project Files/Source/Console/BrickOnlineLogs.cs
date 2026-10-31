@@ -26,6 +26,7 @@ namespace BrickSDR
         public bool Eqsl; public string EqslUser = "", EqslPass = "", EqslNick = "";
         public bool Club; public string ClubToken = "", ClubCall = "";
         public bool Lotw; public string TqslPath = "", TqslLocation = "";
+        public string HamQthUser = "", HamQthPass = "", QrzXmlUser = "", QrzXmlPass = "";        // call sign look-up (BrickCallLookup.cs)
     }
 
     internal static class OnlineLogs
@@ -107,6 +108,10 @@ namespace BrickSDR
                         case "lotw": c.Lotw = v == "1"; break;
                         case "tqsl": c.TqslPath = v; break;
                         case "tqslloc": c.TqslLocation = v; break;
+                        case "hamuser": c.HamQthUser = v; break;
+                        case "hampass": c.HamQthPass = Unprotect(v); break;
+                        case "qrzxuser": c.QrzXmlUser = v; break;
+                        case "qrzxpass": c.QrzXmlPass = Unprotect(v); break;
                     }
                 }
             }
@@ -125,7 +130,8 @@ namespace BrickSDR
                     "qrz=" + (c.Qrz ? 1 : 0), "qrzkey=" + Protect(c.QrzKey),
                     "eqsl=" + (c.Eqsl ? 1 : 0), "equser=" + c.EqslUser, "eqpass=" + Protect(c.EqslPass), "eqnick=" + c.EqslNick,
                     "club=" + (c.Club ? 1 : 0), "clubtoken=" + Protect(c.ClubToken), "clubcall=" + c.ClubCall,
-                    "lotw=" + (c.Lotw ? 1 : 0), "tqsl=" + c.TqslPath, "tqslloc=" + c.TqslLocation
+                    "lotw=" + (c.Lotw ? 1 : 0), "tqsl=" + c.TqslPath, "tqslloc=" + c.TqslLocation,
+                    "hamuser=" + c.HamQthUser, "hampass=" + Protect(c.HamQthPass), "qrzxuser=" + c.QrzXmlUser, "qrzxpass=" + Protect(c.QrzXmlPass)
                 });
             }
             catch { }

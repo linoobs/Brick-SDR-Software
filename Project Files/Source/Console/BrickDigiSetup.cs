@@ -113,7 +113,25 @@ namespace BrickSDR
                 try { if (System.IO.File.Exists(exe)) System.Diagnostics.Process.Start(exe, "-s"); } catch { }
             };
 
-            Label st = new Label { AutoSize = false, Location = new Point(12, 526), Size = new Size(640, 70) };
+            // call sign look-up of the log bar: HamQTH and QRZ.com XML are asked too when their log-in is given (the other sources need none)
+            GroupBox gk = grp("Call sign look-up (log bar)", 526, 106, 0);
+            gk.Controls.Add(new Label { Text = "HamQTH (free account)", AutoSize = true, Location = new Point(16, 27) });
+            TextBox thu = new TextBox { Location = new Point(160, 24), Width = 110, Text = c.HamQthUser };
+            Label lhp = new Label { Text = "Password", AutoSize = true, Location = new Point(285, 27) };
+            TextBox thp = new TextBox { Location = new Point(350, 24), Width = 110, Text = c.HamQthPass, UseSystemPasswordChar = true };
+            gk.Controls.Add(new Label { Text = "QRZ.com XML (paid)", AutoSize = true, Location = new Point(16, 57) });
+            TextBox tqu = new TextBox { Location = new Point(160, 54), Width = 110, Text = c.QrzXmlUser };
+            Label lqp = new Label { Text = "Password", AutoSize = true, Location = new Point(285, 57) };
+            TextBox tqp = new TextBox { Location = new Point(350, 54), Width = 110, Text = c.QrzXmlPass, UseSystemPasswordChar = true };
+            Label lkn = new Label { AutoSize = false, Location = new Point(16, 82), Size = new Size(640, 20), ForeColor = SystemColors.GrayText,
+                Text = "Always asked, no log-in needed: callook.info and HamDB (US), RadioID.net, the country table and the program's own log." };
+            gk.Controls.AddRange(new Control[] { thu, lhp, thp, tqu, lqp, tqp, lkn });
+            thu.TextChanged += (s, e) => { c.HamQthUser = thu.Text.Trim(); OnlineLogs.Save(); };
+            thp.TextChanged += (s, e) => { c.HamQthPass = thp.Text; OnlineLogs.Save(); };
+            tqu.TextChanged += (s, e) => { c.QrzXmlUser = tqu.Text.Trim(); OnlineLogs.Save(); };
+            tqp.TextChanged += (s, e) => { c.QrzXmlPass = tqp.Text; OnlineLogs.Save(); };
+
+            Label st = new Label { AutoSize = false, Location = new Point(12, 642), Size = new Size(640, 70) };
             pg.Controls.Add(st);
             Timer tm = new Timer { Interval = 1000 };
             tm.Tick += (s, e) =>

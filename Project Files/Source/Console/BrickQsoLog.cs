@@ -15,7 +15,7 @@ namespace BrickSDR
 {
     internal sealed class Qso
     {
-        public string Call = "", Grid = "", Mode = "", Submode = "", RstSent = "", RstRcvd = "", Name = "", Comment = "";
+        public string Call = "", Grid = "", Mode = "", Submode = "", RstSent = "", RstRcvd = "", Name = "", Qth = "", Comment = "";
         public double Mhz;
         public DateTime On, Off;
     }
@@ -50,7 +50,7 @@ namespace BrickSDR
             f("BAND", Band(q.Mhz));
             f("FREQ", q.Mhz.ToString("0.000000", CultureInfo.InvariantCulture));
             f("RST_SENT", q.RstSent); f("RST_RCVD", q.RstRcvd);
-            f("NAME", q.Name); f("COMMENT", q.Comment);
+            f("NAME", q.Name); f("QTH", q.Qth); f("COMMENT", q.Comment);
             f("QSO_DATE", q.On.ToString("yyyyMMdd")); f("TIME_ON", q.On.ToString("HHmmss"));
             f("QSO_DATE_OFF", q.Off.ToString("yyyyMMdd")); f("TIME_OFF", q.Off.ToString("HHmmss"));
             f("STATION_CALLSIGN", myCall); f("OPERATOR", myCall); f("MY_GRIDSQUARE", myGrid);

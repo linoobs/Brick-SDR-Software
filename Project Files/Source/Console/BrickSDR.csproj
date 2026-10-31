@@ -483,6 +483,8 @@
     <Compile Include="BrickDock.cs" />
     <Compile Include="BrickMfsk.cs" />
     <Compile Include="BrickQsoLog.cs" />
+    <Compile Include="BrickCallLookup.cs" />
+    <Compile Include="BrickLogBar.cs" />
     <Compile Include="BrickOnlineLogs.cs" />
     <Compile Include="BrickFt.cs" />
     <Compile Include="BrickFtPane.cs" />

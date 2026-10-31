@@ -10746,6 +10746,7 @@ namespace BrickSDR
             float panelHeight = (lines.Count * lineHeight) + ((lines.Count - 1) * lineGap) + (textPaddingY * 2f);
             int xPos = display_cursor_x + 28;                              // Brick-SDR: a little further from the pointer (was 12)
             float rectX = xPos - textPaddingX;
+            yPos = Math.Max(textPaddingYMin + textPaddingY, display_cursor_y - panelHeight / 2f + textPaddingY);      // Brick-SDR: the panel is level with the pointer
             float rectY = yPos - textPaddingY;
             if (rectX + panelWidth > W)
             {

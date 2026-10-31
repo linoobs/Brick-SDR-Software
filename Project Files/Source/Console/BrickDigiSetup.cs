@@ -45,19 +45,23 @@ namespace BrickSDR
             Label lq = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(470, 46) };
             // no paid QRZ subscription: the QSOs are collected in a file that is imported by hand (QRZ logbook - Import)
             Button bqf = new Button { Text = "Import file (no subscription)", Location = new Point(500, 20), Size = new Size(160, 25) };
-            Button bqd = new Button { Text = "Imported, start new file", Location = new Point(500, 50), Size = new Size(160, 25) };
+            Button bqd = new Button { Text = "Clear list (after import)", Location = new Point(500, 50), Size = new Size(160, 25) };
             gq.Controls.AddRange(new Control[] { cq, bq, lq, bqf, bqd });
             bqf.Click += (s, e) =>
             {
                 try
                 {
                     if (System.IO.File.Exists(OnlineLogs.ManualFile)) System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + OnlineLogs.ManualFile + "\"");
-                    else lq.Text = "No QSOs are waiting. Without a subscription they are collected in qrz_manual.adi when they are logged.";
+                    else
+                    {
+                        lq.Text = "No QSOs are waiting. Without a subscription they are collected in qrz_manual.adi when they are logged.";
+                        System.Diagnostics.Process.Start("explorer.exe", "\"" + System.IO.Path.GetDirectoryName(OnlineLogs.ManualFile) + "\"");
+                    }
                     System.Diagnostics.Process.Start("https://logbook.qrz.com/");
                 }
                 catch { }
             };
-            bqd.Click += (s, e) => { OnlineLogs.ManualDone(); lq.Text = "The file is kept as qrz_imported_*.adi, the next QSOs start a new one."; };
+            bqd.Click += (s, e) => { OnlineLogs.ManualDone(); lq.Text = "List cleared (the file is kept as qrz_imported_*.adi). The next QSOs start a new one."; };
             cq.CheckedChanged += (s, e) => { c.Qrz = cq.Checked; OnlineLogs.Save(); };
             tq.TextChanged += (s, e) => { c.QrzKey = tq.Text.Trim(); OnlineLogs.Save(); };
             bq.Click += (s, e) =>

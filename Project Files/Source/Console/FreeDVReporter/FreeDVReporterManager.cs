@@ -67,11 +67,8 @@ namespace BrickSDR.FreeDVReporter
 
         private static string buildClientName()
         {
-            try
-            {
-                Version v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                return "Brick-SDR " + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision;
-            }
+            // the assembly file version is the Thetis one (kept for the database migration checks), so the Brick-SDR version is sent
+            try { return "Brick-SDR " + BrickBranding.Version; }
             catch { return "Brick-SDR"; }
         }
 
@@ -195,13 +192,8 @@ namespace BrickSDR.FreeDVReporter
             if (_console == null || hz == 0) return;
             try
             {
-                double mhz = hz / 1e6;
-                _console.VFOAFreq = mhz;
-                if (_console.RadeEnabled)
-                {
-                    DSPMode want = (mhz >= 5.0 && mhz < 5.5) || mhz >= 10.0 ? DSPMode.DIGU : DSPMode.DIGL;
-                    if (_console.RX1DSPMode != want) _console.RX1DSPMode = want;
-                }
+                // the receiver that is reported; RADE stays on and follows the new band (the mode it forces depends on the frequency)
+                _console.RadeRetune(_rx, hz / 1e6);
             }
             catch (Exception ex) { LogReporter("TuneToFrequency failed: " + ex.Message); }
         }

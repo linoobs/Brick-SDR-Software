@@ -85,6 +85,26 @@ namespace BrickSDR
 
         public bool SetRadeEnabled(bool on) { return SetRadeEnabled(0, on); }
 
+        // a station was picked in the FreeDV Reporter: tune the receiver there. A change of band loads the mode of the band stack, which is not the
+        // mode RADE forces (DIGL / DIGU by frequency), and brickDigitalModeChanged would switch RADE off; so the forced mode is renewed first.
+        internal void RadeRetune(int rx, double mhz)
+        {
+            rx = rx == 1 ? 1 : 0;
+            bool on = RadeEnabledOn(rx);
+            DSPMode want = DSPMode.FIRST;
+            if (on)
+            {
+                bool upper = (mhz >= 5.0 && mhz < 5.5) || mhz >= 10.0;
+                want = RadeVoiceModes ? (upper ? DSPMode.USB : DSPMode.LSB) : (upper ? DSPMode.DIGU : DSPMode.DIGL);
+                _radeForcedMode[rx] = want;
+            }
+            if (rx == 1) VFOBFreq = mhz; else VFOAFreq = mhz;
+            if (on && rxMode(rx) != want)
+            {
+                if (rx == 0) RX1DSPMode = want; else RX2DSPMode = want;
+            }
+        }
+
         // RADE is the operating mode for a receiver while it is on: it goes to DIGL below 10 MHz and DIGU above
         // (DIGU on 60 m), noise reduction, NB2 and the auto-notch are switched off because they damage the modem
         // signal, and Kainos Audio is bypassed (it runs in voice modes only). Switching RADE off puts the receiver

@@ -117,8 +117,8 @@ namespace BrickSDR
                 Rade.SetRadaeProtocolV2(0, _rs.V2Rx1 ? 1 : 0);
                 Rade.SetRadaeProtocolV2(1, _rs.V2Rx2 ? 1 : 0);
                 Rade.SetRadaeMicScale(Math.Pow(10.0, _rs.MicDb / 20.0));
-                Rade.SetRadaeRxDialScale(0, Math.Pow(10.0, _rs.Rx1Db / 20.0));
-                Rade.SetRadaeRxDialScale(1, Math.Pow(10.0, _rs.Rx2Db / 20.0));
+                radeApplyRxScale(0);
+                radeApplyRxScale(1);
                 Rade.SetRadaeMicRNNoiseEnabled(_rs.Noise ? 1 : 0);
                 Rade.SetRadaeMicAGCTargetLufs(_rs.AgcTarget);
                 Rade.SetRadaeMicAGCEnabled(_rs.Agc ? 1 : 0);
@@ -141,7 +141,7 @@ namespace BrickSDR
         internal sealed class BrickRadeForm : Form
         {
             private readonly Console c;
-            private readonly BrickBtn bOn, bV1, bV2, bNoise, bAgc, bEq;
+            private readonly BrickBtn bOn, bV1, bV2, bNoise, bAgc, bEq, bAuto;
             private readonly Label status, footer;
             private readonly StatusPanel statusPanel;
             private readonly HeardPanel heard;
@@ -202,6 +202,7 @@ namespace BrickSDR
                 bNoise = mk("Noise", 12, y, 80, 28, () => { if (!syncing) { c._rs.Noise = !c._rs.Noise; c.radeSettingsChanged(); sync(); } });
                 bAgc = mk("AGC", 98, y, 80, 28, () => { if (!syncing) { c._rs.Agc = !c._rs.Agc; c.radeSettingsChanged(); sync(); } });
                 bEq = mk("EQ", 184, y, 80, 28, () => { if (!syncing) { c._rs.Eq = !c._rs.Eq; c.radeSettingsChanged(); sync(); } });
+                bAuto = mk("Auto RX level", 478, y, 110, 28, () => { if (!syncing) { c._digiAutoLevel = !c._digiAutoLevel; c.digiSaveSettings(); sync(); } });
                 Controls.Add(lbl("AGC target (LUFS)", 284, y + 6));
                 agcTarget = nud(390, y + 2, -30, 0, 1, -23, v => c._rs.AgcTarget = (int)v);
 
@@ -247,7 +248,7 @@ namespace BrickSDR
                 ClientSize = new Size(600, y + 40);
 
                 footer = new Label { Left = 340, Top = yEq - 76, Width = 248, Height = 100, ForeColor = cMuted };
-                Controls.AddRange(new Control[] { bOn, bV1, bV2, status, statusPanel, heard, rxBar, micBar, footer, bNoise, bAgc, bEq });
+                Controls.AddRange(new Control[] { bOn, bV1, bV2, status, statusPanel, heard, rxBar, micBar, footer, bNoise, bAgc, bEq, bAuto });
 
                 timer.Tick += (s, e) => tick();
                 showReceiver(!c.RadeEnabledOn(0) && c.RadeEnabledOn(1) ? 1 : 0);
@@ -333,7 +334,7 @@ namespace BrickSDR
                     light(bOn, c.RadeEnabledOn(rx));
                     bool v2 = rx == 0 ? c._rs.V2Rx1 : c._rs.V2Rx2;
                     light(bV1, !v2); light(bV2, v2);
-                    light(bNoise, c._rs.Noise); light(bAgc, c._rs.Agc); light(bEq, c._rs.Eq);
+                    light(bNoise, c._rs.Noise); light(bAgc, c._rs.Agc); light(bEq, c._rs.Eq); light(bAuto, c._digiAutoLevel);
                     call.Text = c._rs.Call;
                     grid.Text = c._rs.Grid; repMsg.Text = c._rs.ReporterMessage ?? "";
                     chkReport.Checked = c._rs.Reporting; chkQsy.Checked = c._rs.IgnoreQsy; chkUtc.Checked = c._rs.Utc;

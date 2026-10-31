@@ -36,6 +36,8 @@ namespace BrickSDR
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern void KDigiRxTap(int rx, int on);
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern void KDigiRxSetAF(int rx, float gain);
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern int KDigiRxActive(int rx);
+        [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern void KDigiRxSetTap(int rx, float gain);
+        [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern float KDigiRxPeak(int rx);
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern int KDigiRxRate(int rx);
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern int KDigiRxRead(int rx, float[] dst, int max);
         [DllImport("ChannelMaster.dll", CallingConvention = CallingConvention.Cdecl)] public static extern void KDigiTxEnable(int on);

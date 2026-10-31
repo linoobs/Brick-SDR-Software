@@ -211,6 +211,21 @@ namespace BrickSDR
             rtty.Controls.Add(new Label { AutoSize = false, Location = new Point(12, 14), Size = new Size(680, 40), Text = "The RTTY settings (shift, baud, reverse, AFC, squelch, TX level) are in the RTTY window: DIGI menu - RTTY." });
             fdv.Controls.Add(new Label { AutoSize = false, Location = new Point(12, 14), Size = new Size(680, 40), Text = "The FreeDV settings (call sign, version, noise reduction, AGC, equalizer, Reporter) are in the FreeDV window: the Settings button of the FreeDV strip." });
 
+            // automatic RX level of the digital modes
+            TabPage lv = new TabPage("RX level") { BackColor = SystemColors.Control };
+            tc.TabPages.Add(lv);
+            CheckBox cal = new CheckBox { Text = "Automatic RX level for the digital modes (FT8 / FT4, RTTY, CW, FreeDV)", AutoSize = true, Location = new Point(16, 16), Checked = console.DigiAutoLevel };
+            cal.CheckedChanged += (s, e) => console.DigiAutoLevel = cal.Checked;
+            lv.Controls.Add(cal);
+            lv.Controls.Add(new Label
+            {
+                AutoSize = false, Location = new Point(34, 44), Size = new Size(640, 110),
+                Text = "The audio the decoders get comes from the receiver's AGC, and its level is different on every band. When the peaks of that audio come within 3 dB " +
+                       "of full scale (the CLIP indicator of FreeDV), the level the decoders get is lowered in steps of 2 dB, down to -30 dB; when the peaks stay low it is " +
+                       "raised again, never above the level of the receiver. What you hear and the AGC are not changed. For FreeDV the step is added to \"RX level (dB)\" " +
+                       "of the FreeDV window, for the others it is applied to the copy of the audio the decoders read."
+            });
+
             BrickBuildOnlineLogsPage(tc);
 
             tcGeneral.TabPages.Add(tpBrickDigi);       // the last page, after Navigation

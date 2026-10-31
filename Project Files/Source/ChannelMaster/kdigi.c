@@ -41,19 +41,48 @@ static volatile LONG tx_w, tx_r;
 static volatile LONG tx_on;
 static volatile LONG tx_clear;              /* set by the console, done by the audio thread (the ring's reader) */
 
+/* The level the decoders get: a gain set by the console's automatic level control (at most unity; the speakers do not hear it) and the
+   peak of what was written since the last read, which that control watches. */
+static volatile float rx_tap[KDIGI_NRX] = { 1.0f, 1.0f };
+static volatile float rx_peak[KDIGI_NRX] = { 0.0f, 0.0f };
+
 void xkdigi_rx(int rx, double* audio)
 {
     int i, n;
     LONG w;
+    float g, pk;
     if (rx < 0 || rx >= KDIGI_NRX || !pcm) return;
     if (!_InterlockedAnd(&rx_on[rx], 1)) return;
     n = pcm->rcvr[rx].ch_outsize;
     if (n <= 0) return;
     InterlockedExchange(&rx_rate[rx], pcm->rcvr[rx].ch_outrate);
     w = InterlockedCompareExchange(&rx_w[rx], 0, 0);
+    g = rx_tap[rx];
+    pk = rx_peak[rx];
     for (i = 0; i < n; i++)
-        rx_ring[rx][(w + i) & KDIGI_MASK] = (float)audio[2 * i];
+    {
+        float s = (float)audio[2 * i] * g, a = s < 0.0f ? -s : s;
+        if (a > pk) pk = a;
+        rx_ring[rx][(w + i) & KDIGI_MASK] = s;
+    }
+    rx_peak[rx] = pk;
     InterlockedExchange(&rx_w[rx], w + n);
+}
+
+PORT void KDigiRxSetTap(int rx, float g)
+{
+    if (rx < 0 || rx >= KDIGI_NRX) return;
+    rx_tap[rx] = g;
+}
+
+/* peak (full scale = 1.0) of the decoders' audio since the last call */
+PORT float KDigiRxPeak(int rx)
+{
+    float p;
+    if (rx < 0 || rx >= KDIGI_NRX) return 0.0f;
+    p = rx_peak[rx];
+    rx_peak[rx] = 0.0f;
+    return p;
 }
 
 PORT void KDigiRxTap(int rx, int on)

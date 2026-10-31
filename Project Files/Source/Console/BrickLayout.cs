@@ -1964,6 +1964,7 @@ namespace BrickSDR
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();
+            try { radeAutoLevelTick(); digiTapAutoLevelTick(); } catch { }
             if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
             if (!initializing && !IsSetupFormNull)
             {

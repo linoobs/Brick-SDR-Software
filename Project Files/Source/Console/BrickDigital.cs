@@ -30,6 +30,7 @@ namespace BrickSDR
 
         // settings (digital.txt in the data folder)
         private string _digiMyCall = "";
+        internal bool _digiAutoLevel = true;          // automatic RX level of the digital modes (BrickRade.cs radeAutoLevelTick, BrickDigiLevel.cs)
         private int _digiRx;
         private double _rttyShift = 170, _rttyBaud = 45.45;
         private bool _rttyReverse, _rttyAfc = true;
@@ -92,6 +93,7 @@ namespace BrickSDR
                         case "ftrx": if (num) _ftRxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
                         case "fttx": if (num) _ftTxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
                         case "ftauto": _ftAuto = v != "0"; break;
+                        case "autolvl": _digiAutoLevel = v != "0"; break;
                         case "psk": _ftPsk = v == "1"; break;
                         case "blockunknown": _ftBlockUnknown = v == "1"; break;
                         case "blocked": _ftBlockedSeen = true; _ftBlocked.Clear(); foreach (string cn in v.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)) _ftBlocked.Add(cn.Trim()); break;
@@ -117,7 +119,7 @@ namespace BrickSDR
                     "mycall=" + _digiMyCall, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
                     "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
-                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "blocked=" + string.Join(";", _ftBlocked), "blockunknown=" + (_ftBlockUnknown ? 1 : 0), "cwdec=" + _cwKind, "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
+                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "autolvl=" + (_digiAutoLevel ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "blocked=" + string.Join(";", _ftBlocked), "blockunknown=" + (_ftBlockUnknown ? 1 : 0), "cwdec=" + _cwKind, "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
                 });
             }
             catch { }

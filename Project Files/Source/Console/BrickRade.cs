@@ -85,6 +85,96 @@ namespace BrickSDR
 
         public bool SetRadeEnabled(bool on) { return SetRadeEnabled(0, on); }
 
+        // ---- automatic RX level: the audio that reaches the decoder is what the WDSP AGC delivers (it differs from band to band and with the
+        // AGC mode) times the "RX level (dB)" step of the FreeDV window. While "Auto RX level" is on, an offset (-30 .. 0 dB) is added to that step:
+        // down 2 dB as soon as the decoder input clips or its peaks come near full scale, up 1 dB again when the peaks stay low. ----
+        private readonly double[] _radeAutoDb = new double[2];
+        private readonly double[] _radeAutoMax = { -120, -120 };
+        private readonly DateTime[] _radeAutoAt = { DateTime.MinValue, DateTime.MinValue };
+
+        private void radeApplyRxScale(int rx)
+        {
+            double db = (rx == 0 ? _rs.Rx1Db : _rs.Rx2Db) + (_digiAutoLevel ? _radeAutoDb[rx] : 0.0);
+            Rade.SetRadaeRxDialScale(rx, Math.Pow(10.0, db / 20.0));
+        }
+
+        // every 200 ms from brickTick
+        private void radeAutoLevelTick()
+        {
+            for (int rx = 0; rx < 2; rx++)
+            {
+                if (!RadeEnabledOn(rx) || !_digiAutoLevel || _mox)
+                {
+                    if (_radeAutoDb[rx] != 0.0) { _radeAutoDb[rx] = 0.0; radeApplyRxScale(rx); }
+                    _radeAutoMax[rx] = -120;
+                    continue;
+                }
+                int lvl = Rade.GetRadaeRxLevelDb(rx);
+                if (lvl > _radeAutoMax[rx]) _radeAutoMax[rx] = lvl;
+                bool clip = Rade.GetRadaeClip(rx) != 0;
+                double now = (DateTime.UtcNow - _radeAutoAt[rx]).TotalSeconds;
+                if (clip || _radeAutoMax[rx] > -3)
+                {
+                    if (now < 0.8) continue;                     // one step, then let the AGC and the meters settle
+                    _radeAutoDb[rx] = Math.Max(-30.0, _radeAutoDb[rx] - 2.0);
+                }
+                else if (now >= 3.0 && _radeAutoMax[rx] < -12 && _radeAutoMax[rx] > -100 && _radeAutoDb[rx] < 0.0)
+                    _radeAutoDb[rx] = Math.Min(0.0, _radeAutoDb[rx] + 1.0);
+                else
+                {
+                    if (now >= 3.0) _radeAutoMax[rx] = -120;     // a new look at the peaks
+                    continue;
+                }
+                _radeAutoAt[rx] = DateTime.UtcNow;
+                _radeAutoMax[rx] = -120;
+                radeApplyRxScale(rx);
+            }
+        }
+
+        // The same for the other digital modes (FT8 / FT4, RTTY, CW): the decoders' copy of the audio gets a gain of -30 .. 0 dB (kdigi.c), set from
+        // the peak of that audio. The speakers and the AGC are not touched.
+        internal bool DigiAutoLevel
+        {
+            get { return _digiAutoLevel; }
+            set { _digiAutoLevel = value; digiSaveSettings(); }
+        }
+
+        private readonly double[] _tapAutoDb = new double[2];
+        private readonly double[] _tapAutoMax = new double[2];
+        private readonly DateTime[] _tapAutoAt = { DateTime.MinValue, DateTime.MinValue };
+
+        private void digiTapAutoLevelTick()
+        {
+            for (int rx = 0; rx < 2; rx++)
+            {
+                bool active = _digiAutoLevel && !_mox && KDigi.KDigiRxActive(rx) != 0 && !RadeEnabledOn(rx);
+                if (!active)
+                {
+                    if (_tapAutoDb[rx] != 0.0) { _tapAutoDb[rx] = 0.0; KDigi.KDigiRxSetTap(rx, 1.0f); }
+                    _tapAutoMax[rx] = 0;
+                    continue;
+                }
+                double pk = KDigi.KDigiRxPeak(rx);
+                if (pk > _tapAutoMax[rx]) _tapAutoMax[rx] = pk;
+                double now = (DateTime.UtcNow - _tapAutoAt[rx]).TotalSeconds;
+                if (pk >= 0.7)                                            // within 3 dB of full scale
+                {
+                    if (now < 0.6) continue;
+                    _tapAutoDb[rx] = Math.Max(-30.0, _tapAutoDb[rx] - 2.0);
+                }
+                else if (now >= 3.0 && _tapAutoMax[rx] < 0.2 && _tapAutoMax[rx] > 0.003 && _tapAutoDb[rx] < 0.0)
+                    _tapAutoDb[rx] = Math.Min(0.0, _tapAutoDb[rx] + 1.0);
+                else
+                {
+                    if (now >= 3.0) _tapAutoMax[rx] = 0;
+                    continue;
+                }
+                _tapAutoAt[rx] = DateTime.UtcNow;
+                _tapAutoMax[rx] = 0;
+                KDigi.KDigiRxSetTap(rx, (float)Math.Pow(10.0, _tapAutoDb[rx] / 20.0));
+            }
+        }
+
         // a station was picked in the FreeDV Reporter: tune the receiver there. A change of band loads the mode of the band stack, which is not the
         // mode RADE forces (DIGL / DIGU by frequency), and brickDigitalModeChanged would switch RADE off; so the forced mode is renewed first.
         internal void RadeRetune(int rx, double mhz)

@@ -61,6 +61,7 @@ namespace BrickSDR
             H("New Year's Eve", "newyear", "Happy New Year!", "Frohes neues Jahr!  ·  З Новим роком!", y => new DateTime(y, 1, 1), 1, 1, 5),
             H("Valentine's Day", "hearts", "Happy Valentine's Day!", "Alles Liebe  ·  З Днем закоханих!", y => new DateTime(y, 2, 14), 0, 0, 3),
             H("World Amateur Radio Day", "radio", "World Amateur Radio Day", "73 de Brick-SDR  ·  Welttag des Amateurfunks", y => new DateTime(y, 4, 18), 0, 0, 4),
+            H("Summerween", "summerween", "Happy Summerween!", "Sommerween  ·  Літовін  ·  Halloween in summer", y => new DateTime(y, 6, 22), 0, 0, 3),
             H("Halloween", "halloween", "Happy Halloween!", "Fröhliches Halloween  ·  Щасливого Гелловіну!", y => new DateTime(y, 10, 31), 0, 0, 4),
             H("Christmas", "xmas", "Merry Christmas!", "Frohe Weihnachten  ·  З Різдвом Христовим!", y => new DateTime(y, 12, 25), 1, 1, 6),
             // Ukraine
@@ -230,6 +231,76 @@ namespace BrickSDR
             }
             // pumpkins
             Pumpkin(g, 400, 352, 62, true); Pumpkin(g, 490, 366, 44, false); Pumpkin(g, 340, 374, 34, false); Pumpkin(g, 560, 362, 50, true);
+        }
+
+        // Summerween (the holiday of the cartoon "Gravity Falls", 22 June): Halloween in the summer evening, with melons instead of pumpkins
+        private static void Summerween(Graphics g, int w, int h)
+        {
+            Sky(g, w, h, Color.FromArgb(40, 30, 110), Color.FromArgb(255, 150, 60));
+            Stars(g, w, h, 40, 23, h / 3);
+            Glow(g, 470, 235, 190, Color.FromArgb(255, 200, 80), 150);
+            using (Brush b = new SolidBrush(Color.FromArgb(255, 230, 120))) g.FillEllipse(b, 470 - 46, 235 - 46, 92, 92);
+            // forest of firs
+            Random rf = new Random(31);
+            for (int layer = 0; layer < 2; layer++)
+            {
+                Color c = layer == 0 ? Color.FromArgb(120, 52, 70, 96) : Color.FromArgb(255, 14, 30, 36);
+                using (Brush b = new SolidBrush(c))
+                    for (int x = -10; x < w + 20; x += layer == 0 ? 26 : 34)
+                    {
+                        float hh = (layer == 0 ? 70 : 105) + rf.Next(50), bx = x + rf.Next(10), by = layer == 0 ? 300 : 330;
+                        for (int i = 0; i < 4; i++) g.FillPolygon(b, new[] { new PointF(bx, by - hh + i * hh * 0.22f), new PointF(bx - 16 - i * 4, by - hh * 0.55f + i * hh * 0.18f), new PointF(bx + 16 + i * 4, by - hh * 0.55f + i * hh * 0.18f) });
+                        g.FillRectangle(b, bx - 2, by - hh * 0.35f, 4, hh * 0.35f + 40);
+                    }
+            }
+            Hills(g, w, h, 352, Color.FromArgb(10, 22, 20), 13, 8);
+            // bunting
+            using (Pen p = new Pen(Color.FromArgb(30, 20, 40), 2f)) g.DrawBezier(p, 0, 40, 150, 100, 450, 100, 600, 30);
+            Color[] fl = { Color.FromArgb(255, 100, 40), Color.FromArgb(120, 220, 90), Color.FromArgb(180, 90, 240), Color.FromArgb(255, 220, 60) };
+            for (int i = 0; i < 14; i++)
+            {
+                double t = (i + 0.5) / 14; float x = (float)(t * 600), y = (float)(40 + Math.Sin(t * Math.PI) * 45) + 4;
+                using (Brush b = new SolidBrush(fl[i % fl.Length])) g.FillPolygon(b, new[] { new PointF(x - 11, y), new PointF(x + 11, y), new PointF(x, y + 26) });
+            }
+            // the melons: a green striped watermelon, carved and lit
+            Melon(g, 400, 366, 66, true); Melon(g, 500, 372, 50, true); Melon(g, 565, 374, 40, false); Melon(g, 330, 376, 36, false);
+            // fireflies
+            Random rl = new Random(2);
+            for (int i = 0; i < 40; i++)
+            {
+                float x = rl.Next(w), y = 130 + rl.Next(220);
+                Glow(g, x, y, 9, Color.FromArgb(255, 255, 140), 120);
+                using (Brush b = new SolidBrush(Color.FromArgb(255, 255, 210))) g.FillEllipse(b, x - 1.5f, y - 1.5f, 3, 3);
+            }
+            // candy
+            Color[] cc = { Color.FromArgb(255, 80, 120), Color.FromArgb(90, 200, 255), Color.FromArgb(255, 220, 60), Color.FromArgb(150, 230, 100) };
+            for (int i = 0; i < 7; i++)
+            {
+                float x = 250 + i * 16 + (i % 2) * 4, y = 384 + (i % 3) * 3;
+                using (Brush b = new SolidBrush(cc[i % 4])) { g.FillEllipse(b, x, y, 10, 7); g.FillPolygon(b, new[] { new PointF(x - 4, y), new PointF(x + 1, y + 3.5f), new PointF(x - 4, y + 7) }); g.FillPolygon(b, new[] { new PointF(x + 14, y), new PointF(x + 9, y + 3.5f), new PointF(x + 14, y + 7) }); }
+            }
+        }
+
+        private static void Melon(Graphics g, float cx, float by, float s, bool face)
+        {
+            Glow(g, cx, by - s * 0.5f, s * 1.3f, Color.FromArgb(255, 220, 90), face ? 80 : 25);
+            using (GraphicsPath p = new GraphicsPath())
+            {
+                p.AddEllipse(cx - s * 0.95f, by - s * 1.05f, s * 1.9f, s * 1.1f);
+                using (Brush b = new LinearGradientBrush(new RectangleF(cx - s, by - s * 1.05f, s * 2, s * 1.1f), Color.FromArgb(90, 190, 90), Color.FromArgb(24, 100, 52), 90f)) g.FillPath(b, p);
+                g.SetClip(p, CombineMode.Intersect);
+                using (Pen st = new Pen(Color.FromArgb(120, 20, 80, 40), s * 0.1f))
+                    for (int i = -4; i <= 4; i++) g.DrawBezier(st, cx + i * s * 0.2f, by - s * 1.05f, cx + i * s * 0.3f, by - s * 0.7f, cx + i * s * 0.3f, by - s * 0.3f, cx + i * s * 0.2f, by);
+                g.ResetClip();
+            }
+            using (Brush b = new SolidBrush(Color.FromArgb(70, 100, 30))) g.FillRectangle(b, cx - 2, by - s * 1.15f, 4, 10);
+            if (!face) return;
+            using (Brush b = new SolidBrush(Color.FromArgb(255, 245, 140)))
+            {
+                g.FillPolygon(b, new[] { new PointF(cx - s * 0.5f, by - s * 0.78f), new PointF(cx - s * 0.2f, by - s * 0.78f), new PointF(cx - s * 0.35f, by - s * 0.98f) });
+                g.FillPolygon(b, new[] { new PointF(cx + s * 0.2f, by - s * 0.78f), new PointF(cx + s * 0.5f, by - s * 0.78f), new PointF(cx + s * 0.35f, by - s * 0.98f) });
+                g.FillPolygon(b, new[] { new PointF(cx - s * 0.52f, by - s * 0.5f), new PointF(cx - s * 0.3f, by - s * 0.32f), new PointF(cx - s * 0.12f, by - s * 0.45f), new PointF(cx, by - s * 0.3f), new PointF(cx + s * 0.12f, by - s * 0.45f), new PointF(cx + s * 0.3f, by - s * 0.32f), new PointF(cx + s * 0.52f, by - s * 0.5f), new PointF(cx + s * 0.3f, by - s * 0.15f), new PointF(cx - s * 0.3f, by - s * 0.15f) });
+            }
         }
 
         private static void Pumpkin(Graphics g, float cx, float by, float s, bool face)
@@ -614,6 +685,7 @@ namespace BrickSDR
                 switch (h.Scene)
                 {
                     case "halloween": Halloween(g, w, ht); break;
+                    case "summerween": Summerween(g, w, ht); break;
                     case "xmas": Xmas(g, w, ht); break;
                     case "newyear": NewYear(g, w, ht); break;
                     case "hearts": Hearts(g, w, ht); break;

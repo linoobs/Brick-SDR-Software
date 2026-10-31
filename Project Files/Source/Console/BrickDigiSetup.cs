@@ -38,11 +38,11 @@ namespace BrickSDR
                 Text = "Every QSO logged in any mode (FT8 / FT4 automatically, the others with Log QSO in the DIGI menu or the RTTY / CW window) is sent to the services switched on here. Keys and passwords are stored encrypted for this Windows user." };
             pg.Controls.Add(hint);
 
-            GroupBox gq = grp("QRZ.com Logbook", 54, 78, 0);
+            GroupBox gq = grp("QRZ.com Logbook", 54, 100, 0);
             CheckBox cq = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Qrz };
             TextBox tq = field(gq, "API key", 90, 22, 190, c.QrzKey, true);
             Button bq = new Button { Text = "Check key", Location = new Point(400, 20), Size = new Size(90, 25) };
-            Label lq = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(650, 20) };
+            Label lq = new Label { AutoSize = false, Location = new Point(16, 50), Size = new Size(640, 46) };
             gq.Controls.AddRange(new Control[] { cq, bq, lq });
             cq.CheckedChanged += (s, e) => { c.Qrz = cq.Checked; OnlineLogs.Save(); };
             tq.TextChanged += (s, e) => { c.QrzKey = tq.Text.Trim(); OnlineLogs.Save(); };
@@ -53,7 +53,7 @@ namespace BrickSDR
                 System.Threading.Tasks.Task.Run(() => { string r = OnlineLogs.QrzCheck(key); try { BeginInvoke(new Action(() => { lq.Text = r; bq.Enabled = true; })); } catch { } });
             };
 
-            GroupBox ge = grp("eQSL.cc", 140, 80, 0);
+            GroupBox ge = grp("eQSL.cc", 162, 80, 0);
             CheckBox ce = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Eqsl };
             TextBox teu = field(ge, "User", 90, 22, 110, c.EqslUser, false);
             Label lp = new Label { Text = "Password", AutoSize = true, Location = new Point(310, 25) };
@@ -66,7 +66,7 @@ namespace BrickSDR
             tep.TextChanged += (s, e) => { c.EqslPass = tep.Text; OnlineLogs.Save(); };
             ten.TextChanged += (s, e) => { c.EqslNick = ten.Text.Trim(); OnlineLogs.Save(); };
 
-            GroupBox gc = grp("Club Log", 226, 130, 0);
+            GroupBox gc = grp("Club Log", 250, 130, 0);
             CheckBox cc = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Club };
             TextBox tct = field(gc, "API token", 90, 22, 300, c.ClubToken, true);
             Label lcc = new Label { Text = "Call sign", AutoSize = true, Location = new Point(90, 53) };
@@ -78,7 +78,7 @@ namespace BrickSDR
             tct.TextChanged += (s, e) => { c.ClubToken = tct.Text.Trim(); OnlineLogs.Save(); };
             tcc.TextChanged += (s, e) => { c.ClubCall = tcc.Text.Trim().ToUpperInvariant(); OnlineLogs.Save(); };
 
-            GroupBox gl = grp("LoTW (through TQSL)", 366, 128, 0);
+            GroupBox gl = grp("LoTW (through TQSL)", 390, 128, 0);
             CheckBox cl = new CheckBox { Text = "Upload", AutoSize = true, Location = new Point(16, 24), Checked = c.Lotw };
             TextBox tlp = field(gl, "TQSL", 90, 22, 300, string.IsNullOrEmpty(c.TqslPath) ? OnlineLogs.FindTqsl() : c.TqslPath, false);
             TextBox tll = field(gl, "Station location", 90, 50, 190, c.TqslLocation, false);
@@ -95,7 +95,7 @@ namespace BrickSDR
                 try { if (System.IO.File.Exists(exe)) System.Diagnostics.Process.Start(exe, "-s"); } catch { }
             };
 
-            Label st = new Label { AutoSize = false, Location = new Point(12, 502), Size = new Size(640, 70) };
+            Label st = new Label { AutoSize = false, Location = new Point(12, 526), Size = new Size(640, 70) };
             pg.Controls.Add(st);
             Timer tm = new Timer { Interval = 1000 };
             tm.Tick += (s, e) =>

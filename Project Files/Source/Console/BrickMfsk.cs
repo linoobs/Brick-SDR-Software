@@ -49,6 +49,7 @@ namespace BrickSDR
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern void mfsk_decoder_close(IntPtr dec);
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern int mfsk_decoder_set_params(IntPtr dec, ref Params p);
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern int mfsk_decoder_decode_i16(IntPtr dec, short[] samples, UIntPtr n, uint rate, long period, [In, Out] Decode[] output, UIntPtr cap, out UIntPtr len);
+        [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern int mfsk_decoder_decode_prefix_i16(IntPtr dec, short[] samples, UIntPtr n, uint rate, long period, [In, Out] Decode[] output, UIntPtr cap, out UIntPtr len);
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern int mfsk_encode(uint mode, byte[] text, uint flags, uint rate, float freqHz, float[] output, UIntPtr cap, out UIntPtr len);
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern int mfsk_decoder_add_callsign(IntPtr dec, byte[] call);
         [DllImport("mfsk.dll", CallingConvention = CallingConvention.Cdecl)] private static extern IntPtr mfsk_last_error();
@@ -112,7 +113,7 @@ namespace BrickSDR
 
             public struct Row { public string Text; public float Hz, Dt, Snr; }
 
-            public List<Row> DecodePeriod(short[] samples, int rate, long period)
+            public List<Row> DecodePeriod(short[] samples, int rate, long period, bool prefix = false)
             {
                 List<Row> res = new List<Row>();
                 if (h == IntPtr.Zero) return res;
@@ -123,7 +124,8 @@ namespace BrickSDR
                     for (int i = 0; i < cap; i++) { o[i].text = new byte[64]; o[i].key = new byte[10]; }
                     o[0].size = (uint)Marshal.SizeOf(typeof(Decode));
                     UIntPtr len;
-                    int st = mfsk_decoder_decode_i16(h, samples, (UIntPtr)(uint)samples.Length, (uint)rate, period, o, (UIntPtr)(uint)cap, out len);
+                    int st = prefix ? mfsk_decoder_decode_prefix_i16(h, samples, (UIntPtr)(uint)samples.Length, (uint)rate, period, o, (UIntPtr)(uint)cap, out len)
+                                      : mfsk_decoder_decode_i16(h, samples, (UIntPtr)(uint)samples.Length, (uint)rate, period, o, (UIntPtr)(uint)cap, out len);
                     int n = (int)len;
                     if (st == -2 && n > cap) { cap = n + 8; continue; }
                     if (st != 0) throw new InvalidOperationException("decode " + st + " " + LastError());

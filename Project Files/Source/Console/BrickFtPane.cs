@@ -363,7 +363,7 @@ namespace BrickSDR
                 if (status.Text != text) status.Text = text;
                 DateTime u = DateTime.UtcNow;
                 u = u.AddSeconds(-c.FtClock);
-                clock.Text = u.ToString("HH:mm:ss") + " UTC" + (c._digiRx == 1 ? "  RX2" : "") + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
+                clock.Text = (c.FtDecodeMs > 0 ? "decode " + c.FtDecodeMs + " ms   " : "") + u.ToString("HH:mm:ss") + " UTC" + (c._digiRx == 1 ? "  RX2" : "") + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
                 bTx.On = c._ftTxEnable || tx;
                 if (!msg.Box.Focused && msg.Text != c.FtNextMessage) msg.Text = c.FtNextMessage;
                 if (tx) { slotBar.Invalidate(); }

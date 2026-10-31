@@ -55,6 +55,9 @@ namespace BrickSDR
         private volatile float _ftInDb = -120;           // receive audio level (dB re full scale) for the meter
         private volatile bool _ftClip;
         private volatile bool _ftClockOk = true;
+        private volatile int _ftDecodeMs;                     // how long the last decoding pass took, and when it ended (seconds on the UTC clock)
+        private double _ftDecodeAt;
+        internal int FtDecodeMs { get { return _ftDecodeMs; } }
         private double _ftClock;                          // seconds the PC clock is ahead of the stations heard (their median DT), taken off the slot timing
         internal double FtClock { get { return _ftClock; } }
         private double _ftSlotPos;                       // seconds into the current slot, for the progress bar
@@ -199,7 +202,7 @@ namespace BrickSDR
             float[] ring = null;
             long total = 0, startIdx = 0;
             int rate = 0;
-            long lastSlot = long.MinValue, earlySlot = long.MinValue;
+            long lastSlot = long.MinValue, prefixSlot = long.MinValue, fullSlot = long.MinValue;
             long lastSpecAt = 0;
             int lastRateWarn = 0;
             double smooth = -120;
@@ -251,57 +254,23 @@ namespace BrickSDR
                         long slot = (long)Math.Floor(now / T);
                         double into = now - slot * T;
                         _ftSlotPos = into;
+                        if (lastSlot == long.MinValue) { lastSlot = slot; startIdx = total - (long)(into * rate); }        // started inside a slot: its first part is missing (zeros)
                         if (slot != lastSlot)
                         {
-                            long endIdx = total - (long)(into * rate);
-                            if (lastSlot != long.MinValue)
-                            {
-                                int len = (int)Math.Round(T * rate);
-                                long from = endIdx - len;
-                                if (from >= 0 && total - from < ring.Length && lastSlot != _ftSkipSlot && !_ftTxActive)
-                                {
-                                    // the audio is at whatever level the receiver gives (AGC); fit the slot's peak to 90 % of full scale
-                                    float peak = 0;
-                                    for (int i = 0; i < len; i++) { float a = Math.Abs(ring[(int)((from + i) % ring.Length)]); if (a > peak) peak = a; }
-                                    float scale = peak > 1e-6f ? Math.Max(0.02f, Math.Min(50f, 0.9f / peak)) * 32767f : 0f;
-                                    short[] s = new short[len];
-                                    for (int i = 0; i < len; i++)
-                                    {
-                                        float v = ring[(int)((from + i) % ring.Length)] * scale;
-                                        s[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
-                                    }
-                                    long period = lastSlot;
-                                    int rt = rate;
-                                    string md = mode;
-                                    Task.Run(() => ftDecode(s, rt, period, md));
-                                }
-                            }
+                            // the slot that just ended: a last pass if the one after its signal was missed (it ran at the start, in a half slot...)
+                            if (fullSlot != lastSlot && lastSlot != _ftSkipSlot && !_ftTxActive)
+                                ftStartPass(ring, total, rate, startIdx, T, lastSlot, mode, false);
                             lastSlot = slot;
-                            startIdx = endIdx;
+                            startIdx = total - (long)(into * rate);
                         }
-                        // An early pass 1.5 s before the slot ends (the signals are over by then): the messages are on the screen while the slot is still running,
-                        // so a station clicked and TX enabled in time is answered in the very next slot. The pass at the end only adds what the early one missed.
-                        if (slot == lastSlot && earlySlot != slot && into >= T - 1.5 && slot != _ftSkipSlot && !_ftTxActive && total - startIdx > rate * 3)
+                        // The messages are on the screen as soon as the signals are over, not at the end of the slot, so a station can be chosen and answered at once:
+                        // FT8 has a first pass at 11.8 s (what the decoder of WSJT-X does too: the strong stations are found there), and a pass of the whole slot
+                        // right after the last symbol (0.5 s + the length of the signal + a little). In a slot that was entered in the middle the missing start is zeros.
+                        double sigLen = mode == "FT4" ? 5.04 : 12.64, fullAt = 0.5 + sigLen + 0.15;
+                        if (slot == lastSlot && slot != _ftSkipSlot && !_ftTxActive)
                         {
-                            earlySlot = slot;
-                            int len = (int)Math.Round(T * rate);
-                            int have = (int)Math.Min(len, total - startIdx);
-                            if (startIdx >= 0 && total - startIdx < ring.Length)
-                            {
-                                float peak = 0;
-                                for (int i = 0; i < have; i++) { float a = Math.Abs(ring[(int)((startIdx + i) % ring.Length)]); if (a > peak) peak = a; }
-                                float scale = peak > 1e-6f ? Math.Max(0.02f, Math.Min(50f, 0.9f / peak)) * 32767f : 0f;
-                                short[] s = new short[len];
-                                for (int i = 0; i < have; i++)
-                                {
-                                    float v = ring[(int)((startIdx + i) % ring.Length)] * scale;
-                                    s[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
-                                }
-                                long period = slot;
-                                int rt = rate;
-                                string md = mode;
-                                Task.Run(() => ftDecode(s, rt, period, md));
-                            }
+                            if (mode == "FT8" && prefixSlot != slot && into >= 11.85 && into < fullAt) { prefixSlot = slot; ftStartPass(ring, total, rate, startIdx, T, slot, mode, true); }
+                            if (fullSlot != slot && into >= fullAt) { fullSlot = slot; ftStartPass(ring, total, rate, startIdx, T, slot, mode, false); }
                         }
                         ftTxStep(now, T, slot, into);
                     }
@@ -315,21 +284,68 @@ namespace BrickSDR
             }
         }
 
-        private void ftDecode(short[] samples, int rate, long period, string mode)
+        // the audio of a slot for the decoder: 16 bit at 12 kHz when the receiver rate is a multiple of it (mfsk-core's own rate, and its early pass needs it), else at
+        // the receiver rate. Before the first sample (the program entered the slot late) there are zeros. The level is fitted to the peak of what there is (the AGC changes it).
+        private short[] ftGrab(float[] ring, long total, int rate, long start, double slotSeconds, out int outRate, out int real)
+        {
+            int f = rate % 12000 == 0 ? rate / 12000 : 1;
+            outRate = rate / f;
+            int len = (int)Math.Round(slotSeconds * outRate);
+            float[] tmp = new float[len];
+            float peak = 0;
+            real = 0;
+            for (int i = 0; i < len; i++)
+            {
+                long a = start + (long)i * f;
+                double sum = 0; bool any = false;
+                for (int k = 0; k < f; k++)
+                {
+                    long ix = a + k;
+                    if (ix >= 0 && ix < total && total - ix < ring.Length) { sum += ring[(int)(ix % ring.Length)]; any = true; }
+                }
+                if (any) { tmp[i] = (float)(sum / f); real = i + 1; float ab = Math.Abs(tmp[i]); if (ab > peak) peak = ab; }
+            }
+            float scale = peak > 1e-6f ? Math.Max(0.02f, Math.Min(50f, 0.9f / peak)) * 32767f : 0f;
+            short[] s = new short[len];
+            for (int i = 0; i < len; i++) { float v = tmp[i] * scale; s[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v); }
+            return s;
+        }
+
+        // one decoding pass over the slot that began at sample startIdx; prefix: the early pass of FT8 (the first 141 696 samples at 12 kHz = 11.8 s)
+        private void ftStartPass(float[] ring, long total, int rate, long startIdx, double T, long period, string mode, bool prefix)
+        {
+            int outRate, real;
+            short[] s = ftGrab(ring, total, rate, startIdx, T, out outRate, out real);
+            if (real < outRate * 2) return;                                        // not even two seconds of this slot
+            if (prefix)
+            {
+                if (outRate != 12000) return;
+                short[] p = new short[141696];
+                Array.Copy(s, p, Math.Min(p.Length, s.Length));
+                s = p;
+            }
+            string md = mode; bool pf = prefix;
+            Task.Run(() => ftDecode(s, outRate, period, md, pf));
+        }
+
+        private void ftDecode(short[] samples, int rate, long period, string mode, bool prefix = false)
         {
             try
             {
                 List<Mfsk.Decoder.Row> rows;
+                System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
                 lock (_ftDecLock)
                 {
                     if (!_ftRun || mode != _ftMode) return;
                     if (_ftDecoder == null) _ftDecoder = new Mfsk.Decoder(mode == "FT4" ? Mfsk.FT4 : Mfsk.FT8);
                     _ftDecoder.Context(_digiMyCall, _ftGrid, _ftDx, _ftDxGrid, _ftRxHz);
-                    rows = _ftDecoder.DecodePeriod(samples, rate, period);
+                    rows = _ftDecoder.DecodePeriod(samples, rate, period, prefix);
                     // the early pass and the pass at the end of a slot see the same signals: report each message once
                     if (_ftSeenPeriod != period) { _ftSeen.Clear(); _ftSeenPeriod = period; }
                     rows = rows.FindAll(x => _ftSeen.Add(x.Text));
                 }
+                _ftDecodeMs = (int)sw.ElapsedMilliseconds;
+                _ftDecodeAt = ftUtcSeconds() - _ftClock;
                 double T = mode == "FT4" ? 7.5 : 15.0;
                 DateTime start = FtEpoch.AddSeconds(period * T);
                 foreach (var r in rows)
@@ -387,6 +403,10 @@ namespace BrickSDR
 
         internal string FtNextMessage { get { return ftCurrentMessage(); } }
 
+        // how late into its slot a transmission may still begin: the first part of the signal is left out (the receiver of the other side needs most of it, so not more than this)
+        // FT8: 2.5 s (a fifth of the 12.6 s signal), FT4: 1.2 s. Pressing Enable TX a little after the start of the slot is no loss of the whole round.
+        internal static double FtLateLimit(double T) { return T > 10 ? 2.5 : 1.2; }
+
         private void ftTxStep(double now, double T, long slot, double into)
         {
             if (_ftTxState == 0)
@@ -395,7 +415,7 @@ namespace BrickSDR
                 string msg = ftCurrentMessage();
                 if (msg.Length == 0 || FtStartProblem != null) return;
                 if ((slot % 2 == 0) != _ftTxEven) return;
-                if (slot == _ftTxSlot || into > (T > 10 ? 1.4 : 0.9)) return;
+                if (slot == _ftTxSlot || into > FtLateLimit(T)) return;
                 int txRate = KDigi.KDigiTxRate();
                 if (txRate <= 0) return;
                 string err;
@@ -486,7 +506,7 @@ namespace BrickSDR
             double T = FtSlotLength, now = ftUtcSeconds() - _ftClock;
             long slot = (long)Math.Floor(now / T);
             double into = now - slot * T;
-            long use = into <= (T > 10 ? 1.4 : 0.9) ? slot : slot + 1;
+            long use = into <= FtLateLimit(T) ? slot : slot + 1;
             _ftTxEven = use % 2 == 0;
         }
 

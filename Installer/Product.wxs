@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brick-SDR Windows Installer package (WiX 5). Built by build-msi.ps1, which passes Version, StageDir and IconFile. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall">
+  <Package Name="Brick-SDR" Manufacturer="Brick-SDR project" Version="$(Version)" UpgradeCode="7C0F2B1E-4D3A-4F6B-9A55-8E21B3C4D5F7"
+           Scope="perMachine" InstallerVersion="500" Compressed="yes">
+    <SummaryInformation Description="Brick-SDR - SDR transceiver software for HPSDR, Hermes Lite 2 and Brick radios" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Brick-SDR is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="BrickIcon" SourceFile="$(IconFile)" />
+    <Property Id="ARPPRODUCTIDICON" Value="BrickIcon" />
+    <Property Id="ARPCOMMENTS" Value="Restyled Thetis for HPSDR radios, WDSP 2.11" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Brick-SDR" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Brick-SDR" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="MainExe" />
+      <ComponentRef Id="GpuPreference" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <!-- every program file except the exe (it has the shortcuts and the firewall rule) -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(StageDir)\**">
+        <Exclude Files="$(StageDir)\BrickSDR.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainExe" Guid="*">
+        <File Id="BrickExe" Source="$(StageDir)\BrickSDR.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Brick-SDR" WorkingDirectory="INSTALLFOLDER" Icon="BrickIcon" Advertise="no" />
+          <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Brick-SDR" WorkingDirectory="INSTALLFOLDER" Icon="BrickIcon" Advertise="no" />
+        </File>
+        <!-- allow the program through Windows Firewall (the radio answers from the network) -->
+        <fire:FirewallException Id="BrickFirewall" Name="Brick-SDR" Program="[#BrickExe]" Scope="any" Profile="all" IgnoreFailure="yes" />
+      </Component>
+
+      <!-- Windows graphics settings: run on the high performance GPU (for the user who installs) -->
+      <Component Id="GpuPreference" Guid="*">
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\DirectX\UserGpuPreferences" Name="[INSTALLFOLDER]BrickSDR.exe" Type="string" Value="GpuPreference=2;" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

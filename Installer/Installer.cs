@@ -7,10 +7,19 @@ using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
 
 // Brick-SDR installer / uninstaller. The program files are embedded as payload.zip.
 namespace BrickSetup
 {
+    static class Native
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool MoveFileEx(string existing, string newName, int flags);
+        // the uninstaller can not delete itself while it runs: Windows removes it (and its empty folder) at the next restart
+        public static void DeleteAtReboot(string path) { MoveFileEx(path, null, 4); }
+    }
+
     static class Program
     {
         public const string AppName = "Brick-SDR";
@@ -198,7 +207,10 @@ namespace BrickSetup
                 catch { Thread.Sleep(600); }
             }
             if (selfHere)
-                Process.Start(new ProcessStartInfo("cmd.exe", "/c ping 127.0.0.1 -n 3 >nul & rmdir /s /q \"" + dir + "\"") { CreateNoWindow = true, UseShellExecute = false });
+            {
+                Native.DeleteAtReboot(self);
+                Native.DeleteAtReboot(dir);
+            }
         }
 
         static void RemoveShortcutsAndRegistry()

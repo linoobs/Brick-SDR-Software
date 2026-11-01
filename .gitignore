@@ -422,3 +422,4 @@ Project Files/lib/opus_dnn/cmake-build/
 
 # database exports of the Brick boards kept next to the installer (the ones in lib\Brick-SDR-resources are the shipped copies)
 /Brick*.xml
+BrickSDR-Setup*.msi

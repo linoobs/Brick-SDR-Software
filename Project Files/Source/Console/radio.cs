@@ -171,13 +171,22 @@ namespace BrickSDR
                 catch { }
             }
 
+            brickShutdownStage("Before WDSP.destroy_impulse_cache");
             WDSP.destroy_impulse_cache();
 
-
+            brickShutdownStage("Before cmaster.StopTCIStreamThreads");
             cmaster.StopTCIStreamThreads();
 
-            cmaster.DestroyRadio();            
+            brickShutdownStage("Before cmaster.DestroyRadio");
+            cmaster.DestroyRadio();
+            brickShutdownStage("After cmaster.DestroyRadio");            
 		}
+
+        // Brick-SDR: stages of the radio shutdown go to the same shutdown_log.txt as the ones of the console
+        private static void brickShutdownStage(string s)
+        {
+            try { File.AppendAllText(Path.Combine(app_data_path, "shutdown_log.txt"), s + "\r\n"); } catch { }
+        }
 
         private static bool _cache_impulse = true;
         public static bool CacheImpulse

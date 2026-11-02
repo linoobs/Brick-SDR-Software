@@ -639,7 +639,7 @@ namespace BrickSDR
             Thread.CurrentThread.CurrentUICulture = ci;
             //
 
-            m_bLogShutdown = Common.HasArg(args, "-logshutdown");
+            m_bLogShutdown = !Common.HasArg(args, "-noshutdownlog");   // Brick-SDR: the shutdown stages are always logged (shutdown_log.txt, deleted at the next start), -noshutdownlog switches it off
 
             // check versions of DLL/etc
             if (!checkVersions())
@@ -1257,7 +1257,14 @@ namespace BrickSDR
             LogTool.Shutdown();
 
             if (_exitConsoleInDispose) // ignore this if the incorrect dlls are found. We wont have used anything
-                ExitConsole();
+            {
+                // Brick-SDR: a native crash in the teardown (cmaster.DestroyRadio) used to leave the process hanging without a window.
+                // The settings are saved by then, so a watchdog ends the process if the shutdown does not finish in 15 s.
+                System.Threading.Thread wd = new System.Threading.Thread(() => { System.Threading.Thread.Sleep(15000); try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { } }) { IsBackground = true, Name = "Shutdown watchdog" };
+                wd.Start();
+                try { ExitConsole(); }
+                catch (Exception ex) { shutdownLogStringToPath("ExitConsole failed: " + ex.ToString()); }
+            }
 
             if (_frmShutDownForm != null)
             {
@@ -2702,6 +2709,9 @@ namespace BrickSDR
         public void ExitConsole()
         {
             shutdownLogStringToPath("Inside ExitConsole()");
+
+            shutdownLogStringToPath("Before brickDigitalShutdown()");
+            try { brickDigitalShutdown(); } catch { }
 
             shutdownLogStringToPath("Before recorder/player stops");
             ARP.StopRecord(out _);

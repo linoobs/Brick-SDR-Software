@@ -315,6 +315,16 @@ namespace BrickSDR
         internal bool DeepCwAvailable { get { return deepCwEngine() != null; } }
         internal string DeepCwError { get { return _deepError; } }
 
+        // At the end of the program: the engines and taps that read the receiver audio are stopped before the native teardown (ExitConsole).
+        // Their threads (FT8 / FT4, RTTY / CW) call into ChannelMaster, which DestroyRadio is about to free.
+        internal void brickDigitalShutdown()
+        {
+            try { ftStopEngine(); } catch { }
+            try { digiStopEngine(); } catch { }
+            try { KDigi.KDigiRxTap(0, 0); KDigi.KDigiRxTap(1, 0); KDigi.KDigiRxSetTap(0, 1f); KDigi.KDigiRxSetTap(1, 1f); } catch { }
+            try { for (int i = 0; i < 2; i++) if (RadeEnabledOn(i)) SetRadeEnabled(i, false); } catch { }
+        }
+
         private void digiStopEngine()
         {
             if (_cwDeep != null) { _cwDeep.Dispose(); _cwDeep = null; }

@@ -56,12 +56,12 @@ First usable version (receive and SSB transmit on all three systems) is the end 
 - **Licensing**: the new core is GPL-3.0 because of deskHPSDR; Thetis-derived files are "GPL v2 or later", so the combination is fine, but the dual-licensing notes in Thetis must be understood first.
 - **Hardware testing**: nothing can be verified without radios on each system; the Windows PC with the Brick3 is the first test bed.
 
-## 6. Questions for the owner
+## 6. Decisions of the owner (2026-11-03)
 
-1. Is a Mac (Apple Silicon) and a Linux PC available for tests, or are testers needed?
-2. Should the new program become the only program for Windows too, or stay a Linux / macOS edition?
-3. Is contact with the deskHPSDR author (DL1BZ) wanted before code is taken?
-4. Which features are the minimum for the first Linux / macOS version?
+1. Windows stays first and, for now, the only supported system. Nothing in the existing Windows program is touched for the sake of other systems; the cross-platform work runs in parallel, in its own repository / folder.
+2. Linux is second. Test machine: a Linux Mint virtual machine under VMware on the development PC (no USB audio or radio passthrough needed for the first phases: network to the radio works through a bridged adapter).
+3. macOS and the licence questions (GPL-3.0 core, Thetis dual-licensing notes) are decided later, before any macOS or release work.
+4. Contact with the deskHPSDR author: not now; after there is something concrete to show (see the note in CLAUDE.md).
 
 ## 7. Related open items (not part of this plan)
 

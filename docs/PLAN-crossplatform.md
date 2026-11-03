@@ -36,8 +36,8 @@ Rough size is a guess in working time for one developer; the real limits are tes
 
 | Phase | Deliverable | Size |
 | --- | --- | --- |
-| 0. Preparation | licence check (GPL-3.0 core with GPL-2.0-or-later Thetis parts, `LICENSE-DUAL-LICENSING` of Thetis), contact with the deskHPSDR author, test machines (a Linux PC or VM, a Mac with Apple Silicon), repository layout, CI skeleton | 1 to 2 weeks |
-| 1. Core | `brick-core` builds with CMake on Windows, Linux and macOS; a command line tool discovers a Brick, receives I/Q, demodulates SSB / CW / AM / FM to the sound card; tested first on Windows with the real Brick3 | 3 to 5 weeks |
+| 0. Linux workshop | Linux Mint VM set up (compiler, CMake, .NET SDK, git, audio and network checked, bridged adapter so the Brick is reachable); deskHPSDR cloned, built and run in the VM against the Brick3 as the reference behaviour; repository skeleton and CI skeleton | 1 week |
+| 1. Core | `brick-core` builds with CMake on Linux (macOS later): discovery, protocol 1 and 2, WDSP, audio through miniaudio; a command line tool receives I/Q from the Brick3 and plays SSB / CW / AM / FM; the code is taken from deskHPSDR (as source or as reference, see section 6) | 3 to 5 weeks |
 | 2. Interface skeleton | Avalonia window with spectrum, waterfall, VFO A / B, band / mode / filter, S-meter, audio out; same code on all three systems | 3 to 4 weeks |
 | 3. Transmit and radio features | TX chain (SSB, CW, digital), mic input, PureSignal, power / SWR meters, band stacks, memories, Brick profiles and PA calibration, RX2, noise reduction, Setup pages | 5 to 8 weeks |
 | 4. Digital modes | `Brick.Digital` on the new core: FT8 / FT4, RTTY, CW decoders, FreeDV, log bar, call look-up, online logs, PSK Reporter | 4 to 6 weeks |
@@ -54,14 +54,15 @@ First usable version (receive and SSB transmit on all three systems) is the end 
 - **macOS distribution**: a paid Apple Developer ID (about 99 USD per year) is needed for notarization, otherwise users get Gatekeeper warnings.
 - **Two code bases**: until the new program replaces the Windows one, fixes have to be kept in step. The plan is to move Windows to the new program too (one interface for all three systems).
 - **Licensing**: the new core is GPL-3.0 because of deskHPSDR; Thetis-derived files are "GPL v2 or later", so the combination is fine, but the dual-licensing notes in Thetis must be understood first.
-- **Hardware testing**: nothing can be verified without radios on each system; the Windows PC with the Brick3 is the first test bed.
+- **Hardware testing**: nothing can be verified without radios on each system; the Brick3 on the LAN, reached from the Linux VM through a bridged network adapter, is the test bed.
 
 ## 6. Decisions of the owner (2026-11-03)
 
 1. Windows stays first and, for now, the only supported system. Nothing in the existing Windows program is touched for the sake of other systems; the cross-platform work runs in parallel, in its own repository / folder.
 2. Linux is second. Test machine: a Linux Mint virtual machine under VMware on the development PC (no USB audio or radio passthrough needed for the first phases: network to the radio works through a bridged adapter).
 3. macOS and the licence questions (GPL-3.0 core, Thetis dual-licensing notes) are decided later, before any macOS or release work.
-4. Contact with the deskHPSDR author: not now; after there is something concrete to show (see the note in CLAUDE.md).
+4. deskHPSDR is the base (as source or as reference) because its author has done the protocol and Brick work, better than pihpsdr / linhpsdr. The contact with its author (DL1BZ) is handled by the project owner personally; he likes the Brick-SDR interface and wants to borrow some of it, so code and ideas can flow both ways.
+5. The Windows program (Thetis based, this repository) is not part of this track and is not changed for it. The new track is for Linux first, macOS later, and its interface follows the Brick-SDR design.
 
 ## 7. Related open items (not part of this plan)
 

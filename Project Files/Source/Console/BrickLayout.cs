@@ -1939,6 +1939,8 @@ namespace BrickSDR
 
         private bool brickTxAvgValid;
         private double brickPwrAvg, brickSwrAvg = 1.0;
+        private double brickPwrPeak;                  // the peak of the forward power with a hold, shown as a red mark on the power bar like the S-meter peak
+        private DateTime brickPwrPeakTime = DateTime.MinValue;
 
         // SWR 1..2 takes two thirds of the bar, 2..3 the last third
         private static double brickSwrFraction(double s)
@@ -2204,9 +2206,12 @@ namespace BrickSDR
             bool tx = !rx2 && _mox;
             float pw = alex_fwd;
             double swNow = alex_swr < 1 ? 1 : alex_swr;
-            if (!tx) brickTxAvgValid = false;
+            float pwRaw = pw;
+            if (!tx) { brickTxAvgValid = false; brickPwrPeak = 0; }
             else
             {
+                // peak of the raw power: held for 1.2 s, then it falls to the present value
+                if (pwRaw >= brickPwrPeak || (DateTime.Now - brickPwrPeakTime).TotalMilliseconds > 1200) { brickPwrPeak = pwRaw; brickPwrPeakTime = DateTime.Now; }
                 // averaged readings: the numbers and bars do not jump
                 if (!brickTxAvgValid) { brickPwrAvg = pw; brickSwrAvg = swNow; brickTxAvgValid = true; }
                 else { brickPwrAvg += (pw - brickPwrAvg) * 0.2; brickSwrAvg += (swNow - brickSwrAvg) * 0.2; }
@@ -2254,6 +2259,11 @@ namespace BrickSDR
                     g.DrawString("PWR", ft, bm, 2, y1 - 1);
                     g.DrawString("SWR", ft, bm, 2, y2 - 1);
                     brickBar(g, bx, y1, bw, bh, pw / max);
+                    if (brickPwrPeak > 0)
+                    {
+                        int ppx = bx + (int)Math.Round(bw * Math.Min(1.0, brickPwrPeak / max));
+                        using (Pen pk = new Pen(Color.FromArgb(235, 60, 50), 2f)) g.DrawLine(pk, ppx, y1 - 3, ppx, y1 + bh + 3);
+                    }
                     brickBar(g, bx, y2, bw, bh, brickSwrFraction(brickSwrAvg), false, true);
                     brickPwrLabelRect = Rectangle.Empty;
                     // marks on the SWR bar: yellow at 1.5, red at 2.0

@@ -27,7 +27,7 @@ namespace BrickSDR
         {
             new Row { Name = "MIC",   Avg = WDSP.txaMeterType.TXA_MIC_AV,  Pk = WDSP.txaMeterType.TXA_MIC_PK },
             new Row { Name = "EQ",    Avg = WDSP.txaMeterType.TXA_EQ_AV,   Pk = WDSP.txaMeterType.TXA_EQ_PK },
-            new Row { Name = "LEVELER", Avg = WDSP.txaMeterType.TXA_LVLR_AV, Pk = WDSP.txaMeterType.TXA_LVLR_PK, Gain = WDSP.txaMeterType.TXA_LVLR_GAIN },
+            new Row { Name = "LVLR", Avg = WDSP.txaMeterType.TXA_LVLR_AV, Pk = WDSP.txaMeterType.TXA_LVLR_PK, Gain = WDSP.txaMeterType.TXA_LVLR_GAIN },
             new Row { Name = "CFC",   Avg = WDSP.txaMeterType.TXA_CFC_AV,  Pk = WDSP.txaMeterType.TXA_CFC_PK,  Gain = WDSP.txaMeterType.TXA_CFC_GAIN },
             new Row { Name = "COMP",  Avg = WDSP.txaMeterType.TXA_COMP_AV, Pk = WDSP.txaMeterType.TXA_COMP_PK },
             new Row { Name = "ALC",   Avg = WDSP.txaMeterType.TXA_ALC_AV,  Pk = WDSP.txaMeterType.TXA_ALC_PK,  Gain = WDSP.txaMeterType.TXA_ALC_GAIN },
@@ -92,7 +92,7 @@ namespace BrickSDR
                 {
                     int x = pad + i * (cw + gap);
                     g.DrawString(rows[i].Name, f, bm, x, 3);
-                    string val = rows[i].P.ToString("0.0") + " dB" + (rows[i].Gain.HasValue ? "   G " + rows[i].G.ToString("+0.0;-0.0;0.0") : "");
+                    string val = rows[i].P.ToString("0.0") + " dB";
                     SizeF sv = g.MeasureString(val, fs);
                     g.DrawString(val, fs, bt, x + cw - sv.Width, 4);
                     int by = 23, bh = 12;
@@ -104,6 +104,12 @@ namespace BrickSDR
                     using (Pen pk = new Pen(rows[i].P > -0.5 ? cTx : cText, 2f)) g.DrawLine(pk, px, by - 2, px, by + bh + 2);
                     int zero = x + (int)Math.Round(cw * (0 - Lo) / (Hi - Lo));
                     using (Pen p0 = new Pen(cMuted, 1f)) g.DrawLine(p0, zero, by - 3, zero, by + bh + 3);
+                    if (rows[i].Gain.HasValue && Math.Abs(rows[i].G) < 100)
+                    {
+                        // the gain (reduction) sits in the bar, at its left end, so it never meets the name or the peak value
+                        using (Font fg = new Font("Segoe UI", 7f, FontStyle.Bold))
+                            g.DrawString("G " + rows[i].G.ToString("+0.0;-0.0;0.0"), fg, Brushes.White, x + 2, by - 0.5f);
+                    }
                 }
             }
         }

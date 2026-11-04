@@ -362,6 +362,7 @@ namespace BrickSDR
 
             chkSplitDisplay.Checked = RX2Enabled;
             BeginInvoke(new Action(brickDigitalRestore));      // the terminal or FreeDV strip that was open at the last exit
+            BeginInvoke(new Action(brickRestoreTxMeters));
 
             // focus parking place: the old code moves the focus here after clicks, it must stay focusable (off screen)
             btnHidden.SetBounds(-1000, -1000, 1, 1);
@@ -627,6 +628,7 @@ namespace BrickSDR
         // a click on the power scale numbers lets the full scale be changed
         private void brickMeterMouseDown(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Right) { brickToggleTxMeters(); return; }
             if (_mox && !brickPwrLabelRect.IsEmpty && brickPwrLabelRect.Contains(e.Location)) brickAskPowerMax();
         }
 

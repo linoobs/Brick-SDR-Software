@@ -486,6 +486,7 @@
     <Compile Include="HPSDR\IoBoardHl2.cs" />
     <Compile Include="BrickCallLookup.cs" />
     <Compile Include="BrickLogBar.cs" />
+    <Compile Include="BrickTxMeters.cs" />
     <Compile Include="BrickOnlineLogs.cs" />
     <Compile Include="BrickFt.cs" />
     <Compile Include="BrickFtPane.cs" />

@@ -335,6 +335,36 @@ namespace BrickSDR
 
         // Brick style: the knob is drawn by paintBrick, so the mouse maps position -> value directly
         private bool _brickDrag;
+        private bool _brickHover;                 // pointer on the knob (aura)
+
+        // centre of the knob in client coordinates (same geometry as paintBrick)
+        private Point brickKnobCenter()
+        {
+            const int r = 9;
+            double span = (max - min) == 0 ? 0 : (val - min) / (double)(max - min);
+            if (span < 0) span = 0; if (span > 1) span = 1;
+            if (orientation == Orientation.Horizontal)
+            {
+                int x0 = r, x1 = Math.Max(r + 1, Width - r);
+                return new Point(x0 + (int)Math.Round(span * (x1 - x0)), Height / 2);
+            }
+            int y0 = Math.Max(r + 1, Height - r), y1 = r;
+            return new Point(Width / 2, y0 - (int)Math.Round(span * (y0 - y1)));
+        }
+
+        private void brickUpdateHover(Point p)
+        {
+            if (!BrickStyle) return;
+            Point c = brickKnobCenter();
+            bool h = (p.X - c.X) * (p.X - c.X) + (p.Y - c.Y) * (p.Y - c.Y) <= 10 * 10;
+            if (h != _brickHover) { _brickHover = h; Invalidate(); }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            if (_brickHover) { _brickHover = false; Invalidate(); }
+            base.OnMouseLeave(e);
+        }
         private void brickSetFromMouse(MouseEventArgs e)
         {
             const int r = 9;
@@ -355,7 +385,7 @@ namespace BrickSDR
         {
             if (BrickStyle && e.Button == MouseButtons.Left && this.Enabled)
             {
-                _brickDrag = true;
+                _brickDrag = true; Invalidate();
                 this.Capture = true;
                 brickSetFromMouse(e);
                 return;
@@ -470,6 +500,7 @@ namespace BrickSDR
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            brickUpdateHover(e.Location);
             if (_brickDrag) { brickSetFromMouse(e); return; }
             if (_head_rect.IsEmpty) return;
 
@@ -600,7 +631,7 @@ namespace BrickSDR
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
-            if (_brickDrag) { _brickDrag = false; this.Capture = false; base.OnMouseUp(e); return; }
+            if (_brickDrag) { _brickDrag = false; this.Capture = false; brickUpdateHover(e.Location); Invalidate(); base.OnMouseUp(e); return; }
             if (!(e.Button == MouseButtons.Left || e.Button == MouseButtons.Right)) return;
             if (_head_rect.IsEmpty) return;
 
@@ -644,6 +675,10 @@ namespace BrickSDR
             Color accent = on ? BrickAccent : Color.FromArgb(110, 80, 50);
             Color knob = on ? (m_bGreenThumb ? Color.FromArgb(60, 214, 96) : Color.FromArgb(235, 238, 245)) : Color.FromArgb(120, 124, 136);        // green while Auto AGC is on
             const int r = 9;
+            // the knob is small; the pointer on it shows an aura of full size, and while it is held the knob grows to the aura
+            bool grabbed = _brickDrag;
+            int kr = grabbed ? r - 1 : (_brickHover ? r - 3 : r - 3);
+            Color aura = Color.FromArgb(grabbed ? 0 : 70, knob);
 
             if (orientation == Orientation.Horizontal)
             {
@@ -654,7 +689,8 @@ namespace BrickSDR
                     g.DrawLine(pg, x0, y, x1, y);
                 using (Pen pa = new Pen(accent, 4f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
                     g.DrawLine(pa, x0, y, x, y);
-                using (SolidBrush kb = new SolidBrush(knob)) g.FillEllipse(kb, x - r + 1, y - r + 1, 2 * r - 2, 2 * r - 2);
+                if ((_brickHover || grabbed) && on) using (SolidBrush ab = new SolidBrush(aura)) g.FillEllipse(ab, x - r, y - r, 2 * r, 2 * r);
+                using (SolidBrush kb = new SolidBrush(knob)) g.FillEllipse(kb, x - kr, y - kr, 2 * kr, 2 * kr);
             }
             else
             {
@@ -665,7 +701,8 @@ namespace BrickSDR
                     g.DrawLine(pg, x, y0, x, y1);
                 using (Pen pa = new Pen(accent, 4f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
                     g.DrawLine(pa, x, y0, x, y);
-                using (SolidBrush kb = new SolidBrush(knob)) g.FillEllipse(kb, x - r + 1, y - r + 1, 2 * r - 2, 2 * r - 2);
+                if ((_brickHover || grabbed) && on) using (SolidBrush ab = new SolidBrush(aura)) g.FillEllipse(ab, x - r, y - r, 2 * r, 2 * r);
+                using (SolidBrush kb = new SolidBrush(knob)) g.FillEllipse(kb, x - kr, y - kr, 2 * kr, 2 * kr);
             }
         }
 

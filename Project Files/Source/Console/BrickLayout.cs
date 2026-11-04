@@ -1990,7 +1990,7 @@ namespace BrickSDR
                         int at = statusStripMain.Items.IndexOf(toolStripStatusLabel_CatTCPip);
                         statusStripMain.Items.Insert(at < 0 ? statusStripMain.Items.Count : at, brickSpeedLabel);
                     }
-                    string sp = BrickHardware.SpeedText().Trim();
+                    string sp = BrickHardware.SpeedText(chkPower.Checked).Trim();
                     if (brickSpeedLabel.Text != sp) brickSpeedLabel.Text = sp;
                 }
                 catch { }

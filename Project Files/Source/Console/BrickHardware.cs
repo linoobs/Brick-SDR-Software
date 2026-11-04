@@ -21,12 +21,14 @@ namespace BrickSDR
         private static string _speed = "";
 
         // " RX 2.4 Mb/s TX 0.3 Mb/s": traffic of the network card of the radio, refreshed at most once a second ("" while not connected)
-        public static string SpeedText()
+        public const string ZeroSpeed = "RX 0.00 Mb/s  TX 0.00 Mb/s";
+
+        public static string SpeedText(bool connected)
         {
+            if (!connected || HostIp == "") { _lastT = DateTime.MinValue; return _speed = ZeroSpeed; }
             if ((DateTime.UtcNow - _lastT).TotalMilliseconds < 900) return _speed;
             try
             {
-                if (HostIp == "") return _speed = "";
                 if (_nic == null || _nicIp != HostIp)
                 {
                     _nic = null; _nicIp = HostIp;
@@ -35,7 +37,7 @@ namespace BrickSDR
                             if (ua.Address.ToString() == HostIp) _nic = ni;
                     _lastT = DateTime.MinValue;
                 }
-                if (_nic == null) return _speed = "";
+                if (_nic == null) return _speed = ZeroSpeed;
                 var st = _nic.GetIPv4Statistics();
                 DateTime now = DateTime.UtcNow;
                 long rx = st.BytesReceived, tx = st.BytesSent;
@@ -47,7 +49,7 @@ namespace BrickSDR
                 }
                 _lastRx = rx; _lastTx = tx; _lastT = now;
             }
-            catch { _speed = ""; }
+            catch { _speed = ZeroSpeed; }
             return _speed;
         }
 

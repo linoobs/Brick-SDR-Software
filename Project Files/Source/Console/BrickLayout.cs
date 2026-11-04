@@ -1072,10 +1072,11 @@ namespace BrickSDR
             nud.Location = new Point(-3000, 0);
             Button minus = new Button { Text = "\u2212" };
             Button plus = new Button { Text = "+" };
-            Label val = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 10f), ForeColor = cAccent };
-            minus.SetBounds(x, y, 28, 24);
-            val.SetBounds(x + 30, y, 44, 24);
-            plus.SetBounds(x + 76, y, 28, 24);
+            // the Hermes Lite 2 range goes to -28 / +31 dB: the value needs room for "-28 dB" on one line
+            Label val = new Label { AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI Semibold", 9f), ForeColor = cAccent, UseCompatibleTextRendering = false };
+            minus.SetBounds(x, y, 24, 24);
+            val.SetBounds(x + 25, y, 54, 24);
+            plus.SetBounds(x + 80, y, 24, 24);
             decimal limit = Math.Min(31, nud.Maximum);
             int dir = 0;
             System.Windows.Forms.Timer rep = new System.Windows.Forms.Timer { Interval = 350 };

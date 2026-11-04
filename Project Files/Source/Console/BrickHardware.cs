@@ -11,6 +11,46 @@ namespace BrickSDR
         private static string _name = "";
         private static string _mac = "";
 
+        // local address of the network card the radio is reached through (set when connecting)
+        public static string HostIp = "";
+
+        private static System.Net.NetworkInformation.NetworkInterface _nic;
+        private static string _nicIp = "";
+        private static long _lastRx, _lastTx;
+        private static DateTime _lastT = DateTime.MinValue;
+        private static string _speed = "";
+
+        // " RX 2.4 Mb/s TX 0.3 Mb/s": traffic of the network card of the radio, refreshed at most once a second ("" while not connected)
+        public static string SpeedText()
+        {
+            if ((DateTime.UtcNow - _lastT).TotalMilliseconds < 900) return _speed;
+            try
+            {
+                if (HostIp == "") return _speed = "";
+                if (_nic == null || _nicIp != HostIp)
+                {
+                    _nic = null; _nicIp = HostIp;
+                    foreach (var ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                        foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                            if (ua.Address.ToString() == HostIp) _nic = ni;
+                    _lastT = DateTime.MinValue;
+                }
+                if (_nic == null) return _speed = "";
+                var st = _nic.GetIPv4Statistics();
+                DateTime now = DateTime.UtcNow;
+                long rx = st.BytesReceived, tx = st.BytesSent;
+                if (_lastT != DateTime.MinValue)
+                {
+                    double dt = (now - _lastT).TotalSeconds;
+                    if (dt > 0.2)
+                        _speed = " RX " + ((rx - _lastRx) * 8 / dt / 1e6).ToString("0.00") + " Mb/s  TX " + ((tx - _lastTx) * 8 / dt / 1e6).ToString("0.00") + " Mb/s";
+                }
+                _lastRx = rx; _lastTx = tx; _lastT = now;
+            }
+            catch { _speed = ""; }
+            return _speed;
+        }
+
         // MAC of the connected radio, 12 hex digits without separators ("" when unknown)
         public static string Mac { get { return _mac; } }
 
@@ -76,7 +116,12 @@ namespace BrickSDR
 
             HPSDRModel model;
             string name;
-            if (!TryGetModel(radio.MacAddress, out model, out name)) return;
+            if (!TryGetModel(radio.MacAddress, out model, out name))
+            {
+                // not a Brick board: a Hermes Lite 2 reports board id 6 in discovery, select its model so the HL2 drive / PA handling is used
+                if (radio.DeviceType == HPSDRHW.HermesLite) console.SetupForm.SelectRadioModel(HPSDRModel.HERMESLITE);
+                return;
+            }
 
             _name = name;
             console.SetupForm.SelectRadioModel(model);

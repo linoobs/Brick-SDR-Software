@@ -153,6 +153,7 @@ namespace BrickSDR
                 rl.UpdateSelectedDetails(scan_result, scan_result.Radios[0]);
             }
 
+            BrickHardware.HostIp = hostIP;
             ret = nativeInitMetis(radioIP, ratioPort, hostIP, hostPort, protocol, model_id);
 
             if(ret == 0)

@@ -37135,6 +37135,9 @@ if (chkContainer_hideRADEnotenabled != null) chkContainer_hideRADEnotenabled.Che
         public void SelectRadioModel(HPSDRModel model)
         {
             string text = HardwareSpecific.EnumModelToString(model);
+            // the list item can be spelled differently from the enum name ("HERMES LITE" / "HERMES-LITE"): match by model
+            foreach (object it in comboRadioModel.Items)
+                if (HardwareSpecific.StringModelToEnum(it.ToString()) == model) { text = it.ToString(); break; }
             if (comboRadioModel.Text.Equals(text, StringComparison.OrdinalIgnoreCase)) return;
 
             comboRadioModel.Text = text;

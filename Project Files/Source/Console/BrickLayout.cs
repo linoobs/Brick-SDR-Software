@@ -1974,9 +1974,27 @@ namespace BrickSDR
             else Display.AlwaysShowCursorInfo = now;
         }
 
+        private ToolStripStatusLabel brickSpeedLabel;
+
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();
+            if (!initializing && !IsSetupFormNull)
+            {
+                // link speed (receive / transmit) in the status bar, in front of the CAT indicators
+                try
+                {
+                    if (brickSpeedLabel == null)
+                    {
+                        brickSpeedLabel = new ToolStripStatusLabel { Name = "brickSpeedLabel", ForeColor = cText, BackColor = Color.Transparent, Overflow = ToolStripItemOverflow.Never, Margin = new Padding(0, 0, 10, 0) };
+                        int at = statusStripMain.Items.IndexOf(toolStripStatusLabel_CatTCPip);
+                        statusStripMain.Items.Insert(at < 0 ? statusStripMain.Items.Count : at, brickSpeedLabel);
+                    }
+                    string sp = BrickHardware.SpeedText().Trim();
+                    if (brickSpeedLabel.Text != sp) brickSpeedLabel.Text = sp;
+                }
+                catch { }
+            }
             try { radeAutoLevelTick(); digiTapAutoLevelTick(); brickLogBarUpdate(); } catch { }
             if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
             if (!initializing && !IsSetupFormNull)

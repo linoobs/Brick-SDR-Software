@@ -110,6 +110,7 @@ namespace BrickSDR
         public static void ApplyForRadio(Console console, RadioInfo radio)
         {
             _name = "";
+            IdentifiedBrick = null;
             _mac = radio == null || radio.MacAddress == null ? "" : radio.MacAddress.Replace(":", "").Replace("-", "").ToUpperInvariant();
 
             if (radio == null || radio.IsCustom || console.IsSetupFormNull) return;
@@ -118,14 +119,40 @@ namespace BrickSDR
             string name;
             if (!TryGetModel(radio.MacAddress, out model, out name))
             {
-                // not a Brick board: a Hermes Lite 2 reports board id 6 in discovery, select its model so the HL2 drive / PA handling is used
-                if (radio.DeviceType == HPSDRHW.HermesLite) console.SetupForm.SelectRadioModel(HPSDRModel.HERMESLITE);
+                // not a Brick board: the model has to fit the board id the radio reports in discovery (Hermes Lite 2, Hermes, Angelia, Orion, Saturn ...);
+                // when the model chosen in Setup already belongs to that hardware family it stays (ANAN-10 / ANAN-100 / Hermes, ...)
+                IdentifiedBrick = false;
+                HPSDRModel def;
+                if (DefaultModelFor(radio.DeviceType, out def) && HardwareSpecific.Hardware != radio.DeviceType)
+                    console.SetupForm.SelectRadioModel(def);
                 return;
             }
 
+            IdentifiedBrick = true;
             _name = name;
             console.SetupForm.SelectRadioModel(model);
             BrickProfiles.ApplyOnce(console, name, _mac);
+        }
+
+        // true / false once a radio has been identified (Brick2 / Brick3 or anything else), null before
+        public static bool? IdentifiedBrick;
+
+        private static bool DefaultModelFor(HPSDRHW hw, out HPSDRModel m)
+        {
+            switch (hw)
+            {
+                case HPSDRHW.Atlas: m = HPSDRModel.HPSDR; return true;
+                case HPSDRHW.Hermes: m = HPSDRModel.HERMES; return true;
+                case HPSDRHW.HermesII: m = HPSDRModel.ANAN10E; return true;
+                case HPSDRHW.Angelia: m = HPSDRModel.ANAN100D; return true;
+                case HPSDRHW.Orion: m = HPSDRModel.ANAN200D; return true;
+                case HPSDRHW.OrionMKII: m = HPSDRModel.ORIONMKII; return true;
+                case HPSDRHW.HermesLite: m = HPSDRModel.HERMESLITE; return true;
+                case HPSDRHW.Saturn: m = HPSDRModel.ANAN_G2; return true;
+                case HPSDRHW.HermesC10: m = HPSDRModel.ANAN_G2E; return true;
+            }
+            m = HPSDRModel.HERMES;
+            return false;
         }
     }
 }

@@ -23,7 +23,7 @@ namespace BrickSDR
         public static string GetFWVersionErrorMsg { get; set; } = "";
         public static string BoardMismatch { get; set; } = "";
 
-        public static int InitRadio()
+        public static int InitRadio(bool identifyOnly = false)
         {
             int ret = -1;
             // 0 everything fine
@@ -139,6 +139,7 @@ namespace BrickSDR
                 // select its model now, before connecting, otherwise the first attempt runs with the wrong model
                 BrickHardware.ApplyForRadio(c, ri);
                 model_id = (int)HardwareSpecific.Model;
+                if (identifyOnly) return 0;   // Brick-SDR: only identify the board (model / layout), the connection is made afterwards
 
                 if (ri.DeviceType == HPSDRHW.HermesII)
                 {
@@ -153,6 +154,7 @@ namespace BrickSDR
                 rl.UpdateSelectedDetails(scan_result, scan_result.Radios[0]);
             }
 
+            if (identifyOnly) return 0;
             BrickHardware.HostIp = hostIP;
             ret = nativeInitMetis(radioIP, ratioPort, hostIP, hostPort, protocol, model_id);
 

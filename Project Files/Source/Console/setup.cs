@@ -1812,11 +1812,7 @@ namespace BrickSDR
                 string val = a["comboRadioModel"];
                 if (!comboRadioModel.Items.Contains(val))
                 {
-                    DialogResult dr = MessageBox.Show($"The radio model stored in the database is not known by this version of Brick-SDR [{val}]. \n\nAre you using the correct version ? It will be reset back to HERMES.",
-                    "Model version issue",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST);
-
+                    // Brick-SDR: no warning, the model is set again from the radio when it is identified at Power
                     a["comboRadioModel"] = HPSDRModel.HERMES.ToString();
                 }
             }

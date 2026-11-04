@@ -27819,6 +27819,8 @@ namespace BrickSDR
         }
         private bool DataFlowing = false;
         private byte[] id_bytes = new byte[1];
+        private bool brickIdentified = false;
+
         private void chkPower_CheckedChanged(object sender, System.EventArgs e)
         {
             // ignore if dbman shown, prevents external sources from doing this such as midi/cat
@@ -27829,6 +27831,14 @@ namespace BrickSDR
                 return;
             }
             //
+
+            if (chkPower.Checked && !brickIdentified)
+            {
+                // Brick-SDR: identify the board first (Brick2/3, Hermes, Hermes Lite 2, ANAN ...), set the model and layout for it, and only then connect
+                brickIdentified = true;
+                try { NetworkIO.InitRadio(true); } catch { }
+            }
+            if (!chkPower.Checked) brickIdentified = false;
 
             if (chkPower.Checked)
             {

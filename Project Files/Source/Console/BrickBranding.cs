@@ -10,7 +10,7 @@ namespace BrickSDR
     internal static class BrickBranding
     {
         public const string ProductName = "Brick-SDR";
-        public const string Version = "1.4_hl2";
+        public const string Version = "1.4";
 
         private static Icon _icon;
         private static Bitmap _logo;

@@ -95,6 +95,25 @@ namespace BrickSDR
             Put(chkRXEQ, panelModeSpecificPhone, 214, 5, 56, 23);
             Put(chkTXEQ, panelModeSpecificPhone, 274, 5, 56, 23);
             Put(chkShowTXFilter, panelModeSpecificPhone, 274, 36, 56, 23);
+            // transmit audio source: the microphone of the radio or VAC (the radio mic also works while VAC carries the receiver audio)
+            string micFile = System.IO.Path.Combine(AppDataPath, "mic_source.txt");
+            try { if (System.IO.File.Exists(micFile)) Audio.BrickMicSource = System.IO.File.ReadAllText(micFile).Trim() == "vac" ? 1 : 0; } catch { }
+            CheckBox micSrc = new CheckBox { Name = "brickMicSrc", Appearance = Appearance.Button, AutoCheck = false, Text = "MIC HW" };
+            Put(micSrc, panelModeSpecificPhone, 214, 36, 56, 23);
+            micSrc.Click += (s, e) =>
+            {
+                Audio.BrickMicSource = Audio.BrickMicSource == 0 ? 1 : 0;
+                try { System.IO.File.WriteAllText(micFile, Audio.BrickMicSource == 1 ? "vac" : "hw"); } catch { }
+                Audio.BrickMicRefresh();
+            };
+            brickAgcSyncs.Add(() =>
+            {
+                string t = Audio.BrickMicSource == 0 ? "MIC HW" : "MIC VAC";
+                string tag = Audio.BrickMicSource == 0 ? "green" : "blue";     // green = radio microphone, blue = VAC
+                if (micSrc.Text != t || (string)micSrc.Tag != tag) { micSrc.Text = t; micSrc.Tag = tag; micSrc.Invalidate(); }
+                if (!micSrc.Checked) micSrc.Checked = true;
+                Audio.BrickMicRefresh();     // also follows mode changes
+            });
             // MIC, COMP, VOX and DEXP in rows of the same pitch (31 px) as TX EQ / TX FL
             PrettyTrackBar[] sl = { ptbMic, ptbCPDR, ptbVOX, ptbNoiseGate };
             CheckBox[] bt = { chkMicMute, chkCPDR, chkVOX, chkNoiseGate };

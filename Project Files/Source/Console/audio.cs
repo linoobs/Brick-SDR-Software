@@ -539,6 +539,10 @@ namespace BrickSDR
         }
 
         private static bool vac_bypass = false;
+        private static bool vac_bypass_req = false;
+        // Brick-SDR: the button under RX EQ chooses the transmit audio source (0 = microphone of the radio, 1 = VAC); digital modes keep the Thetis rule
+        public static int BrickMicSource = 0;
+        public static void BrickMicRefresh() { VACBypass = vac_bypass_req; }
         public static bool VACBypass
         {
             get
@@ -547,6 +551,10 @@ namespace BrickSDR
             }
             set
             {
+                vac_bypass_req = value;
+                DSPMode bm = TXDSPMode;
+                if (bm != DSPMode.DIGU && bm != DSPMode.DIGL) value = BrickMicSource == 0;
+                if (value == vac_bypass) return;
                 Debug.Print("VAC BYPASS : " + value.ToString());
                 vac_bypass = value;
                 cmaster.CMSetTXAPanelGain1(WDSP.id(1, 0));

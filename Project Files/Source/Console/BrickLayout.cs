@@ -150,6 +150,8 @@ namespace BrickSDR
             bool hover = brickHover.Contains(b) && b.Enabled;
             bool down = hover && (Control.MouseButtons & MouseButtons.Left) != 0;
             bool teal = b.Tag is string && (string)b.Tag == "teal";
+            if (b.Tag is string && (string)b.Tag == "green") on = Color.FromArgb(70, 190, 95);       // transmit audio source button: radio microphone
+            else if (b.Tag is string && (string)b.Tag == "blue") on = Color.FromArgb(70, 140, 240);  // ... VAC
             Color baseC = state ? (teal ? Color.FromArgb(22, 50, 56) : on) : cBtn;
             if (!b.Enabled) baseC = state ? brickShade(on, -0.55) : Color.FromArgb(30, 33, 44);
             Color top = brickShade(baseC, hover ? 0.26 : 0.16);

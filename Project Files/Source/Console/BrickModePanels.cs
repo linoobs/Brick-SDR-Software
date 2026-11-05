@@ -105,6 +105,7 @@ namespace BrickSDR
                 Audio.BrickMicSource = Audio.BrickMicSource == 0 ? 1 : 0;
                 try { System.IO.File.WriteAllText(micFile, Audio.BrickMicSource == 1 ? "vac" : "hw"); } catch { }
                 Audio.BrickMicRefresh();
+                brickMicToVac();
             };
             brickAgcSyncs.Add(() =>
             {

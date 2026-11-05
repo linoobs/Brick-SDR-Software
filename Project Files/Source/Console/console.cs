@@ -29533,6 +29533,7 @@ namespace BrickSDR
 
                 //[2.10.3.9]MW0LGE fix for when mic is disabled
                 setAudioMicGain((double)ptbMic.Value);
+                brickMicToVac();
 
                 // MI0BOT:  For HL2 Audio control is based on VFO and Mode
                 if (!IsSetupFormNull && HardwareSpecific.Model == HPSDRModel.HERMESLITE)

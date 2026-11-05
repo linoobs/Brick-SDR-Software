@@ -1,4 +1,4 @@
-# Builds BrickSDR-Setup_<version>.exe (in the folder above) from "Project Files/bin/x64/Release".
+﻿# Builds BrickSDR-Setup_<version>.exe (in the folder above) from "Project Files/bin/x64/Release".
 # Run it after building the solution.
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $rel  = Join-Path $root 'Project Files\bin\x64\Release'
@@ -7,7 +7,7 @@ Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $work | Out-Null
 $stage = Join-Path $work 'stage'
 robocopy $rel $stage /E /XF *.pdb *.old.exe | Out-Null
-$ver = "1.4"
+$ver = "1.4.1"
 Set-Content (Join-Path $work 'version.txt') $ver -Encoding ASCII
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = Join-Path $work 'payload.zip'

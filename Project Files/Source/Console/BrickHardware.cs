@@ -195,3 +195,24 @@ namespace BrickSDR
         }
     }
 }
+
+namespace BrickSDR
+{
+    public partial class Console
+    {
+        // MIC VAC mode: the audio comes from VAC, where WDSP's mic gain is not used; the MIC slider then sets the VAC TX gain of Setup
+        // (digital modes keep their own VAC gain). Called when the slider moves and when the source is switched to VAC.
+        public void brickMicToVac()
+        {
+            try
+            {
+                if (IsSetupFormNull || Audio.BrickMicSource != 1 || HardwareSpecific.Model == HPSDRModel.HERMESLITE) return;     // Hermes Lite 2 does this in ptbMic_Scroll
+                DSPMode m = radio.GetDSPTX(0).CurrentDSPMode;
+                if (m == DSPMode.DIGU || m == DSPMode.DIGL || m == DSPMode.FM) return;
+                if (SetupForm.VACTXGain != ptbMic.Value) SetupForm.VACTXGain = ptbMic.Value;
+                vac_tx_gain = ptbMic.Value;
+            }
+            catch { }
+        }
+    }
+}

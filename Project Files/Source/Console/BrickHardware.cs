@@ -117,6 +117,11 @@ namespace BrickSDR
 
             if (radio == null || radio.IsCustom || console.IsSetupFormNull) return;
 
+            try { ApplyForRadioModel(console, radio); } finally { console.brickApplyModelRanges(); }
+        }
+
+        private static void ApplyForRadioModel(Console console, RadioInfo radio)
+        {
             HPSDRModel model;
             string name;
             if (!TryGetModel(radio.MacAddress, out model, out name))
@@ -155,6 +160,60 @@ namespace BrickSDR
             }
             m = HPSDRModel.HERMES;
             return false;
+        }
+    }
+}
+
+namespace BrickSDR
+{
+    public partial class Console
+    {
+        // Ranges that depend on the radio: Hermes Lite 2 has 15 drive steps (one wheel click = one step) and an LNA range of -28..+31 dB,
+        // every other board 0..100 and 0..31 dB. Applied at start and again whenever the model is set from the radio, so nothing of the
+        // Hermes Lite 2 stays behind after another board is connected.
+        public void brickApplyModelRanges()
+        {
+            try
+            {
+                if (HardwareSpecific.Model == HPSDRModel.HERMESLITE)
+                {
+                    ptbPWR.Maximum = 90; ptbPWR.LargeChange = 6; ptbPWR.SmallChange = 6;
+                    ptbTune.Maximum = 99; ptbTune.LargeChange = 3; ptbTune.SmallChange = 3;
+                    udRX1StepAttData.Minimum = -28; udRX2StepAttData.Minimum = -28; udTXStepAttData.Minimum = -28;
+                    udRX1StepAttData.Maximum = 31; udRX2StepAttData.Maximum = 31;
+                }
+                else
+                {
+                    ptbPWR.Maximum = 100; ptbPWR.LargeChange = 1; ptbPWR.SmallChange = 1;
+                    ptbTune.Maximum = 100; ptbTune.LargeChange = 1; ptbTune.SmallChange = 1;
+                    udRX1StepAttData.Minimum = 0; udRX2StepAttData.Minimum = 0; udTXStepAttData.Minimum = 0;
+                    if (udRX1StepAttData.Maximum < 31) udRX1StepAttData.Maximum = 31;
+                    if (udRX2StepAttData.Maximum < 31) udRX2StepAttData.Maximum = 31;
+                }
+            }
+            catch { }
+        }
+    }
+}
+
+namespace BrickSDR
+{
+    public partial class Console
+    {
+        // With VAC1 as the transmit source (VAC on, no bypass) WDSP's mic gain is not used, the audio is scaled by the VAC TX gain of Setup.
+        // The MIC slider of the main window then sets that gain, so it always does what its name says (digital modes keep their own VAC gain).
+        public void brickMicToVac()
+        {
+            try
+            {
+                if (IsSetupFormNull || HardwareSpecific.Model == HPSDRModel.HERMESLITE) return;     // Hermes Lite 2 does this in ptbMic_Scroll
+                if (!vac_enabled || Audio.VACBypass) return;
+                DSPMode m = radio.GetDSPTX(0).CurrentDSPMode;
+                if (m == DSPMode.DIGU || m == DSPMode.DIGL || m == DSPMode.FM) return;
+                if (SetupForm.VACTXGain != ptbMic.Value) SetupForm.VACTXGain = ptbMic.Value;
+                vac_tx_gain = ptbMic.Value;
+            }
+            catch { }
         }
     }
 }

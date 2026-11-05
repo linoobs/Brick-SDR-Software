@@ -983,6 +983,7 @@ namespace BrickSDR
 
             LogTool.AddLogEntry("Console showing");
             brickBuildLayout();
+            brickApplyModelRanges();
             System.Windows.Forms.Timer dumpTimer = new System.Windows.Forms.Timer(); dumpTimer.Interval = 6000; dumpTimer.Tick += (ds, de) => { dumpTimer.Stop(); brickDumpControlTree(); }; dumpTimer.Start();
 
             LogTool.AddLogEntry("Finalising...", "FIN");
@@ -19937,6 +19938,7 @@ namespace BrickSDR
                 vac_enabled = value;
                 Audio.VACEnabled = value;
                 if (chkVAC1 != null) chkVAC1.Checked = value;
+                if (value && ptbMic != null) brickMicToVac();
 
                 if (old_vac != vac_enabled)
                 {
@@ -29532,6 +29534,7 @@ namespace BrickSDR
 
                 //[2.10.3.9]MW0LGE fix for when mic is disabled
                 setAudioMicGain((double)ptbMic.Value);
+                brickMicToVac();
 
                 // MI0BOT:  For HL2 Audio control is based on VFO and Mode
                 if (!IsSetupFormNull && HardwareSpecific.Model == HPSDRModel.HERMESLITE)

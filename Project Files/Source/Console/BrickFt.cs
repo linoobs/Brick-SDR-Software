@@ -110,6 +110,7 @@ namespace BrickSDR
             brickDockShow("ft", _ftPane);
             _digiOpenKey = _ftMode; digiSaveSettings();
             ftStartEngine();
+            if (_ftDual) BeginInvoke(new Action(ftPrepareSecondReceiver));       // Dual RX was left on: the second receiver has to run again
         }
 
         internal void brickFtSetMode(string mode)
@@ -126,6 +127,7 @@ namespace BrickSDR
 
         internal void brickFtClose()
         {
+            ftDualRelease();
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
@@ -136,6 +138,7 @@ namespace BrickSDR
         // the window is gone for another one (or the mode no longer fits)
         private void ftRelease()
         {
+            ftDualRelease();
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
@@ -229,7 +232,7 @@ namespace BrickSDR
             {
                 if (_ftDual == value) return;
                 _ftDual = value;
-                if (value) ftPrepareSecondReceiver();
+                if (value) ftPrepareSecondReceiver(); else ftDualRelease();
                 digiSaveSettings();
                 if (_ftPane != null) _ftPane.Refresh2();
             }
@@ -237,6 +240,15 @@ namespace BrickSDR
 
         // the band the second receiver was on when it last had its dial set, to tell a band change (put it on the FT8 / FT4 frequency of the new band) from a mode change (Dual RX is over)
         private Band _ftDualBand2 = Band.FIRST;
+
+        // RX2 was switched on by Dual RX (it was off): it goes off again when Dual RX ends or the window closes
+        private bool _ftDualOpenedRx2;
+        private void ftDualRelease()
+        {
+            if (!_ftDualOpenedRx2) return;
+            _ftDualOpenedRx2 = false;
+            try { if (RX2Enabled) chkRX2.Checked = false; } catch { }
+        }
 
         internal void ftApplyDialRx(int rx)
         {
@@ -252,6 +264,10 @@ namespace BrickSDR
             catch { }
         }
 
+        // the RX1 / RX2 buttons of the window: the waterfall of that receiver on the main display is shown or hidden (Panafall / Panadapter)
+        internal bool FtWaterfallOn(int rx) { string t = rx == 0 ? DisplayModeText : DisplayRX2ModeText; return t == "Panafall" || t == "Waterfall"; }
+        internal void FtShowWaterfall(int rx, bool on) { if (rx == 0) DisplayModeText = on ? "Panafall" : "Panadapter"; else DisplayRX2ModeText = on ? "Panafall" : "Panadapter"; }
+
         // the receiver that is not the transmit one (_digiRx) has to run in DIGU
         private void ftPrepareSecondReceiver()
         {
@@ -260,7 +276,7 @@ namespace BrickSDR
                 int other = 1 - _digiRx;
                 if (other == 1)
                 {
-                    if (!RX2Enabled) chkRX2.Checked = true;
+                    if (!RX2Enabled) { chkRX2.Checked = true; _ftDualOpenedRx2 = true; }
                     ftApplyDialRx(1);                                                      // DIGU on the FT8 / FT4 frequency of the band RX2 is on
                 }
                 else ftApplyDialRx(0);

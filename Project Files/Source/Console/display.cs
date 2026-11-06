@@ -3077,6 +3077,11 @@ namespace BrickSDR
         public static int BrickActiveRX = 1;
 
         // spectrum or its 3D view
+        private static readonly List<int>[] _brickEdgeX = { new List<int>(), new List<int>() };
+        private static readonly int[] _brickZeroX = { -1, -1 };               // the 0 Hz line of the last grid pass of each receiver, drawn again on top of the 3D ridges
+        private static readonly SharpDX.Direct2D1.Brush[] _brickZeroPen = new SharpDX.Direct2D1.Brush[2];
+        private static readonly float[] _brickZeroW = { 1f, 1f };
+
         private static void brickSpectrum(int nVerticalShift, int W, int H, int rx, bool bottom)
         {
             if (rx == 1 ? Use3DRX1 : Use3DRX2) Draw3DDX2D(nVerticalShift, W, H, rx);
@@ -3365,6 +3370,13 @@ namespace BrickSDR
             if (fr <= fl) fr = fl + 1;
             SharpDX.Direct2D1.Brush fb = getDXBrushForColour(Color.FromArgb(60, 255, 255, 255));
             if (fb != null) _d2dRenderTarget.FillRectangle(new RectangleF(fl, nVerticalShift, fr - fl, H), fb);
+
+            // the band edge lines in front of the ridges too
+            foreach (int ex in _brickEdgeX[rx == 2 ? 1 : 0].ToArray())
+                if (ex >= 0 && ex <= W) drawLineDX2D(m_bDX2_band_edge_pen, ex, nVerticalShift, ex, nVerticalShift + H);
+            int zx = _brickZeroX[rx == 2 ? 1 : 0];
+            SharpDX.Direct2D1.Brush zp = _brickZeroPen[rx == 2 ? 1 : 0];
+            if (zx >= 0 && zx <= W && zp != null) drawLineDX2D(zp, zx, nVerticalShift, zx, nVerticalShift + H, _brickZeroW[rx == 2 ? 1 : 0]);
         }
 
         public static float RX2SplitRatio
@@ -3403,7 +3415,7 @@ namespace BrickSDR
                         if (displayTargetWidth == _waterfall_bmp_dx2d.Size.Width)
                         {
                             // make copy only if widths equal
-                            int h = Math.Min(H - 20, (int)_waterfall_bmp_dx2d.Size.Height);
+                            int h = Math.Max(1, Math.Min(H - 20, (int)_waterfall_bmp_dx2d.Size.Height));
                             preservedRows = h;
 
                             tmp = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2((int)_waterfall_bmp_dx2d.Size.Width, h),
@@ -3419,7 +3431,7 @@ namespace BrickSDR
                         Utilities.Dispose(ref _waterfall_bmp_dx2d);
                         _waterfall_bmp_dx2d = null;
                     }
-                    _waterfall_bmp_dx2d = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2(displayTargetWidth, H - 20), new BitmapProperties(new SDXPixelFormat(_swapChain.Description.ModeDescription.Format, ALPHA_MODE)));
+                    _waterfall_bmp_dx2d = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2(Math.Max(1, displayTargetWidth), Math.Max(2, H - 20)), new BitmapProperties(new SDXPixelFormat(_swapChain.Description.ModeDescription.Format, ALPHA_MODE)));
                     clearWaterfallBitmapRegion(_waterfall_bmp_dx2d, 0, 0, displayTargetWidth, H - 20);
 
                     if (tmp != null)
@@ -3458,7 +3470,7 @@ namespace BrickSDR
                         if (displayTargetWidth == _waterfall_bmp2_dx2d.Size.Width)
                         {
                             // make copy only if widths equal
-                            int h = Math.Min(H - 20, (int)_waterfall_bmp2_dx2d.Size.Height);
+                            int h = Math.Max(1, Math.Min(H - 20, (int)_waterfall_bmp2_dx2d.Size.Height));
                             preservedRows = h;
 
                             tmp = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2((int)_waterfall_bmp2_dx2d.Size.Width, h),
@@ -3474,7 +3486,7 @@ namespace BrickSDR
                         Utilities.Dispose(ref _waterfall_bmp2_dx2d);
                         _waterfall_bmp2_dx2d = null;
                     }
-                    _waterfall_bmp2_dx2d = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2(displayTargetWidth, H - 20), new BitmapProperties(new SDXPixelFormat(_swapChain.Description.ModeDescription.Format, ALPHA_MODE)));
+                    _waterfall_bmp2_dx2d = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2(Math.Max(1, displayTargetWidth), Math.Max(2, H - 20)), new BitmapProperties(new SDXPixelFormat(_swapChain.Description.ModeDescription.Format, ALPHA_MODE)));
                     clearWaterfallBitmapRegion(_waterfall_bmp2_dx2d, 0, 0, displayTargetWidth, H - 20);
 
                     if (tmp != null)
@@ -7297,6 +7309,7 @@ namespace BrickSDR
                     }
 
                     int preservedBitmapHeight = (int)waterfallBitmap.Size.Height - (addRow ? 1 : 0);
+                    if (preservedBitmapHeight < 1 || (int)waterfallBitmap.Size.Width < 1) return false;     // the window was made so low that the waterfall is a pixel high: nothing to draw (Direct2D answers E_INVALIDARG)
                     topPixels = new SharpDX.Direct2D1.Bitmap(_d2dRenderTarget, new Size2((int)waterfallBitmap.Size.Width, preservedBitmapHeight), new BitmapProperties(new SDXPixelFormat(waterfallBitmap.PixelFormat.Format, ALPHA_MODE)));
 
                     topPixels.CopyFromBitmap(waterfallBitmap, new SharpDX.Point(0, 0), new SharpDX.Rectangle(0, 0, (int)topPixels.Size.Width, preservedBitmapHeight));
@@ -10000,6 +10013,7 @@ namespace BrickSDR
             }
 
             // Draw 0Hz vertical line if visible
+            if (!bIsWaterfall) _brickZeroX[rx == 2 ? 1 : 0] = -1;
             if ((!bIsWaterfall && show_zero_line) |
                 (bIsWaterfall && ((m_bShowRXZeroLineOnWaterfall & !local_mox) || (m_bShowTXZeroLineOnWaterfall & local_mox)))) // MW0LGE
             {
@@ -10009,6 +10023,7 @@ namespace BrickSDR
                     SharpDX.Direct2D1.Brush pnPen = local_mox ? m_bDX2_tx_grid_zero_pen : m_bDX2_grid_zero_pen;
 
                     drawLineDX2D(pnPen, center_line_x, nVerticalShift + top, center_line_x, nVerticalShift + H, pw);
+                    if (!bIsWaterfall) { _brickZeroX[rx == 2 ? 1 : 0] = center_line_x; _brickZeroPen[rx == 2 ? 1 : 0] = pnPen; _brickZeroW[rx == 2 ? 1 : 0] = pw; }
                 }
             }
 
@@ -10022,6 +10037,7 @@ namespace BrickSDR
 
             #region Band edges, H+V lines and labels
             m_bandEdgeRegionCacheDX2D.Update(console.CurrentRegion);
+            if (!bIsWaterfall) _brickEdgeX[rx == 2 ? 1 : 0].Clear();       // the band edge lines of this pass, drawn again on top of the 3D ridges
             int[] band_edge_list = m_bandEdgeRegionCacheDX2D.Edges;
 
             double vfo;
@@ -10091,6 +10107,7 @@ namespace BrickSDR
 
                     if (bBandEdge)
                     {
+                        if (!bIsWaterfall) _brickEdgeX[rx == 2 ? 1 : 0].Add(vgrid);
                         if (local_mox)
                         {
                             pnMajorLine = m_bDX2_tx_band_edge_pen;

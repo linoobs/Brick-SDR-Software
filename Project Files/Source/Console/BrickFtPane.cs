@@ -158,7 +158,7 @@ namespace BrickSDR
         {
             private readonly Console c;
             private readonly BrickBtn bFt8, bFt4, bAuto, bTx, bHalt, bCq, bClear, bLog;
-            private readonly BrickBtn bDual;
+            private readonly BrickBtn bDual, bRx1, bRx2;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
             private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
@@ -215,6 +215,10 @@ namespace BrickSDR
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
                 bDual = mk("Dual RX", 74, 24, null); bDual.Toggle = true; bDual.Checked = c._ftDual;
                 bDual.CheckedChanged += (s, e) => { if (setting) return; c.FtDual = bDual.Checked; };
+                bRx1 = mk("RX1", 46, 24, null); bRx1.Toggle = true; bRx1.Checked = c.FtWaterfallOn(0);
+                bRx2 = mk("RX2", 46, 24, null); bRx2.Toggle = true; bRx2.Checked = c.FtWaterfallOn(1);
+                bRx1.CheckedChanged += (s, e) => { if (!setting) c.FtShowWaterfall(0, bRx1.Checked); };
+                bRx2.CheckedChanged += (s, e) => { if (!setting) c.FtShowWaterfall(1, bRx2.Checked); };
 
                 wf.RxHz = () => c._ftRxHz; wf.TxHz = () => c._ftTxHz;
                 wf.Dim = r => c.FtIsDimmed(r);
@@ -261,7 +265,7 @@ namespace BrickSDR
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
                 Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, wf,
-                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, bDual, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
+                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, bDual, bRx1, bRx2, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
@@ -307,6 +311,7 @@ namespace BrickSDR
             {
                 bFt8.On = c._ftMode == "FT8"; bFt4.On = c._ftMode == "FT4";
                 if (bDual.Checked != c._ftDual) { bool was = setting; setting = true; bDual.Checked = c._ftDual; setting = was; }
+                { bool was = setting; setting = true; bRx1.Checked = c.FtWaterfallOn(0); bRx2.Checked = c.FtWaterfallOn(1); bRx2.Visible = c.RX2Enabled; setting = was; }       // RX1 / RX2: the waterfall of that receiver is on or off
                 c.FtSyncTxRx();                                         // Dual RX: the TX tag of VFO A / B is what decides the transmit receiver
                 activity.ShowBand = qso.ShowBand = c._ftDual;
                 bTx.On = c._ftTxEnable;
@@ -334,6 +339,8 @@ namespace BrickSDR
                 lblTxHz.Location = new Point(x, 40); x += lblTxHz.PreferredWidth + 4; txHz.Location = new Point(x, 37); x += txHz.Width + 12;
                 bAuto.Location = new Point(x, 37);
                 bDual.Location = new Point(bAuto.Right + 8, 37);
+                bRx1.Location = new Point(bDual.Right + 14, 37);
+                bRx2.Location = new Point(bRx1.Right + 4, 37);
                 // bottom: messages and TX
                 int rowY = h - 34;
                 bCq.Location = new Point(8, rowY);

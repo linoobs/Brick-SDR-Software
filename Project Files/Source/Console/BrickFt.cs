@@ -235,6 +235,23 @@ namespace BrickSDR
             }
         }
 
+        // the band the second receiver was on when it last had its dial set, to tell a band change (put it on the FT8 / FT4 frequency of the new band) from a mode change (Dual RX is over)
+        private Band _ftDualBand2 = Band.FIRST;
+
+        internal void ftApplyDialRx(int rx)
+        {
+            try
+            {
+                bool rx2 = rx == 1;
+                Band b = rx2 ? RX2Band : RX1Band;
+                _ftDualBand2 = RX2Band;
+                double[] f;
+                if (brickDigiFreq.TryGetValue(b, out f)) brickDigiSet(rx2, DSPMode.DIGU, f[_ftMode == "FT4" ? 1 : 0]);
+                else brickDigiSet(rx2, DSPMode.DIGU, null);
+            }
+            catch { }
+        }
+
         // the receiver that is not the transmit one (_digiRx) has to run in DIGU
         private void ftPrepareSecondReceiver()
         {
@@ -244,9 +261,9 @@ namespace BrickSDR
                 if (other == 1)
                 {
                     if (!RX2Enabled) chkRX2.Checked = true;
-                    if (_rx2_dsp_mode != DSPMode.DIGU) brickDigiSet(true, DSPMode.DIGU, null);
+                    ftApplyDialRx(1);                                                      // DIGU on the FT8 / FT4 frequency of the band RX2 is on
                 }
-                else if (_rx1_dsp_mode != DSPMode.DIGU) brickDigiSet(false, DSPMode.DIGU, null);
+                else ftApplyDialRx(0);
                 _ftStatus = "Dual RX: both receivers are decoded, set the band of each one";
             }
             catch { }

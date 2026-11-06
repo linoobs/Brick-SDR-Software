@@ -98,6 +98,31 @@ namespace BrickSDR
                 g.Clear(cField);
                 TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left;
                 using (Brush b = new SolidBrush(Color.FromArgb(34, 38, 52))) g.FillRectangle(b, 0, 0, Width, HeadH);
+                int cw = TextRenderer.MeasureText(g, "0", font, new Size(100, 100), TextFormatFlags.NoPadding).Width;          // the width of a digit of the lists: the heading words end where their numbers end
+                if (Compact)
+                {
+                    // the columns of this list are narrower: the heading words sit over them
+                    using (Font hf = new Font("Segoe UI Semibold", 9f))
+                    {
+                        TextRenderer.DrawText(g, "Your QSO", hf, new Rectangle(6, 0, 60, HeadH), cMuted, fl);
+                        TextRenderer.DrawText(g, "dB", hf, new Rectangle(66 + 3 * cw - 60, 0, 60, HeadH), cMuted, fl | TextFormatFlags.Right);
+                        TextRenderer.DrawText(g, "Hz", hf, new Rectangle(98 + 4 * cw - 60, 0, 60, HeadH), cMuted, fl | TextFormatFlags.Right);
+                        TextRenderer.DrawText(g, "message", hf, new Rectangle(140 + (ShowBand ? 34 : 0), 0, 120, HeadH), cMuted, fl);
+                    }
+                }
+                else if (Heading.StartsWith("Band"))
+                {
+                    using (Font hf = new Font("Segoe UI Semibold", 9f))
+                    {
+                        TextRenderer.DrawText(g, "Activity", hf, new Rectangle(6, 0, 60, HeadH), cMuted, fl);
+                        TextRenderer.DrawText(g, "dB", hf, new Rectangle(66 + 3 * cw - 60, 0, 60, HeadH), cMuted, fl | TextFormatFlags.Right);
+                        TextRenderer.DrawText(g, "DT", hf, new Rectangle(108 + 4 * cw - 60, 0, 60, HeadH), cMuted, fl | TextFormatFlags.Right);
+                        TextRenderer.DrawText(g, "Hz", hf, new Rectangle(158 + 4 * cw - 60, 0, 60, HeadH), cMuted, fl | TextFormatFlags.Right);
+                        if (ShowBand) TextRenderer.DrawText(g, "band", hf, new Rectangle(212, 0, 40, HeadH), cMuted, fl);
+                        TextRenderer.DrawText(g, "message", hf, new Rectangle(212 + (ShowBand ? 38 : 0), 0, 120, HeadH), cMuted, fl);
+                    }
+                }
+                else
                 TextRenderer.DrawText(g, Heading, new Font("Segoe UI Semibold", 9f), new Rectangle(6, 0, Width, HeadH), cMuted, fl);
                 int y = HeadH + 1;
                 for (int i = top; i < Items.Count && y < Height; i++, y += RowH)
@@ -120,10 +145,10 @@ namespace BrickSDR
                         if (!Compact) TextRenderer.DrawText(g, r.Dt.ToString("0.0", CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(108, y, 44, RowH), kTextDim, fl);
                     }
                     else TextRenderer.DrawText(g, "Tx", bold, new Rectangle(66, y, 40, RowH), fore, fl);
-                    TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 106 : 158, y, 44, RowH), kTextDim, fl);
-                    if (ShowBand) TextRenderer.DrawText(g, r.Band, bold, new Rectangle(Compact ? 158 : 212, y, 38, RowH), r.Rx == 1 ? Color.FromArgb(110, 170, 255) : Color.FromArgb(255, 170, 60), fl);
-                    if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle((Compact ? 158 : 212) + (ShowBand ? 38 : 0), y, Math.Max(10, Width - ((Compact ? 158 : 212) + (ShowBand ? 38 : 0))), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
-                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle((Compact ? 158 : 212) + (ShowBand ? 38 : 0), y, Math.Max(10, Width - ((Compact ? 158 : 212) + (ShowBand ? 38 : 0))), RowH), fore, fl | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 98 : 158, y, 44, RowH), kTextDim, fl);
+                    if (ShowBand) TextRenderer.DrawText(g, r.Band, bold, new Rectangle(Compact ? 140 : 212, y, 38, RowH), r.Rx == 1 ? Color.FromArgb(110, 170, 255) : Color.FromArgb(255, 170, 60), fl);
+                    if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle((Compact ? 140 : 212) + (ShowBand ? (Compact ? 34 : 38) : 0), y, Math.Max(10, Width - ((Compact ? 140 : 212) + (ShowBand ? (Compact ? 34 : 38) : 0))), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle((Compact ? 140 : 212) + (ShowBand ? (Compact ? 34 : 38) : 0), y, Math.Max(10, Width - ((Compact ? 140 : 212) + (ShowBand ? (Compact ? 34 : 38) : 0))), RowH), fore, fl | TextFormatFlags.EndEllipsis);
                 }
                 using (Pen p = new Pen(cLine)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
             }
@@ -327,7 +352,7 @@ namespace BrickSDR
                 int top = 70 + (wfH > 40 ? wfH + 4 : 0), bot = slotBar.Top - 4;
                 wf.Visible = wfH > 40;
                 if (wfH > 40) wf.SetBounds(8, 70, w - 16, wfH);
-                int lw = (int)((w - 24) * 0.58);
+                int lw = Math.Max(300, Math.Min((int)((w - 24) * 0.58), w - 24 - 350));      // the QSO list on the right keeps at least 350 px: a reply to a call with the band mark must fit
                 activity.SetBounds(8, top, lw, Math.Max(40, bot - top));
                 qso.SetBounds(8 + lw + 8, top, w - 24 - lw, Math.Max(40, bot - top));
             }

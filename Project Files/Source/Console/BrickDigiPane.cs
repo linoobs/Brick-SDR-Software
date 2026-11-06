@@ -114,6 +114,7 @@ namespace BrickSDR
                 Controls.AddRange(new Control[] { title, lblMy, my, lblTheir, their, bClear, bPop, bLog, settings, rxFrame, meter, status, type, bTx, bEnd, bAbort });
                 foreach (BrickBtn b in macroButtons) Controls.Add(b);
                 settings.Controls.AddRange(new Control[] { lblDec, decoder, lblShift, shift, lblBaud, baud, rev, afc, lblSql, rsql, lblLevel, rlevel, csql, lblWpm, wpm });
+                lblLevel.Visible = false; rlevel.Visible = false;     // the RTTY audio is full scale, the Drive slider sets the power
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
                 VisibleChanged += (s, e) => { if (Visible) { layout(); timer.Start(); } else timer.Stop(); };
@@ -144,7 +145,7 @@ namespace BrickSDR
                 mode = m;
                 title.Text = m == "RTTY" ? "RTTY" : "CW";
                 bool r = m == "RTTY";
-                foreach (Control k in new Control[] { lblShift, shift, lblBaud, baud, rev, afc, lblLevel, rlevel, rsql }) k.Visible = r;
+                foreach (Control k in new Control[] { lblShift, shift, lblBaud, baud, rev, afc, rsql }) k.Visible = r;     // no TX level: the audio is full scale, Drive sets the power
                 foreach (Control k in new Control[] { lblWpm, wpm, csql }) k.Visible = !r;
                 lblSql.Visible = true;
                 foreach (Control k in new Control[] { lblDec, decoder }) k.Visible = !r;
@@ -172,10 +173,10 @@ namespace BrickSDR
                     ctl.Top = ctl is Label ? (settings.Height - ctl.Height) / 2 : (settings.Height - ctl.Height) / 2;
                     x += ctl.Width + gap;
                 };
-                foreach (Label l in new[] { lblShift, lblBaud, lblSql, lblLevel, lblWpm }) { l.AutoSize = true; }
+                foreach (Label l in new[] { lblShift, lblBaud, lblSql, lblWpm }) { l.AutoSize = true; }
                 if (mode == "RTTY")
                 {
-                    put(lblShift, 4); put(shift, 12); put(lblBaud, 4); put(baud, 12); put(rev, 6); put(afc, 14); put(lblSql, 4); put(rsql, 12); put(lblLevel, 4); put(rlevel, 0);
+                    put(lblShift, 4); put(shift, 12); put(lblBaud, 4); put(baud, 12); put(rev, 6); put(afc, 14); put(lblSql, 4); put(rsql, 0);
                 }
                 else
                 {
@@ -273,7 +274,7 @@ namespace BrickSDR
                     if (d != null)
                     {
                         meter.Value = d.Quality;
-                        stats = string.Format(CultureInfo.InvariantCulture, "Quality {0:0}%   tones centre {1:0} Hz", d.Quality * 100, d.Center);
+                        stats = string.Format(CultureInfo.InvariantCulture, "Quality {0:0}%   tones centre {1:0} Hz", d.Quality * 100, d.Center) + c.RttyMarkText();
                     }
                     hintText = c.RttyTransmitting ? "TRANSMITTING" : (ok ? "" : "Use DIGL / LSB");
                     status.ForeColor = c.RttyTransmitting ? cTx : cMuted;

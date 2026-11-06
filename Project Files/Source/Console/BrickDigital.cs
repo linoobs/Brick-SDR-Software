@@ -354,20 +354,43 @@ namespace BrickSDR
             return upper ? new[] { mark, space } : new[] { -mark, -space };
         }
 
+        // The mark tone is the one of the RTTY Offset of Thetis (Setup, CAT Control: 2125 Hz, DIGL / DIGU); the centre of the two tones follows from it and the shift.
+        // 'rev' is the swap of mark and space (Reverse xor upper sideband), as in rttyApplyParams.
+        private double rttyNominalCentre(bool rev)
+        {
+            double mark = 2125, h = _rttyShift / 2;
+            try { if (!IsSetupFormNull) mark = rttyUpperSideband ? SetupForm.RttyOffsetHigh : SetupForm.RttyOffsetLow; } catch { }
+            if (mark < 300 || mark > 3000) mark = 2125;
+            return rev ? mark - h : mark + h;
+        }
+
+        // " mark 14.08897 MHz": the radio frequency of the mark tone, what the other station calls the RTTY frequency
+        internal string RttyMarkText()
+        {
+            RttyDemod d = _rttyDemod;
+            if (d == null) return "";
+            double h = _rttyShift / 2, c = d.Center;
+            bool upper = rttyUpperSideband;
+            double mark = (_rttyReverse ^ upper) ? c + h : c - h;
+            double dial = _digiRx == 0 ? VFOAFreq : VFOBFreq;
+            double rf = upper ? dial + mark / 1e6 : dial - mark / 1e6;
+            return string.Format(CultureInfo.InvariantCulture, "   mark {0:0.00000} MHz", rf);
+        }
+
         private void rttyApplyParams()
         {
             bool rev = _rttyReverse ^ rttyUpperSideband;
             if (_rttyDemod != null)
             {
-                _rttyDemod.Nominal = 2210; _rttyDemod.Afc = _rttyAfc; _rttyDemod.Shift = _rttyShift; _rttyDemod.Baud = _rttyBaud;
+                _rttyDemod.Nominal = rttyNominalCentre(rev); _rttyDemod.Afc = _rttyAfc; _rttyDemod.Shift = _rttyShift; _rttyDemod.Baud = _rttyBaud;
                 _rttyDemod.Reverse = rev; _rttyDemod.UnshiftOnSpace = true;
                 _rttyDemod.Squelch = _rttySql / 100.0;
                 _rttyDemod.MinConfidence = 0.3 + _rttySql / 200.0;
             }
             if (_rttyMod != null)
             {
-                _rttyMod.Center = _rttyDemod != null ? _rttyDemod.Center : 2210; _rttyMod.Shift = _rttyShift; _rttyMod.Baud = _rttyBaud; _rttyMod.Reverse = rev;
-                _rttyMod.Amplitude = (float)Math.Pow(10, _rttyLevel / 20.0);
+                _rttyMod.Center = _rttyDemod != null ? _rttyDemod.Center : rttyNominalCentre(rev); _rttyMod.Shift = _rttyShift; _rttyMod.Baud = _rttyBaud; _rttyMod.Reverse = rev;
+                _rttyMod.Amplitude = 1f;     // full scale: the Drive slider sets the power, as in the other modes
             }
         }
 

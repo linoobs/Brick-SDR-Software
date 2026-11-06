@@ -18,7 +18,7 @@ $msiVer = $vm.Groups[1].Value + '.' + $vm.Groups[2].Value + '.' + $build      # 
 $out = Join-Path $root ("BrickSDR-Setup_" + $ver + ".msi")
 $ico = Join-Path $root 'Project Files\Source\Console\Resources\Brick-SDR-icon.ico'
 $wix = Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe'
-& $wix build (Join-Path $root 'Installer\Product.wxs') -arch x64 -ext WixToolset.Firewall.wixext `
-    -d "Version=$msiVer" -d "StageDir=$stage" -d "IconFile=$ico" `
+& $wix build (Join-Path $root 'Installer\Product.wxs') -arch x64 -ext WixToolset.Firewall.wixext -ext WixToolset.UI.wixext -loc (Join-Path $root 'Installer\Product.wxl') `
+    -d "Version=$msiVer" -d "StageDir=$stage" -d "IconFile=$ico" -d ("LicenseRtf=" + (Join-Path $root 'Installer\License.rtf')) `
     -pdbtype none -o $out
 Get-Item $out | Select-Object Name, Length

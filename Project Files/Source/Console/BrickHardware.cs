@@ -186,6 +186,11 @@ namespace BrickSDR
                 {
                     ptbPWR.Maximum = 100; ptbPWR.LargeChange = 1; ptbPWR.SmallChange = 1;
                     ptbTune.Maximum = 100; ptbTune.LargeChange = 1; ptbTune.SmallChange = 1;
+                    // the per-band limit bars were cut to the Hermes Lite 2 maximum (90 / 99) while that model was set and kept in the database
+                    for (int i = 0; i < limitPower_by_band.Length; i++) if (limitPower_by_band[i] == 90) limitPower_by_band[i] = 100;
+                    for (int i = 0; i < limitTunePower_by_band.Length; i++) if (limitTunePower_by_band[i] == 99) limitTunePower_by_band[i] = 100;
+                    ptbPWR.LimitValue = limitPower_by_band[(int)TXBand];
+                    ptbTune.LimitValue = limitTunePower_by_band[(int)TXBand];
                     udRX1StepAttData.Minimum = 0; udRX2StepAttData.Minimum = 0; udTXStepAttData.Minimum = 0;
                     if (udRX1StepAttData.Maximum < 31) udRX1StepAttData.Maximum = 31;
                     if (udRX2StepAttData.Maximum < 31) udRX2StepAttData.Maximum = 31;

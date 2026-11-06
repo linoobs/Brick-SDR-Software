@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-US" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="WelcomeDlgTitle" Value="Welcome to the [ProductName] Setup" />
+  <String Id="WelcomeDlgDescription" Value="This wizard installs [ProductName] on your computer. It takes about a minute.&#xD;&#xA;&#xD;&#xA;Close Brick-SDR first if it is running. Your settings and logs stay where they are (in %APPDATA%\OpenHPSDR\Brick-SDR-x64), so an update keeps your configuration. A version installed with the old .exe installer is not replaced: remove it first in Windows Settings, Apps.&#xD;&#xA;&#xD;&#xA;Click Next to continue." />
+  <String Id="ExitDialogTitle" Value="[ProductName] is installed" />
+  <String Id="ExitDialogDescription" Value="Brick-SDR is in the Start menu and on the desktop. A Windows Firewall rule for the program was added, so the radio can answer.&#xD;&#xA;&#xD;&#xA;At the first start: connect the radio to the network, open Setup, Radio list and select it, then press POWER.&#xD;&#xA;&#xD;&#xA;Click Finish to close the wizard." />
+</WixLocalization>

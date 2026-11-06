@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Brick-SDR Windows Installer package (WiX 5). Built by build-msi.ps1, which passes Version, StageDir and IconFile. -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="Brick-SDR" Manufacturer="Brick-SDR project" Version="$(Version)" UpgradeCode="7C0F2B1E-4D3A-4F6B-9A55-8E21B3C4D5F7"
            Scope="perMachine" InstallerVersion="500" Compressed="yes">
     <SummaryInformation Description="Brick-SDR - SDR transceiver software for HPSDR, Hermes Lite 2 and Brick radios" />
@@ -15,6 +15,16 @@
     </StandardDirectory>
     <StandardDirectory Id="ProgramMenuFolder" />
     <StandardDirectory Id="DesktopFolder" />
+
+    <!-- install wizard: welcome, license, folder, progress, finish with "Start Brick-SDR" -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(LicenseRtf)" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start Brick-SDR" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction Id="LaunchBrick" FileRef="BrickExe" ExeCommand="" Return="asyncNoWait" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchBrick" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed" />
+    </UI>
 
     <Feature Id="Main" Title="Brick-SDR" Level="1">
       <ComponentGroupRef Id="AppFiles" />

@@ -1195,15 +1195,7 @@ namespace BrickSDR
                     "\\OpenHPSDR\\Skins";
             _skinPath = path;
 
-            if (!Directory.Exists(path))
-            {
-                MessageBox.Show("The console presentation files (skins) were not found.\n" +
-                    "Appearance will suffer until this is rectified.\n",
-                    "Skins files not found",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST); //MW0LGE_[2.9.0.7]);
-                return;
-            }
+            if (!Directory.Exists(path)) return;     // Brick-SDR has no skins: nothing to warn about
 
             foreach (string d in Directory.GetDirectories(path))
             {
@@ -1214,15 +1206,6 @@ namespace BrickSDR
 
             btnRemoveSkin.Enabled = comboAppSkin.Items.Count > 1;
 
-            if (comboAppSkin.Items.Count == 0)
-            {
-                MessageBox.Show("The console presentation files (skins) were not found.\n" +
-                    "Appearance will suffer until this is rectified.\n",
-                    "Skins files not found",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error, MessageBoxDefaultButton.Button1, Common.MB_TOPMOST); //MW0LGE_[2.9.0.7]);
-                return;
-            }
         }
         private void selectSkin()
         {

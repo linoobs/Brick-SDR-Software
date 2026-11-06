@@ -11,8 +11,20 @@ namespace BrickSDR
 
         // NR3 / NR4 are both served by the neural noise reduction (NNR) of WDSP 2.11,
         // only the reduction depth is adjustable
+        // there are no skins in Brick-SDR (the interface is built in code): the skin list, Remove and Open Skins Folder go,
+        // the two background options stay
+        private void BrickHideSkins()
+        {
+            comboAppSkin.Visible = false; btnRemoveSkin.Visible = false; btnOpenSkinsFolder.Visible = false;
+            grpAppSkins.Text = "Spectrum background";
+            chkDisablePicDisplayBackgroundImage.Top = comboAppSkin.Top + 2;
+            chkMaintainBackgroundAspectRatio.Top = chkDisablePicDisplayBackgroundImage.Bottom + 6;
+            grpAppSkins.Height = chkMaintainBackgroundAspectRatio.Bottom + 12;
+        }
+
         public void BrickSimplifyNR()
         {
+            BrickHideSkins();
             BrickAddRadeMeterOption();
             BrickAddDigiModesTab();
             grpRNnoise.Visible = false;

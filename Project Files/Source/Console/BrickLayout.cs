@@ -448,7 +448,7 @@ namespace BrickSDR
             boxB.Title = "VFO B";
             boxB.GetFreq = () => VFOBFreq;
             boxB.SetFreq = v => { if (!(_mox && VFOBTX)) VFOBFreq = v; };
-            boxB.IsActive = () => chkRX2.Checked || VFOBTX;
+            boxB.IsActive = () => chkRX2.Checked || VFOBTX || chkEnableMultiRX.Checked;       // SUB-RX uses VFO B as RX2 does: the box is lit
             boxB.IsTransmitting = () => _mox && VFOBTX;
             boxB.SetBounds(842, 6, 244, 92);
             pnlTop.Controls.Add(boxB);
@@ -893,6 +893,8 @@ namespace BrickSDR
             // moving an AF slider by hand changes the base the mix works from
             ptbRX1AF.Scroll += (s, e) => { if (!mixing) { double f = fade1(mix.Value); base1 = f > 0.05 ? ptbRX1AF.Value / f : ptbRX1AF.Value; } };
             ptbRX2AF.Scroll += (s, e) => { if (!mixing) { double f = fade2(mix.Value); base2 = f > 0.05 ? ptbRX2AF.Value / f : ptbRX2AF.Value; } };
+            ptbRX2AF.Scroll += (s, e) => { if (chkEnableMultiRX.Checked && !chkRX2.Checked) { ptbRX1Gain.Value = Math.Max(ptbRX1Gain.Minimum, Math.Min(ptbRX1Gain.Maximum, ptbRX2AF.Value)); ptbRX1Gain_Scroll(this, EventArgs.Empty); } };
+            chkEnableMultiRX.CheckedChanged += (s, e) => brickUpdateRx2Enabled();
             rx2OnlyControls.AddRange(new Control[] { mixLbl, mixVal, mix, mixCtr });
             rx2OnlyControls.AddRange(new Control[] { lblRX2AF, ptbRX2AF, lblRX2RF, ptbRX2RF, chkRX2Squelch, ptbRX2Squelch, lblRX2AGC });
             rx2OnlyControls.AddRange(agc2);
@@ -1271,6 +1273,10 @@ namespace BrickSDR
         {
             bool on = chkRX2.Checked;
             foreach (Control c in rx2OnlyControls) c.Enabled = on;
+            // SUB-RX (RX2 off) works like RX2 without opening it: the RX2 AF slider is its volume
+            bool sub = chkEnableMultiRX.Checked && !on;
+            lblRX2AF.Enabled = on || sub; ptbRX2AF.Enabled = on || sub;
+            if (sub && ptbRX1Gain.Value != ptbRX2AF.Value) { ptbRX1Gain.Value = Math.Max(ptbRX1Gain.Minimum, Math.Min(ptbRX1Gain.Maximum, ptbRX2AF.Value)); ptbRX1Gain_Scroll(this, EventArgs.Empty); }
             foreach (Control c in new Control[] { chkRX2DisplayPeak, chkRX2DisplayAVG, chkX2TR }) c.Enabled = on;
             layoutTop();
         }

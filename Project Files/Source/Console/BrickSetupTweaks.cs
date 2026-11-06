@@ -19,7 +19,13 @@ namespace BrickSDR
             grpAppSkins.Text = "Spectrum background";
             chkDisablePicDisplayBackgroundImage.Top = comboAppSkin.Top + 2;
             chkMaintainBackgroundAspectRatio.Top = chkDisablePicDisplayBackgroundImage.Bottom + 6;
-            grpAppSkins.Height = chkMaintainBackgroundAspectRatio.Bottom + 12;
+            // the "General" block of Appearance does nothing in this interface (LED font, button and slider limit colours, dark title bars) except
+            // "Allow smeared waterfalls": that one moves up next to the background options, the block goes
+            chkWaterfall_smear.Parent = grpAppSkins;
+            chkWaterfall_smear.Location = new Point(chkMaintainBackgroundAspectRatio.Left, chkMaintainBackgroundAspectRatio.Bottom + 4);
+            grpAppSkins.Height = chkWaterfall_smear.Bottom + 12;
+            groupBoxTS31.Visible = false;
+            groupBoxTS70.Top = grpAppSkins.Bottom + 8;
         }
 
         public void BrickSimplifyNR()

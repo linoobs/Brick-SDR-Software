@@ -221,3 +221,36 @@ namespace BrickSDR
         }
     }
 }
+
+namespace BrickSDR
+{
+    public partial class Console
+    {
+        // the band plan calls 14.074 "20M RTTY"; a receiver in DIGU / DIGL on the FT8 or FT4 frequency of its band is labelled "20M FT8" / "20M FT4"
+        private string brickFtLabel(string info, double mhz, DSPMode m)
+        {
+            try
+            {
+                if (m != DSPMode.DIGU && m != DSPMode.DIGL) return info;
+                Band b = BandByFreq(mhz, -1, current_region);
+                double[] f;
+                if (!brickDigiFreq.TryGetValue(b, out f)) return info;
+                string tag = null;
+                if (mhz >= f[0] - 0.0005 && mhz <= f[0] + 0.0030) tag = "FT8";
+                else if (mhz >= f[1] - 0.0005 && mhz <= f[1] + 0.0030) tag = "FT4";
+                if (tag == null) return info;
+                int sp = (info ?? "").IndexOf(' ');
+                return ((sp > 0 ? info.Substring(0, sp) : "") + " " + tag).Trim();
+            }
+            catch { return info; }
+        }
+
+        // Dual RX: the transmit receiver is the one whose VFO transmits (the TX tag of VFO A / VFO B)
+        internal void FtSyncTxRx()
+        {
+            if (!_ftDual || _ftTxActive) return;
+            int rx = chkVFOBTX.Checked ? 1 : 0;
+            if (rx != _digiRx) _digiRx = rx;
+        }
+    }
+}

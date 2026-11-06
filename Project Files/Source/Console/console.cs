@@ -32460,7 +32460,7 @@ namespace BrickSDR
                 txtVFOABand.BackColor = band_background_color;
 
             if (!(rx2_enabled && (chkEnableMultiRX.Checked || chkVFOSplit.Checked)))
-                txtVFOABand.Text = bandInfo;
+                txtVFOABand.Text = brickFtLabel(bandInfo, freq, _rx1_dsp_mode);
 
             Band b = BandByFreq(freq, rx1_xvtr_index, current_region);
             if (b != rx1_band)
@@ -33499,7 +33499,7 @@ namespace BrickSDR
             else
                 txtVFOBBand.BackColor = band_background_color;
 
-            txtVFOBBand.Text = bandInfo;
+            txtVFOBBand.Text = brickFtLabel(bandInfo, freq, _rx2_dsp_mode);
 
             Band lo_band = Band.FIRST;
             Band lo_banda = Band.FIRST;

@@ -127,6 +127,7 @@ namespace BrickSDR
 
         internal void brickFtClose()
         {
+            ftShowAllReceivers();
             ftDualRelease();
             _ftTxEnable = false;
             ftAbortTx();
@@ -138,6 +139,7 @@ namespace BrickSDR
         // the window is gone for another one (or the mode no longer fits)
         private void ftRelease()
         {
+            ftShowAllReceivers();
             ftDualRelease();
             _ftTxEnable = false;
             ftAbortTx();
@@ -245,6 +247,7 @@ namespace BrickSDR
         private bool _ftDualOpenedRx2;
         private void ftDualRelease()
         {
+            ftShowAllReceivers();
             if (!_ftDualOpenedRx2) return;
             _ftDualOpenedRx2 = false;
             try { if (RX2Enabled) chkRX2.Checked = false; } catch { }
@@ -264,9 +267,20 @@ namespace BrickSDR
             catch { }
         }
 
-        // the RX1 / RX2 buttons of the window: the waterfall of that receiver on the main display is shown or hidden (Panafall / Panadapter)
-        internal bool FtWaterfallOn(int rx) { string t = rx == 0 ? DisplayModeText : DisplayRX2ModeText; return t == "Panafall" || t == "Waterfall"; }
-        internal void FtShowWaterfall(int rx, bool on) { if (rx == 0) DisplayModeText = on ? "Panafall" : "Panadapter"; else DisplayRX2ModeText = on ? "Panafall" : "Panadapter"; }
+        // the RX1 / RX2 buttons of the window: the whole display of that receiver (spectrum and waterfall) is shown or hidden; at least one stays
+        private bool _ftHide1, _ftHide2;
+        internal bool FtWaterfallOn(int rx) { return !(rx == 0 ? _ftHide1 : _ftHide2); }
+        internal void FtShowWaterfall(int rx, bool on)
+        {
+            bool h1 = _ftHide1, h2 = _ftHide2;
+            if (rx == 0) h1 = !on; else h2 = !on;
+            if (h1 && h2) return;
+            _ftHide1 = h1; _ftHide2 = h2;
+            Display.BrickHide = h1 ? 1 : h2 ? 2 : 0;
+        }
+        // every receiver is back on the display (the window closes, RX2 goes off)
+        private void ftShowAllReceivers() { _ftHide1 = false; _ftHide2 = false; Display.BrickHide = 0; }
+
 
         // the receiver that is not the transmit one (_digiRx) has to run in DIGU
         private void ftPrepareSecondReceiver()

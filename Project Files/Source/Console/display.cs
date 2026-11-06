@@ -3392,7 +3392,21 @@ namespace BrickSDR
                 if (_rx2_enabled && _bDX2Setup && displayTargetHeight > 0) { ResetWaterfallBmp(); ResetWaterfallBmp2(); }
             }
         }
-        public static int SplitY(int totalHeight) { return (int)(totalHeight * _rx2SplitRatio); }
+        // Brick-SDR: the FT8 window can hide a receiver completely (1 = RX1, 2 = RX2): the other one gets the whole display
+        private static int _brickHide = 0;
+        public static int BrickHide
+        {
+            get { return _brickHide; }
+            set
+            {
+                if (_brickHide == value) return;
+                _brickHide = value;
+                _bRebuildRXLinearGradBrush = true;
+                _bRebuildTXLinearGradBrush = true;
+                if (_rx2_enabled && _bDX2Setup && displayTargetHeight > 0) { ResetWaterfallBmp(); ResetWaterfallBmp2(); }
+            }
+        }
+        public static int SplitY(int totalHeight) { if (_brickHide == 1) return 0; if (_brickHide == 2) return totalHeight; return (int)(totalHeight * _rx2SplitRatio); }
 
         private static void ResetWaterfallBmp()
         {
@@ -4472,6 +4486,7 @@ namespace BrickSDR
                         int splitTop = SplitY(displayTargetHeight);
                         m_nRX1DisplayHeight = splitTop;
 
+                        if (splitTop > 8)
                         switch (current_display_mode)
                         {
                             case DisplayMode.SPECTRUM:
@@ -4510,6 +4525,7 @@ namespace BrickSDR
 
                         m_nRX2DisplayHeight = displayTargetHeight - splitTop;
 
+                        if (m_nRX2DisplayHeight > 8)
                         switch (current_display_mode_bottom)
                         {
 
@@ -4529,6 +4545,7 @@ namespace BrickSDR
                                 break;
                         }
                         // Brick-SDR: outline both receivers (the selected one in the accent colour) and a bright divider between them
+                        if (_brickHide == 0)
                         {
                             Color act = Color.FromArgb(255, 255, 140, 30), dim = Color.FromArgb(150, 90, 98, 120);
                             SharpDX.Direct2D1.Brush bTop = getDXBrushForColour(BrickActiveRX == 1 ? act : dim);

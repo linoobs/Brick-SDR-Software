@@ -311,7 +311,7 @@ namespace BrickSDR
             {
                 bFt8.On = c._ftMode == "FT8"; bFt4.On = c._ftMode == "FT4";
                 if (bDual.Checked != c._ftDual) { bool was = setting; setting = true; bDual.Checked = c._ftDual; setting = was; }
-                { bool was = setting; setting = true; bRx1.Checked = c.FtWaterfallOn(0); bRx2.Checked = c.FtWaterfallOn(1); bRx2.Visible = c.RX2Enabled; setting = was; }       // RX1 / RX2: the waterfall of that receiver is on or off
+                { bool was = setting; setting = true; bRx1.Checked = c.FtWaterfallOn(0); bRx2.Checked = c.FtWaterfallOn(1); bRx1.Visible = c.RX2Enabled; bRx2.Visible = c.RX2Enabled; setting = was; }       // RX1 / RX2: the waterfall of that receiver is on or off
                 c.FtSyncTxRx();                                         // Dual RX: the TX tag of VFO A / B is what decides the transmit receiver
                 activity.ShowBand = qso.ShowBand = c._ftDual;
                 bTx.On = c._ftTxEnable;

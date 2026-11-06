@@ -20,6 +20,7 @@ namespace BrickSDR
             public readonly List<FtRow> Items = new List<FtRow>();
             public string Heading = "";
             public bool Compact;                    // no DT column: the QSO list is the narrower one
+            public bool ShowBand;                   // Dual RX: the band of every station is shown in front of the message
             public Func<FtRow, bool> Accept = r => true;
             public event Action<FtRow> Picked;                 // a click: the station is selected
             public event Action<FtRow> Activated;              // a double click: select and enable the transmitter
@@ -120,8 +121,9 @@ namespace BrickSDR
                     }
                     else TextRenderer.DrawText(g, "Tx", bold, new Rectangle(66, y, 40, RowH), fore, fl);
                     TextRenderer.DrawText(g, ((int)Math.Round(r.Hz)).ToString(CultureInfo.InvariantCulture).PadLeft(4), font, new Rectangle(Compact ? 106 : 158, y, 44, RowH), kTextDim, fl);
-                    if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
-                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle(Compact ? 158 : 212, y, Math.Max(10, Width - (Compact ? 158 : 212)), RowH), fore, fl | TextFormatFlags.EndEllipsis);
+                    if (ShowBand) TextRenderer.DrawText(g, r.Band, bold, new Rectangle(Compact ? 158 : 212, y, 38, RowH), r.Rx == 1 ? Color.FromArgb(110, 170, 255) : Color.FromArgb(255, 170, 60), fl);
+                    if (warn) TextRenderer.DrawText(g, Warn(r), font, new Rectangle((Compact ? 158 : 212) + (ShowBand ? 38 : 0), y, Math.Max(10, Width - ((Compact ? 158 : 212) + (ShowBand ? 38 : 0))), RowH), Color.FromArgb(150, 110, 40), fl | TextFormatFlags.Right | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, r.Text, r.ToMe || r.Sent || r.Cq ? bold : font, new Rectangle((Compact ? 158 : 212) + (ShowBand ? 38 : 0), y, Math.Max(10, Width - ((Compact ? 158 : 212) + (ShowBand ? 38 : 0))), RowH), fore, fl | TextFormatFlags.EndEllipsis);
                 }
                 using (Pen p = new Pen(cLine)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
             }
@@ -131,6 +133,7 @@ namespace BrickSDR
         {
             private readonly Console c;
             private readonly BrickBtn bFt8, bFt4, bAuto, bTx, bHalt, bCq, bClear, bLog;
+            private readonly BrickBtn bDual, bTxRx;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
             private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
@@ -185,6 +188,9 @@ namespace BrickSDR
                 txHz.ValueChanged += (s, e) => { if (setting) return; c._ftTxHz = (int)txHz.Value; c.digiSaveSettings(); };
                 bAuto = mk("Auto-sequence", 112, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
+                bDual = mk("Dual RX", 74, 24, null); bDual.Toggle = true; bDual.Checked = c._ftDual;
+                bDual.CheckedChanged += (s, e) => { if (setting) return; c.FtDual = bDual.Checked; };
+                bTxRx = mk("TX RX1", 128, 24, () => c.FtToggleTxRx());
 
                 wf.RxHz = () => c._ftRxHz; wf.TxHz = () => c._ftTxHz;
                 wf.Dim = r => c.FtIsDimmed(r);
@@ -231,7 +237,7 @@ namespace BrickSDR
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
                 Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, wf,
-                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
+                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, bDual, bTxRx, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
@@ -276,6 +282,10 @@ namespace BrickSDR
             private void sync()
             {
                 bFt8.On = c._ftMode == "FT8"; bFt4.On = c._ftMode == "FT4";
+                if (bDual.Checked != c._ftDual) { bool was = setting; setting = true; bDual.Checked = c._ftDual; setting = was; }
+                bTxRx.Visible = c._ftDual;
+                bTxRx.Text = "TX " + c.FtTxBandText;
+                activity.ShowBand = qso.ShowBand = c._ftDual;
                 bTx.On = c._ftTxEnable;
                 bTx.Text = c._ftTxEnable ? "TX enabled" : "Enable TX";
                 bCq.On = c._ftMsgNo == 6 && c._ftCustom.Length == 0;
@@ -300,6 +310,8 @@ namespace BrickSDR
                 lblRxHz.Location = new Point(x, 40); x += lblRxHz.PreferredWidth + 4; rxHz.Location = new Point(x, 37); x += rxHz.Width + 12;
                 lblTxHz.Location = new Point(x, 40); x += lblTxHz.PreferredWidth + 4; txHz.Location = new Point(x, 37); x += txHz.Width + 12;
                 bAuto.Location = new Point(x, 37);
+                bDual.Location = new Point(bAuto.Right + 8, 37);
+                bTxRx.Location = new Point(bDual.Right + 6, 37);
                 // bottom: messages and TX
                 int rowY = h - 34;
                 bCq.Location = new Point(8, rowY);

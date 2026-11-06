@@ -86,6 +86,7 @@ namespace BrickSDR
                         if (!fits) digiClose();
                     }
                     if (brickDockKey == "ft" && _digiRx == i && m != DSPMode.DIGU) brickFtClose();       // LSB / USB and the rest take the receiver away from FT8 / FT4
+                    if (brickDockKey == "ft" && _ftDual && _digiRx != i && m != DSPMode.DIGU) FtDual = false;          // the second receiver left DIGU: Dual RX is over
                     if (_radeStrip != null && brickDockKey == "rade" && _radeStrip.Rx == i && !digital && !(RadeEnabledOn(i) && m == _radeForcedMode[i])) brickRadeClose();
                     brickEnsureSsbLeveler();
                 }

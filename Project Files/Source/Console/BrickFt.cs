@@ -29,6 +29,9 @@ namespace BrickSDR
             public string Text = "";
             public bool Even, Sent, ToMe, Cq;
             public string Sender = "", Country = "";            // who sent it and from which country (from the call sign)
+            public int Rx;                                       // the receiver it was heard on (Dual RX), with the band and the dial frequency of that moment
+            public string Band = "";
+            public double DialMHz;
         }
 
         private BrickFtPane _ftPane;
@@ -152,17 +155,21 @@ namespace BrickSDR
             _ftRun = false;
             if (_ftThread != null) _ftThread.Join(800);
             _ftThread = null;
-            try { if (_digiTapRx >= 0) digiTap(_digiTapRx, 0); } catch { }
+            foreach (FtChan ch in _ftChans) { try { if (ch.Tapped) digiTap(ch.Rx, 0); } catch { } ch.Tapped = false; ch.Rate = 0; ch.LastSlot = long.MinValue; }
             _digiTapRx = -1;
             ftDropDecoder();
         }
 
         private void ftDropDecoder()
         {
-            lock (_ftDecLock) { if (_ftDecoder != null) { _ftDecoder.Dispose(); _ftDecoder = null; } _ftDecoderKey = -1; }
+            foreach (FtChan ch in _ftChans) lock (ch.Lock) { if (ch.Decoder != null) { ch.Decoder.Dispose(); ch.Decoder = null; } ch.SeenPeriod = long.MinValue; ch.Seen.Clear(); }
         }
 
         internal bool FtModeOk { get { return digiRxMode == DSPMode.DIGU; } }
+
+        // Dual RX: which receiver (and band) the transmission goes out on, and the switch of it
+        internal string FtTxBandText { get { int rx = _digiRx; string b = ftBandName(rx == 1 ? VFOBFreq : VFOAFreq); return "RX" + (rx + 1) + (b.Length > 0 ? "  " + b : ""); } }
+        internal void FtToggleTxRx() { if (_ftDual && ftChanUsable(1 - _digiRx)) ftSelectTxRx(1 - _digiRx); }
 
         internal string FtStartProblem
         {
@@ -197,92 +204,175 @@ namespace BrickSDR
 
         // ---- the engine thread: receive, slots, decode, transmit ----
 
+        // One receiver's audio for the decoder: its own ring buffer, slot bookkeeping and decoder (the second receiver of Dual RX has its own, the slots are the same UTC ones)
+        private sealed class FtChan
+        {
+            public int Rx;
+            public bool Tapped;
+            public float[] Ring;
+            public long Total, StartIdx, LastSlot = long.MinValue, PrefixSlot = long.MinValue, FullSlot = long.MinValue, LastSpecAt;
+            public int Rate;
+            public double Smooth = -120;
+            public readonly object Lock = new object();
+            public Mfsk.Decoder Decoder;
+            public readonly HashSet<string> Seen = new HashSet<string>();
+            public long SeenPeriod = long.MinValue;
+        }
+        private readonly FtChan[] _ftChans = { new FtChan { Rx = 0 }, new FtChan { Rx = 1 } };
+
+        // Dual RX: the other receiver is decoded too (the stations of both go into the one window, each marked with its band)
+        private bool _ftDual;
+        internal bool FtDual
+        {
+            get { return _ftDual; }
+            set
+            {
+                if (_ftDual == value) return;
+                _ftDual = value;
+                if (value) ftPrepareSecondReceiver();
+                digiSaveSettings();
+                if (_ftPane != null) _ftPane.Refresh2();
+            }
+        }
+
+        // the receiver that is not the transmit one (_digiRx) has to run in DIGU
+        private void ftPrepareSecondReceiver()
+        {
+            try
+            {
+                int other = 1 - _digiRx;
+                if (other == 1)
+                {
+                    if (!RX2Enabled) chkRX2.Checked = true;
+                    if (_rx2_dsp_mode != DSPMode.DIGU) brickDigiSet(true, DSPMode.DIGU, null);
+                }
+                else if (_rx1_dsp_mode != DSPMode.DIGU) brickDigiSet(false, DSPMode.DIGU, null);
+                _ftStatus = "Dual RX: both receivers are decoded, set the band of each one";
+            }
+            catch { }
+        }
+
+        private bool ftChanUsable(int rx)
+        {
+            if (rx == _digiRx) return true;
+            if (!_ftDual) return false;
+            return rx == 1 ? (RX2Enabled && _rx2_dsp_mode == DSPMode.DIGU) : _rx1_dsp_mode == DSPMode.DIGU;
+        }
+
+        // the band name of a dial frequency in MHz ("20m"), for the marks in the list
+        private string ftBandName(double mhz)
+        {
+            try
+            {
+                Band b = BandByFreq(mhz, -1, current_region);
+                string s = b.ToString();
+                return s.Length > 1 && s[0] == 'B' && char.IsDigit(s[1]) ? s.Substring(1).ToLowerInvariant() : "";
+            }
+            catch { return ""; }
+        }
+
+        // the receiver the transmission goes out on: its VFO transmits (VFO A for RX1, VFO B for RX2)
+        private void ftSelectTxRx(int rx)
+        {
+            if (rx == _digiRx && (rx == 0 || chkVFOBTX.Checked)) return;
+            if (_ftTxActive) return;
+            _digiRx = rx;
+            try { if (chkVFOBTX.Checked != (rx == 1)) chkVFOBTX.Checked = rx == 1; } catch { }
+            if (_ftPane != null) _ftPane.Refresh2();
+        }
+
         private void ftWork()
         {
             float[] buf = new float[16384];
-            float[] ring = null;
-            long total = 0, startIdx = 0;
-            int rate = 0;
-            long lastSlot = long.MinValue, prefixSlot = long.MinValue, fullSlot = long.MinValue;
-            long lastSpecAt = 0;
             int lastRateWarn = 0;
-            double smooth = -120;
             while (_ftRun)
             {
                 try
                 {
                     string mode = _ftMode;
                     double T = mode == "FT4" ? 7.5 : 15.0;
-                    int rx = _digiRx;
-                    if (rx != _digiTapRx)
+                    int prim = _digiRx;
+                    double now = ftUtcSeconds() - _ftClock;
+                    long slot = (long)Math.Floor(now / T);
+                    double into = now - slot * T;
+                    _ftSlotPos = into;
+                    bool anyAudio = false;
+                    for (int rx = 0; rx < 2; rx++)
                     {
-                        if (_digiTapRx >= 0) digiTap(_digiTapRx, 0);
-                        digiTap(rx, 1);
-                        _digiTapRx = rx;
-                        lastSlot = long.MinValue;
-                    }
-                    int r = KDigi.KDigiRxRate(rx);
-                    if (r > 0 && r != rate)
-                    {
-                        rate = r;
-                        ring = new float[rate * 40];
-                        total = 0; startIdx = 0; lastSlot = long.MinValue;
-                    }
-                    if (rate > 0)
-                    {
-                        int n;
-                        double sq = 0, pk = 0; int cnt = 0;
-                        while ((n = KDigi.KDigiRxRead(rx, buf, buf.Length)) > 0)
+                        FtChan ch = _ftChans[rx];
+                        bool want = ftChanUsable(rx);
+                        if (want != ch.Tapped)
                         {
-                            for (int i = 0; i < n; i++)
-                            {
-                                float v = buf[i];
-                                ring[(int)((total + i) % ring.Length)] = v;
-                                sq += v * v; float a = Math.Abs(v); if (a > pk) pk = a;
-                            }
-                            cnt += n;
-                            total += n;
+                            if (want) { digiTap(rx, 1); if (rx == prim) _digiTapRx = rx; }
+                            else { digiTap(rx, 0); if (_digiTapRx == rx) _digiTapRx = -1; }
+                            ch.Tapped = want;
+                            ch.LastSlot = long.MinValue;
                         }
-                        if (cnt > 0)
-                        {
-                            double db = 10 * Math.Log10(Math.Max(1e-12, sq / cnt));
-                            smooth = smooth < -100 ? db : smooth + 0.3 * (db - smooth);
-                            _ftInDb = (float)smooth;
-                            _ftClip = pk >= 0.98;
-                        }
-                        if (total - lastSpecAt >= rate * 3 / 10 && total >= SpecN) { lastSpecAt = total; ftSpectrum(ring, total, rate); }       // a line of the close-up waterfall about every 0.3 s
-                        double now = ftUtcSeconds() - _ftClock;
-                        long slot = (long)Math.Floor(now / T);
-                        double into = now - slot * T;
-                        _ftSlotPos = into;
-                        if (lastSlot == long.MinValue) { lastSlot = slot; startIdx = total - (long)(into * rate); }        // started inside a slot: its first part is missing (zeros)
-                        if (slot != lastSlot)
-                        {
-                            // the slot that just ended: a last pass if the one after its signal was missed (it ran at the start, in a half slot...)
-                            if (fullSlot != lastSlot && lastSlot != _ftSkipSlot && !_ftTxActive)
-                                ftStartPass(ring, total, rate, startIdx, T, lastSlot, mode, false);
-                            lastSlot = slot;
-                            startIdx = total - (long)(into * rate);
-                        }
-                        // The messages are on the screen as soon as the signals are over, not at the end of the slot, so a station can be chosen and answered at once:
-                        // FT8 has a first pass at 11.8 s (what the decoder of WSJT-X does too: the strong stations are found there), and a pass of the whole slot
-                        // right after the last symbol (0.5 s + the length of the signal + a little). In a slot that was entered in the middle the missing start is zeros.
-                        double sigLen = mode == "FT4" ? 5.04 : 12.64, fullAt = 0.5 + sigLen + 0.15;
-                        if (slot == lastSlot && slot != _ftSkipSlot && !_ftTxActive)
-                        {
-                            if (mode == "FT8" && prefixSlot != slot && into >= 11.85 && into < fullAt) { prefixSlot = slot; ftStartPass(ring, total, rate, startIdx, T, slot, mode, true); }
-                            if (fullSlot != slot && into >= fullAt) { fullSlot = slot; ftStartPass(ring, total, rate, startIdx, T, slot, mode, false); }
-                        }
-                        ftTxStep(now, T, slot, into);
+                        if (!want) continue;
+                        if (ftChanStep(ch, buf, mode, T, slot, into, now, rx == prim)) anyAudio = true;
                     }
-                    else
-                    {
-                        if (lastRateWarn++ % 100 == 0) _ftStatus = "Waiting for the receiver audio";
-                    }
+                    if (anyAudio) ftTxStep(now, T, slot, into);
+                    else if (lastRateWarn++ % 100 == 0) _ftStatus = "Waiting for the receiver audio";
                 }
                 catch (Exception) { }
                 Thread.Sleep(15);
             }
+        }
+
+        // read what the receiver's tap has, cut the slots and start the decoding passes; false while the receiver has no audio yet
+        private bool ftChanStep(FtChan ch, float[] buf, string mode, double T, long slot, double into, double now, bool primary)
+        {
+            int rx = ch.Rx;
+            int r = KDigi.KDigiRxRate(rx);
+            if (r > 0 && r != ch.Rate)
+            {
+                ch.Rate = r;
+                ch.Ring = new float[r * 40];
+                ch.Total = 0; ch.StartIdx = 0; ch.LastSlot = long.MinValue;
+            }
+            if (ch.Rate <= 0) return false;
+            int rate = ch.Rate;
+            float[] ring = ch.Ring;
+            int n;
+            double sq = 0, pk = 0; int cnt = 0;
+            while ((n = KDigi.KDigiRxRead(rx, buf, buf.Length)) > 0)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    float v = buf[i];
+                    ring[(int)((ch.Total + i) % ring.Length)] = v;
+                    sq += v * v; float a = Math.Abs(v); if (a > pk) pk = a;
+                }
+                cnt += n;
+                ch.Total += n;
+            }
+            if (primary && cnt > 0)
+            {
+                double db = 10 * Math.Log10(Math.Max(1e-12, sq / cnt));
+                ch.Smooth = ch.Smooth < -100 ? db : ch.Smooth + 0.3 * (db - ch.Smooth);
+                _ftInDb = (float)ch.Smooth;
+                _ftClip = pk >= 0.98;
+            }
+            if (primary && ch.Total - ch.LastSpecAt >= rate * 3 / 10 && ch.Total >= SpecN) { ch.LastSpecAt = ch.Total; ftSpectrum(ring, ch.Total, rate); }       // a line of the close-up waterfall about every 0.3 s
+            if (ch.LastSlot == long.MinValue) { ch.LastSlot = slot; ch.StartIdx = ch.Total - (long)(into * rate); }        // started inside a slot: its first part is missing (zeros)
+            if (slot != ch.LastSlot)
+            {
+                // the slot that just ended: a last pass if the one after its signal was missed (it ran at the start, in a half slot...)
+                if (ch.FullSlot != ch.LastSlot && ch.LastSlot != _ftSkipSlot && !_ftTxActive)
+                    ftStartPass(ch, T, ch.LastSlot, mode, false);
+                ch.LastSlot = slot;
+                ch.StartIdx = ch.Total - (long)(into * rate);
+            }
+            // The messages are on the screen as soon as the signals are over, not at the end of the slot, so a station can be chosen and answered at once:
+            // FT8 has a first pass at 11.8 s (what the decoder of WSJT-X does too: the strong stations are found there), and a pass of the whole slot
+            // right after the last symbol (0.5 s + the length of the signal + a little). In a slot that was entered in the middle the missing start is zeros.
+            double sigLen = mode == "FT4" ? 5.04 : 12.64, fullAt = 0.5 + sigLen + 0.15;
+            if (slot == ch.LastSlot && slot != _ftSkipSlot && !_ftTxActive)
+            {
+                if (mode == "FT8" && ch.PrefixSlot != slot && into >= 11.85 && into < fullAt) { ch.PrefixSlot = slot; ftStartPass(ch, T, slot, mode, true); }
+                if (ch.FullSlot != slot && into >= fullAt) { ch.FullSlot = slot; ftStartPass(ch, T, slot, mode, false); }
+            }
+            return true;
         }
 
         // the audio of a slot for the decoder: 16 bit at 12 kHz when the receiver rate is a multiple of it (mfsk-core's own rate, and its early pass needs it), else at
@@ -313,10 +403,10 @@ namespace BrickSDR
         }
 
         // one decoding pass over the slot that began at sample startIdx; prefix: the early pass of FT8 (the first 141 696 samples at 12 kHz = 11.8 s)
-        private void ftStartPass(float[] ring, long total, int rate, long startIdx, double T, long period, string mode, bool prefix)
+        private void ftStartPass(FtChan ch, double T, long period, string mode, bool prefix)
         {
             int outRate, real;
-            short[] s = ftGrab(ring, total, rate, startIdx, T, out outRate, out real);
+            short[] s = ftGrab(ch.Ring, ch.Total, ch.Rate, ch.StartIdx, T, out outRate, out real);
             if (real < outRate * 2) return;                                        // not even two seconds of this slot
             if (prefix)
             {
@@ -326,37 +416,39 @@ namespace BrickSDR
                 s = p;
             }
             string md = mode; bool pf = prefix;
-            Task.Run(() => ftDecode(s, outRate, period, md, pf));
+            double dial = ch.Rx == 1 ? VFOBFreq : VFOAFreq;                          // the frequency of the receiver now (the band mark of its stations)
+            Task.Run(() => ftDecode(ch, dial, s, outRate, period, md, pf));
         }
 
-        private void ftDecode(short[] samples, int rate, long period, string mode, bool prefix = false)
+        private void ftDecode(FtChan ch, double dialMHz, short[] samples, int rate, long period, string mode, bool prefix = false)
         {
             try
             {
                 List<Mfsk.Decoder.Row> rows;
                 System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
-                lock (_ftDecLock)
+                lock (ch.Lock)
                 {
                     if (!_ftRun || mode != _ftMode) return;
-                    if (_ftDecoder == null) _ftDecoder = new Mfsk.Decoder(mode == "FT4" ? Mfsk.FT4 : Mfsk.FT8);
-                    _ftDecoder.Context(_digiMyCall, _ftGrid, _ftDx, _ftDxGrid, _ftRxHz);
-                    rows = _ftDecoder.DecodePeriod(samples, rate, period, prefix);
+                    if (ch.Decoder == null) ch.Decoder = new Mfsk.Decoder(mode == "FT4" ? Mfsk.FT4 : Mfsk.FT8);
+                    ch.Decoder.Context(_digiMyCall, _ftGrid, _ftDx, _ftDxGrid, _ftRxHz);
+                    rows = ch.Decoder.DecodePeriod(samples, rate, period, prefix);
                     // the early pass and the pass at the end of a slot see the same signals: report each message once
-                    if (_ftSeenPeriod != period) { _ftSeen.Clear(); _ftSeenPeriod = period; }
-                    rows = rows.FindAll(x => _ftSeen.Add(x.Text));
+                    if (ch.SeenPeriod != period) { ch.Seen.Clear(); ch.SeenPeriod = period; }
+                    rows = rows.FindAll(x => ch.Seen.Add(x.Text));
                 }
+                string bandName = ftBandName(dialMHz);
                 _ftDecodeMs = (int)sw.ElapsedMilliseconds;
                 _ftDecodeAt = ftUtcSeconds() - _ftClock;
                 double T = mode == "FT4" ? 7.5 : 15.0;
                 DateTime start = FtEpoch.AddSeconds(period * T);
                 foreach (var r in rows)
                 {
-                    FtRow row = new FtRow { Utc = start, Snr = r.Snr, Dt = r.Dt, Hz = r.Hz, Text = r.Text, Even = period % 2 == 0 };
+                    FtRow row = new FtRow { Utc = start, Snr = r.Snr, Dt = r.Dt, Hz = r.Hz, Text = r.Text, Even = period % 2 == 0, Rx = ch.Rx, Band = bandName, DialMHz = dialMHz };
                     ftClassify(row);
                     _ftRows.Enqueue(row);
                 }
                 ftTrackClock(rows);
-                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz); ftPskAdd(rows, period, mode); }));
+                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz, false, ch.Rx); ftPskAdd(rows, period, mode, dialMHz); }));
             }
             catch (Exception ex) { _ftStatus = "Decoder: " + ex.Message; }
         }
@@ -437,7 +529,7 @@ namespace BrickSDR
                 KDigi.KDigiTxEnable(1);
                 BeginInvoke(new Action(() => { if (_ftTxActive) MOX = true; }));
                 _ftTxState = 1;
-                _ftRows.Enqueue(new FtRow { Utc = FtEpoch.AddSeconds(slot * T), Snr = 0, Dt = 0, Hz = _ftTxHz, Text = msg, Even = slot % 2 == 0, Sent = true });
+                _ftRows.Enqueue(new FtRow { Utc = FtEpoch.AddSeconds(slot * T), Snr = 0, Dt = 0, Hz = _ftTxHz, Text = msg, Even = slot % 2 == 0, Sent = true, Rx = _digiRx, Band = ftBandName(_digiRx == 1 ? VFOBFreq : VFOAFreq) });
                 return;
             }
             // on the air
@@ -549,7 +641,7 @@ namespace BrickSDR
             return (s < 0 ? "-" : "+") + Math.Abs(s).ToString("00");
         }
 
-        private void ftAutoSequence(string text, float snr, bool even, float hz, bool force = false)
+        private void ftAutoSequence(string text, float snr, bool even, float hz, bool force = false, int rx = -1)
         {
             if (!_ftAuto || _digiMyCall.Length == 0 || !_ftRun) return;
             string[] t = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -597,6 +689,7 @@ namespace BrickSDR
                 _ftTries = 0;
                 _ftCustom = "";
                 _ftTxEven = !even;                                                           // answer in the other slot
+                if (_ftDual && rx >= 0) ftSelectTxRx(rx);                                    // Dual RX: the answer goes out on the band of that station
                 _ftTxHz = Math.Max(200, Math.Min(3000, (int)Math.Round(hz)));
                 if (_ftPane != null) _ftPane.Refresh2();
             }
@@ -615,6 +708,7 @@ namespace BrickSDR
         internal void FtPick(FtRow row, bool enable)
         {
             if (row.Sent) return;
+            if (_ftDual) ftSelectTxRx(row.Rx);                                               // Dual RX: the transmission follows the band of the station
             if (FtIsBlocked(row)) { _ftStatus = row.Sender + " is not answered (" + FtBlockReason(row) + ")"; return; }
             string[] t = row.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (t.Length < 2) return;
@@ -783,7 +877,7 @@ namespace BrickSDR
         }
 
         // the stations of one decoded period go to the reporter (UI thread): call sign and locator from the message, the dial frequency plus the audio frequency, the SNR
-        private void ftPskAdd(List<Mfsk.Decoder.Row> rows, long period, string mode)
+        private void ftPskAdd(List<Mfsk.Decoder.Row> rows, long period, string mode, double dialMHz)
         {
             try
             {
@@ -791,7 +885,7 @@ namespace BrickSDR
                 if (_psk == null) _psk = new PskReporter();
                 if (!_psk.Running) _psk.Start(_digiMyCall, _ftGrid, "Brick-SDR " + BrickBranding.Version, BrickHardware.Name);
                 if (!_psk.Running) return;
-                double dial = (_digiRx == 1 ? VFOBFreq : VFOAFreq) * 1e6;
+                double dial = dialMHz * 1e6;
                 double T = mode == "FT4" ? 7.5 : 15.0;
                 DateTime start = FtEpoch.AddSeconds(period * T);
                 foreach (var r in rows)

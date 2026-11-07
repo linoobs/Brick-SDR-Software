@@ -38313,7 +38313,9 @@ namespace BrickSDR
                 bool is_vac2_enabled = (vac_enabled_bits & (1 << 1)) != 0;
                 chkVAC2.Checked = is_vac2_enabled;
             }
-            if (RX2Enabled && oldRX2Enabled != chkRX2.Checked && brickVac2Was() && !chkVAC2.Checked) chkVAC2.Checked = true; // Brick-SDR: VAC2 comes back with RX2
+            // Brick-SDR: VAC2 comes back with RX2; a failure of VAC2 (device missing, driver error) must never keep RX2 from starting
+            try { if (RX2Enabled && oldRX2Enabled != chkRX2.Checked && brickVac2Was() && !chkVAC2.Checked) chkVAC2.Checked = true; }
+            catch (Exception vex) { try { File.AppendAllText(Path.Combine(AppDataPath, "rx2_log.txt"), DateTime.Now + " VAC2 with RX2: " + vex.Message + Environment.NewLine); } catch { } }
             //
 
             if (chkVFOBTX.Checked && chkVAC2.Checked && chkRX2.Checked)

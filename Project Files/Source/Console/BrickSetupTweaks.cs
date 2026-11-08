@@ -31,6 +31,7 @@ namespace BrickSDR
         public void BrickSimplifyNR()
         {
             BrickHideSkins();
+            BrickAddBootloaderButton();
             BrickAddRadeMeterOption();
             BrickAddDigiModesTab();
             grpRNnoise.Visible = false;

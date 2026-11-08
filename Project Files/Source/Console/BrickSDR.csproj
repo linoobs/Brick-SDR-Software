@@ -514,6 +514,7 @@
     <Compile Include="BrickCwCodec.cs" />
     <Compile Include="BrickModePanels.cs" />
     <Compile Include="BrickProgrammer.cs" />
+    <Compile Include="BrickBootloader.cs" />
     <Compile Include="BrickProfiles.cs" />
     <Compile Include="BrickSetupTweaks.cs" />
     <Compile Include="BrickControls.cs" />

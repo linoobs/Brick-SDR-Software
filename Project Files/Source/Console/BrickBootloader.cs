@@ -153,7 +153,7 @@ namespace BrickSDR
                         if (r != null && r.Length >= 22) { byte[] m = new byte[6]; Array.Copy(r, 16, m, 0, 6); return BitConverter.ToString(m); }
                     }
                 }
-                err = "The board does not answer. It has to run its bootloader (jumper MODE1 to ground, power cycle) and be on the same cable / switch as this adapter.";
+                err = "No answer. The board must run its bootloader (MODE1 to ground, power cycle) and be on the same cable or switch.";
             }
             catch (Exception ex) { err = ex.Message; }
             return null;
@@ -226,7 +226,7 @@ namespace BrickSDR
                 if (nic.Items.Count > 0) nic.SelectedIndex = pick;
 
                 Button test = new Button { Text = "Test for bootloader", Bounds = new Rectangle(12, 102, 150, 28) };
-                Label found = BrickToolLabel(f, "", 172, 108, 376);
+                Label found = BrickToolLabel(f, "", 172, 102, 376, 36);
                 BrickToolLabel(f, "Firmware file (.rbf, any file name)", 12, 144, 250);
                 TextBox file = new TextBox { Bounds = new Rectangle(12, 164, 448, 22) };
                 Button browse = new Button { Text = "Browse...", Bounds = new Rectangle(468, 162, 80, 26) };

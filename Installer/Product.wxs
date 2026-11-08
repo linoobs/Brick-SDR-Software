@@ -4,7 +4,7 @@
   <Package Name="Brick-SDR" Manufacturer="Brick-SDR project" Version="$(Version)" UpgradeCode="7C0F2B1E-4D3A-4F6B-9A55-8E21B3C4D5F7"
            Scope="perMachine" InstallerVersion="500" Compressed="yes">
     <SummaryInformation Description="Brick-SDR - SDR transceiver software for HPSDR, Hermes Lite 2 and Brick radios" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Brick-SDR is already installed." />
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of Brick-SDR is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
     <Icon Id="BrickIcon" SourceFile="$(IconFile)" />
     <Property Id="ARPPRODUCTIDICON" Value="BrickIcon" />

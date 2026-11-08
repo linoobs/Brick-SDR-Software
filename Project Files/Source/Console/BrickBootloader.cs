@@ -238,6 +238,17 @@ namespace BrickSDR
                 f.Controls.AddRange(new Control[] { nic, test, file, browse, bar, log, start, close });
                 f.CancelButton = close;
                 if (problem != null) log.AppendText(problem + "\r\n");
+                if (problem != null && problem.StartsWith("Npcap (or WinPcap) is not installed"))
+                {
+                    // the bootloader talks raw Ethernet frames, which Windows only allows through the Npcap driver (free for personal use, can't be bundled)
+                    Button get = new Button { Text = "Get Npcap", Bounds = new Rectangle(440, 102, 108, 28) };
+                    get.Click += (s, e) => { try { System.Diagnostics.Process.Start("https://npcap.com/#download"); } catch { } };
+                    f.Controls.Add(get);
+                    test.Enabled = false; start.Enabled = false;
+                    log.AppendText("Download Npcap (npcap.com, free for personal use), install it once with administrator rights, then open this window again.\r\n");
+                    log.AppendText("Brick-SDR itself works without it: Npcap is needed only for a board in bootloader mode. A board with working firmware can be programmed without it, with Program in the radio list of this tab.\r\n");
+                    log.AppendText("To put a board into bootloader mode: jumper MODE1 to ground, power cycle the board, then press Test for bootloader.\r\n");
+                }
 
                 bool running = false, cancel = false;
                 Action<string> addLog = t => { if (f.IsHandleCreated) f.BeginInvoke(new Action(() => log.AppendText(t + "\r\n"))); };

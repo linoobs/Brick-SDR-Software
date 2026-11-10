@@ -3229,7 +3229,7 @@ namespace BrickSDR
             bool classic = _b3dStyle == 0;
             float yFront = H - 1, yBack = H * b3dBackY;
             // classic: every line has 0.58 of the area as full scale; proportional: b3dG = 1 is the full height of a low area, in a tall one the proportions of the width
-            float ampFront = classic ? H * 0.58f : Math.Min(H - 2f, W * B3D_ASPECT);
+            float ampFront = classic ? H * 0.70f : Math.Min(H - 2f, W * B3D_ASPECT);
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front

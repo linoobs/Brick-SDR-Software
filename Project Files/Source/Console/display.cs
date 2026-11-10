@@ -3224,12 +3224,12 @@ namespace BrickSDR
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
             float yFront = H - 1, yBack = H * 0.42f;
-            float ampFront = H * 0.58f;
+            float ampFront = H * 0.85f;                                                // peak height of the front line; the back lines are cut to the top of the area
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
                 float yBase = yBack + (yFront - yBack) * t;
-                float amp = ampFront;
+                float amp = Math.Min(ampFront, yBase - 2f);
                 float scale = 0.72f + 0.28f * t;
                 float xl = W * 0.5f * (1f - scale), xs = W * scale / (B3D_POINTS - 1);
                 float[] line = hist[k];

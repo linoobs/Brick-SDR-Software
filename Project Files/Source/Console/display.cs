@@ -3293,6 +3293,7 @@ namespace BrickSDR
             _b3dDirty[rx] = false;
         }
 
+        private const float B3D_HEIGHT_GAIN = 3f;
         private static bool _b3dSlant = false, _b3dGridPass = false;
         private static object[] _b3dNotchArgs = null;
         private static readonly List<object[]> _b3dDbLabels = new List<object[]>();
@@ -3351,7 +3352,7 @@ namespace BrickSDR
                     int a = p * n / B3D_POINTS, b = Math.Max(a + 1, (p + 1) * n / B3D_POINTS);
                     float mx = float.MinValue;
                     for (int i = a; i < b && i < n; i++) if (data[i] > mx) mx = data[i];
-                    line[p] = Math.Max(0f, Math.Min(1f, (mx + offset - grid_min) / range));
+                    line[p] = Math.Max(0f, Math.Min(1f, B3D_HEIGHT_GAIN * (mx + offset - grid_min) / range));       // ridges are drawn 3 times higher than the plain dB scale gives
                 }
                 if (_b3dCount[rx] < B3D_LAYERS) _b3dCount[rx]++;
                 _b3dDirty[rx] = true;

@@ -31,6 +31,8 @@
 
 #include "network.h" 
 #include <Iphlpapi.h>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 
 #pragma comment(lib, "IPHLPAPI.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -1416,17 +1418,34 @@ void KeepAliveLoop(void)
 	}
 	else
 	{
-		if (!SetWaitableTimer(prn->hTimer, &prn->liDueTime, 500, NULL, NULL, 0))
+		// Brick: the timer ticks every 1 ms. The General (watchdog) packet still goes out every 500 ms, and on every other tick a tiny
+		// datagram (discard port 9) keeps the PC transmitting. The link between PC and radio (switch / NIC) loses the receive direction
+		// for 100-900 ms (sequence errors, torn audio) whenever the PC has not transmitted for ~20 ms, e.g. when the DSP stalls after one
+		// lost packet and the audio / TX IQ frames stop; the next General packet used to end such a stall.
+		timeBeginPeriod(1);
+		if (!SetWaitableTimer(prn->hTimer, &prn->liDueTime, 1, NULL, NULL, 0))
 		{
 			printf("SetWaitableTimer failed (%d)\n", GetLastError());
 		}
 
+		int tick = 0;
 		while (io_keep_running)
 		{
 			WaitForSingleObject(prn->hTimer, INFINITE);
-			if (prn->run && prn->wdt) CmdGeneral();
+			if (!prn->run) { tick = 0; continue; }
+			if (++tick >= 500)
+			{
+				tick = 0;
+				if (prn->wdt) CmdGeneral();
+			}
+			else
+			{
+				char ka[4] = { 0, 0, 0, 0 };
+				sendPacket(listenSock, ka, sizeof(ka), 9);
+			}
 		}
 
+		timeEndPeriod(1);
 		CancelWaitableTimer(prn->hTimer);
 		CloseHandle(prn->hTimer);
 	}

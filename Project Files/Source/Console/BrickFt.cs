@@ -530,6 +530,19 @@ namespace BrickSDR
             if (_ftCustom.Length > 0) return _ftCustom;
             string my = _digiMyCall, dx = _ftDx, g = _ftGrid.Length >= 4 ? _ftGrid.Substring(0, 4) : _ftGrid;
             string rs = _ftRptSent.Length > 0 ? _ftRptSent : "-10";
+            // a call sign that doesn't fit the standard message (ER1WK/QRP, long suffixes): the 77-bit "non-standard" form, the other
+            // station's call in <> (sent as a hash, no grid and no report fit in it): "<ER1WK/QRP> DJ0AK", then RRR / RR73 / 73
+            if (dx.Length > 0 && !FtStdCall(dx) && FtStdCall(my))
+            {
+                string h = "<" + dx.Trim('<', '>') + "> " + my;
+                switch (_ftMsgNo)
+                {
+                    case 4: return h + " RR73";
+                    case 5: return h + " 73";
+                    case 0: return "CQ " + my + " " + g;
+                    default: return h;
+                }
+            }
             switch (_ftMsgNo)
             {
                 case 1: return dx.Length > 0 ? dx + " " + my + " " + g : "";
@@ -540,6 +553,10 @@ namespace BrickSDR
                 default: return "CQ " + my + " " + g;
             }
         }
+
+        // a call that packs into a standard FT8 message: [prefix]digit suffix, optionally /P or /R
+        private static readonly Regex StdCallRe = new Regex("^(?:[A-Z0-9]{1,2}[0-9][A-Z]{1,3})(?:/[PR])?$", RegexOptions.Compiled);
+        internal static bool FtStdCall(string c) { return !string.IsNullOrEmpty(c) && StdCallRe.IsMatch(c.Trim('<', '>').ToUpperInvariant()); }
 
         internal string FtNextMessage { get { return ftCurrentMessage(); } }
 

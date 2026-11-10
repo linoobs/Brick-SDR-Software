@@ -3293,6 +3293,9 @@ namespace BrickSDR
             _b3dDirty[rx] = false;
         }
 
+        private static bool _b3dSlant = false, _b3dGridPass = false;
+        private static object[] _b3dNotchArgs = null;
+
         unsafe private static void Draw3DDX2D(int nVerticalShift, int W, int H, int rx)
         {
             int n = W / m_nDecimation;
@@ -3355,7 +3358,9 @@ namespace BrickSDR
 
             // back wall: the normal frequency grid
             long le, re;
-            drawPanadapterAndWaterfallGridDX2D(nVerticalShift, W, H, rx, rx == 2, out le, out re, false);
+            _b3dNotchArgs = null; _b3dGridPass = true;
+            try { drawPanadapterAndWaterfallGridDX2D(nVerticalShift, W, H, rx, rx == 2, out le, out re, false); }
+            finally { _b3dGridPass = false; }
 
             b3dRender(rx, W, H, grid_min, grid_max);
             if (_b3dRT[rx] != null)
@@ -3370,6 +3375,15 @@ namespace BrickSDR
             if (fr <= fl) fr = fl + 1;
             SharpDX.Direct2D1.Brush fb = getDXBrushForColour(Color.FromArgb(60, 255, 255, 255));
             if (fb != null) _d2dRenderTarget.FillRectangle(new RectangleF(fl, nVerticalShift, fr - fl, H), fb);
+
+            // manual notches (MNF) as slanted bands that follow the perspective of the ridges
+            if (_b3dNotchArgs != null)
+            {
+                object[] a = _b3dNotchArgs; _b3dNotchArgs = null;
+                _b3dSlant = true;
+                try { handleNotches((int)a[0], (bool)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5], (int)a[6], (int)a[7], (int)a[8], (int)a[9], true); }
+                finally { _b3dSlant = false; }
+            }
 
             // the band edge lines in front of the ridges too
             foreach (int ex in _brickEdgeX[rx == 2 ? 1 : 0].ToArray())
@@ -9457,6 +9471,35 @@ namespace BrickSDR
                         drawStringDX2D("W: " + n.FWidth.ToString("f0") + "Hz", fontDX2d_callout, t, notch_right_x + 4, nVerticalShift + top + (H / 4) + 12);
                     }
 
+                    if (_b3dSlant)
+                    {
+                        // 3D: the ridges narrow towards the back (scale 0.72 at the back line), so the notch follows them: a slanted band from
+                        // the front line to the back line, then straight up behind the highest peaks
+                        float yF = nVerticalShift + H - 1, yB = nVerticalShift + H * 0.42f, yT = nVerticalShift + top;
+                        Func<float, float> back = x => W * 0.5f * (1f - 0.72f) + 0.72f * x;
+                        drawLineDX2D(p, notch_centre_x, yF, back(notch_centre_x), yB);
+                        if (yT < yB) drawLineDX2D(p, back(notch_centre_x), yB, back(notch_centre_x), yT);
+                        if (notch_left_x != notch_right_x)
+                        {
+                            using (PathGeometry pg = new PathGeometry(_d2dFactory))
+                            {
+                                using (GeometrySink sk = pg.Open())
+                                {
+                                    sk.BeginFigure(new SharpDX.Vector2(notch_left_x, yF), FigureBegin.Filled);
+                                    sk.AddLine(new SharpDX.Vector2(back(notch_left_x), yB));
+                                    if (yT < yB) sk.AddLine(new SharpDX.Vector2(back(notch_left_x), yT));
+                                    if (yT < yB) sk.AddLine(new SharpDX.Vector2(back(notch_right_x), yT));
+                                    sk.AddLine(new SharpDX.Vector2(back(notch_right_x), yB));
+                                    sk.AddLine(new SharpDX.Vector2(notch_right_x, yF));
+                                    sk.EndFigure(FigureEnd.Closed);
+                                    sk.Close();
+                                }
+                                _d2dRenderTarget.FillGeometry(pg, b);
+                            }
+                        }
+                        continue;
+                    }
+
                     // the middle notch line
                     drawLineDX2D(p, notch_centre_x, nVerticalShift + top, notch_centre_x, nVerticalShift + H);
 
@@ -9943,7 +9986,11 @@ namespace BrickSDR
 
             #region notches
             // draw notches if in RX
-            if (!local_mox && !bIsWaterfall)
+            if (!local_mox && !bIsWaterfall && _b3dGridPass)
+            {
+                _b3dNotchArgs = new object[] { rx, bottom, cwSideToneShift, Low, High, nVerticalShift, top, width, W, H };      // 3D draws them later, over the ridges
+            }
+            else if (!local_mox && !bIsWaterfall)
             {
                 handleNotches(rx, bottom, cwSideToneShift, Low, High, nVerticalShift, top, width, W, H, true);//, 50); //MW0LGE [2.9.0.7] moved to function so can be used by drawmpana/drawwater                
             }// END NOTCH

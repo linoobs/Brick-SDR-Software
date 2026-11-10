@@ -324,7 +324,9 @@ namespace BrickSDR
             if (rx == _digiRx && (rx == 0 || chkVFOBTX.Checked)) return;
             if (_ftTxActive) return;
             _digiRx = rx;
-            try { if (chkVFOBTX.Checked != (rx == 1)) chkVFOBTX.Checked = rx == 1; } catch { }
+            // one of the two TX tags is always on (A's handler switches B off): unchecking B alone left both off, and then the
+            // RX2 DDC frequency was never sent (carrier at zero frequency, no signals on RX2)
+            try { if (rx == 1) { if (!chkVFOBTX.Checked) chkVFOBTX.Checked = true; } else if (!chkVFOATX.Checked) chkVFOATX.Checked = true; } catch { }
             if (_ftPane != null) _ftPane.Refresh2();
         }
 

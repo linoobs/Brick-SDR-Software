@@ -2014,6 +2014,9 @@ namespace BrickSDR
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();
+            // one TX tag (VFO A or B) must always be on: with both off the RX2 DDC frequency is never sent to the radio (a saved state
+            // from an older build could have both off)
+            try { if (!initializing && chkVFOATX != null && chkVFOBTX != null && !chkVFOATX.Checked && !chkVFOBTX.Checked) chkVFOATX.Checked = true; } catch { }
             if (!initializing && !IsSetupFormNull)
             {
                 // link speed (receive / transmit) in the status bar, in front of the CAT indicators

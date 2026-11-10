@@ -3226,10 +3226,10 @@ namespace BrickSDR
             int cnt = _b3dCount[rx];
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
-            bool classic = _b3dStyle == 0;
+            bool classic = _b3dStyle != 1;
             float yFront = H - 1, yBack = H * b3dBackY;
             // classic: every line has 0.58 of the area as full scale; proportional: b3dG = 1 is the full height of a low area, in a tall one the proportions of the width
-            float ampFront = classic ? H * 0.70f : Math.Min(H - 2f, W * B3D_ASPECT);
+            float ampFront = classic ? H * (_b3dStyle == 2 ? _b3dCustom / 100f : 0.58f) : Math.Min(H - 2f, W * B3D_ASPECT);
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
@@ -3307,16 +3307,23 @@ namespace BrickSDR
         private const float B3D_ASPECT = 0.22f;                       // the highest peak is at most this part of the width: a tall area doesn't stretch the ridges
         private static readonly float[] _b3dVLow = { 0.3f, 0.3f, 0.3f }, _b3dVHigh = { 0.8f, 0.8f, 0.8f };
         // 3D style (Setup > Display > General): 0 classic (linear in the dB scale, the default), 1 proportional (low noise, peaks by the waterfall thresholds)
+        // 2 = custom: the classic shape with the peak height typed in (B3DCustom, % of the area height; classic is 58)
         private static volatile int _b3dStyle = 0;
+        private static float _b3dCustom = 70f;
         public static int B3DStyle
         {
             get { return _b3dStyle; }
-            set { int v = value == 1 ? 1 : 0; if (v == _b3dStyle) return; _b3dStyle = v; _b3dDirty[1] = true; _b3dDirty[2] = true; }
+            set { int v = value < 0 || value > 2 ? 0 : value; if (v == _b3dStyle) return; _b3dStyle = v; _b3dDirty[1] = true; _b3dDirty[2] = true; }
         }
-        private static float b3dBackY { get { return _b3dStyle == 0 ? 0.42f : 0.36f; } }
+        public static float B3DCustom
+        {
+            get { return _b3dCustom; }
+            set { float v = Math.Max(20f, Math.Min(300f, value)); if (v == _b3dCustom) return; _b3dCustom = v; _b3dDirty[1] = true; _b3dDirty[2] = true; }
+        }
+        private static float b3dBackY { get { return _b3dStyle == 1 ? 0.36f : 0.42f; } }
         private static float b3dG(int rx, float v)
         {
-            if (_b3dStyle == 0) return Math.Max(0f, Math.Min(1f, v));
+            if (_b3dStyle != 1) return Math.Max(0f, Math.Min(1f, v));
             float lo = _b3dVLow[rx], hi = Math.Max(lo + 0.05f, _b3dVHigh[rx]);
             if (v <= lo) return lo <= 0f ? 0f : Math.Max(0f, B3D_NOISE * v / lo);         // the noise stays a low carpet
             float x = B3D_NOISE + (B3D_TOP - B3D_NOISE) * (v - lo) / (hi - lo);             // linear in dB up to the high threshold

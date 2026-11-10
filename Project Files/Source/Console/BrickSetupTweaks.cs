@@ -91,11 +91,17 @@ namespace BrickSDR
             g.Controls.Add(path); g.Controls.Add(browse); g.Controls.Add(reset); g.Controls.Add(hint);
             // how the 3D panadapter draws its ridges (no free room on the page: it shares this group)
             Label l3 = new Label { Name = "brick3DStyleLabel", Text = "3D", AutoSize = true, Location = new Point(8, 115) };
-            ComboBox st = new ComboBox { Name = "brick3DStyle", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(32, 111), Width = 122 };
-            st.Items.AddRange(new object[] { "Classic", "Proportional" });
-            st.SelectedIndex = console.Brick3DStyle == 1 ? 1 : 0;
-            st.SelectedIndexChanged += (s, e) => console.Brick3DStyle = st.SelectedIndex;
-            g.Controls.Add(l3); g.Controls.Add(st);
+            ComboBox st = new ComboBox { Name = "brick3DStyle", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(30, 111), Width = 84, DropDownWidth = 120 };
+            st.Items.AddRange(new object[] { "Classic", "Proportional", "Custom" });
+            // Custom: the height of the peaks as % of the area (classic is 58)
+            NumericUpDown nh = new NumericUpDown { Name = "brick3DHeight", Minimum = 20, Maximum = 300, Increment = 5, Location = new Point(118, 111), Width = 38 };
+            nh.Value = Math.Max(nh.Minimum, Math.Min(nh.Maximum, (decimal)console.Brick3DCustom));
+            nh.Enabled = console.Brick3DStyle == 2;
+            new ToolTip().SetToolTip(nh, "Peak height in % of the area (Classic = 58)");
+            st.SelectedIndex = Math.Max(0, Math.Min(2, console.Brick3DStyle));
+            st.SelectedIndexChanged += (s, e) => { console.Brick3DStyle = st.SelectedIndex; nh.Enabled = st.SelectedIndex == 2; };
+            nh.ValueChanged += (s, e) => console.Brick3DCustom = (float)nh.Value;
+            g.Controls.Add(l3); g.Controls.Add(st); g.Controls.Add(nh);
             tpDisplayGeneral.Controls.Add(g);
             g.BringToFront();
         }

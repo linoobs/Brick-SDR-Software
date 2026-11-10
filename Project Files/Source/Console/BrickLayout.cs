@@ -678,9 +678,26 @@ namespace BrickSDR
         public int Brick3DStyle
         {
             get { return Display.B3DStyle; }
-            set { Display.B3DStyle = value; try { File.WriteAllText(Brick3DStyleFile, Display.B3DStyle.ToString()); } catch { } }
+            set { Display.B3DStyle = value; brickSave3DStyle(); }
         }
-        private void brickLoad3DStyle() { try { int v; if (File.Exists(Brick3DStyleFile) && int.TryParse(File.ReadAllText(Brick3DStyleFile).Trim(), out v)) Display.B3DStyle = v; } catch { } }
+        public float Brick3DCustom
+        {
+            get { return Display.B3DCustom; }
+            set { Display.B3DCustom = value; brickSave3DStyle(); }
+        }
+        private void brickSave3DStyle() { try { File.WriteAllText(Brick3DStyleFile, Display.B3DStyle + "," + ((int)Display.B3DCustom)); } catch { } }
+        private void brickLoad3DStyle()
+        {
+            try
+            {
+                if (!File.Exists(Brick3DStyleFile)) return;
+                string[] t = File.ReadAllText(Brick3DStyleFile).Trim().Split(',');
+                int v; float h;
+                if (t.Length > 1 && float.TryParse(t[1], out h)) Display.B3DCustom = h;
+                if (int.TryParse(t[0], out v)) Display.B3DStyle = v;
+            }
+            catch { }
+        }
         private void brickLoad3D() { brickLoad3DStyle(); try { if (!File.Exists(Brick3DFile)) return; string t = File.ReadAllText(Brick3DFile).Trim(); if (t.Length >= 2) { chk3D1.Checked = t[0] == '1'; chk3D2.Checked = t[1] == '1'; } } catch { } }
         private readonly List<CheckBox> rx2ZoomButtons = new List<CheckBox>();
         private int rx2ZoomValue = -1;

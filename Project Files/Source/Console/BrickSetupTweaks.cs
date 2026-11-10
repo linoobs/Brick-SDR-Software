@@ -87,8 +87,15 @@ namespace BrickSDR
                 path.Text = console.BrickBackgroundPath;
                 chkDisablePicDisplayBackgroundImage.Checked = false;
             };
-            Label hint = new Label { Text = "Use \"Ignore spectral area image\" to turn it off.", Location = new Point(8, 84), Size = new Size(148, 52) };
+            Label hint = new Label { Text = "Use \"Ignore spectral area image\" to turn it off.", Location = new Point(8, 80), Size = new Size(148, 28) };
             g.Controls.Add(path); g.Controls.Add(browse); g.Controls.Add(reset); g.Controls.Add(hint);
+            // how the 3D panadapter draws its ridges (no free room on the page: it shares this group)
+            Label l3 = new Label { Name = "brick3DStyleLabel", Text = "3D", AutoSize = true, Location = new Point(8, 115) };
+            ComboBox st = new ComboBox { Name = "brick3DStyle", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(32, 111), Width = 122 };
+            st.Items.AddRange(new object[] { "Classic", "Proportional" });
+            st.SelectedIndex = console.Brick3DStyle == 1 ? 1 : 0;
+            st.SelectedIndexChanged += (s, e) => console.Brick3DStyle = st.SelectedIndex;
+            g.Controls.Add(l3); g.Controls.Add(st);
             tpDisplayGeneral.Controls.Add(g);
             g.BringToFront();
         }

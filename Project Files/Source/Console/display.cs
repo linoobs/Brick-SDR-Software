@@ -3189,7 +3189,7 @@ namespace BrickSDR
             if (_brickWfHigh[rx] != 0 || _brickWfLow[rx] != 0) { lowT = (float)Math.Round(_brickWfLow[rx]); highT = (float)Math.Round(_brickWfHigh[rx]); }
             if (highT - lowT < 10) highT = lowT + 10;
             Color low = rx == 1 ? waterfall_low_color : rx2_waterfall_low_color;
-            string key = grid_min + "|" + grid_max + "|" + lowT + "|" + highT + "|" + low.ToArgb();
+            string key = grid_min + "|" + grid_max + "|" + lowT + "|" + highT + "|" + low.ToArgb() + "|" + _b3dStyle;
             if (_b3dLineGrad[rx] != null && _b3dGradKey[rx] == key) return _b3dLineGrad[rx];
             if (_b3dLineGrad[rx] != null) { _b3dLineGrad[rx].Dispose(); _b3dLineGrad[rx] = null; }
             float span = Math.Max(10, grid_max - grid_min);
@@ -3226,13 +3226,15 @@ namespace BrickSDR
             int cnt = _b3dCount[rx];
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
-            float yFront = H - 1, yBack = H * 0.36f;
-            float ampFront = Math.Min(H - 2f, W * B3D_ASPECT);                        // b3dG = 1: full height of a low area, in a tall one the proportions of the width
+            bool classic = _b3dStyle == 0;
+            float yFront = H - 1, yBack = H * b3dBackY;
+            // classic: every line has 0.58 of the area as full scale; proportional: b3dG = 1 is the full height of a low area, in a tall one the proportions of the width
+            float ampFront = classic ? H * 0.58f : Math.Min(H - 2f, W * B3D_ASPECT);
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
                 float yBase = yBack + (yFront - yBack) * t;
-                float amp = Math.Min(ampFront, yBase - 2f), hMax = yBase - 2f;   // a back line has less room above it: its ridges are lower (perspective), not cut
+                float amp = classic ? ampFront : Math.Min(ampFront, yBase - 2f), hMax = classic ? float.MaxValue : yBase - 2f;   // proportional: a back line has less room above it, its ridges are lower (perspective), not cut
                 float scale = 0.72f + 0.28f * t;
                 float xl = W * 0.5f * (1f - scale), xs = W * scale / (B3D_POINTS - 1);
                 float[] line = hist[k];
@@ -3304,8 +3306,17 @@ namespace BrickSDR
         private const float B3D_NOISE = 0.06f, B3D_TOP = 0.88f;      // height of the noise at the low threshold, of a signal at the high threshold
         private const float B3D_ASPECT = 0.22f;                       // the highest peak is at most this part of the width: a tall area doesn't stretch the ridges
         private static readonly float[] _b3dVLow = { 0.3f, 0.3f, 0.3f }, _b3dVHigh = { 0.8f, 0.8f, 0.8f };
+        // 3D style (Setup > Display > General): 0 classic (linear in the dB scale, the default), 1 proportional (low noise, peaks by the waterfall thresholds)
+        private static volatile int _b3dStyle = 0;
+        public static int B3DStyle
+        {
+            get { return _b3dStyle; }
+            set { int v = value == 1 ? 1 : 0; if (v == _b3dStyle) return; _b3dStyle = v; _b3dDirty[1] = true; _b3dDirty[2] = true; }
+        }
+        private static float b3dBackY { get { return _b3dStyle == 0 ? 0.42f : 0.36f; } }
         private static float b3dG(int rx, float v)
         {
+            if (_b3dStyle == 0) return Math.Max(0f, Math.Min(1f, v));
             float lo = _b3dVLow[rx], hi = Math.Max(lo + 0.05f, _b3dVHigh[rx]);
             if (v <= lo) return lo <= 0f ? 0f : Math.Max(0f, B3D_NOISE * v / lo);         // the noise stays a low carpet
             float x = B3D_NOISE + (B3D_TOP - B3D_NOISE) * (v - lo) / (hi - lo);             // linear in dB up to the high threshold
@@ -9500,7 +9511,7 @@ namespace BrickSDR
                     {
                         // 3D: the ridges narrow towards the back (scale 0.72 at the back line), so the notch follows them: a slanted band from
                         // the front line to the back line, then straight up behind the highest peaks
-                        float yF = nVerticalShift + H - 1, yB = nVerticalShift + H * 0.36f, yT = nVerticalShift + top;
+                        float yF = nVerticalShift + H - 1, yB = nVerticalShift + H * b3dBackY, yT = nVerticalShift + top;
                         Func<float, float> back = x => W * 0.5f * (1f - 0.72f) + 0.72f * x;
                         drawLineDX2D(p, notch_centre_x, yF, back(notch_centre_x), yB);
                         if (yT < yB) drawLineDX2D(p, back(notch_centre_x), yB, back(notch_centre_x), yT);

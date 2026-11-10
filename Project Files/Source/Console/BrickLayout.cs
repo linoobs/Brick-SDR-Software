@@ -509,6 +509,7 @@ namespace BrickSDR
             Put(chkRX2DisplayPeak, cardOptsB, 0, 3, 76, 24);
             Put(chkRX2DisplayAVG, cardOptsB, 82, 3, 76, 24);
             Put(chkX2TR, cardOptsB, 164, 3, 76, 24);
+            brickLoad3DStyle();
             if (!IsSetupFormNull) SetupForm.BrickAddDisplayModes(comboDisplayMode, comboRX2DisplayMode);
             panelRX2Display.Visible = false;
             panelDisplay2.Visible = false;
@@ -672,7 +673,15 @@ namespace BrickSDR
         private CheckBox chk3D1, chk3D2;
         private string Brick3DFile { get { return Path.Combine(AppDataPath, "display3d.txt"); } }
         private void brickSave3D() { try { File.WriteAllText(Brick3DFile, (chk3D1 != null && chk3D1.Checked ? "1" : "0") + (chk3D2 != null && chk3D2.Checked ? "1" : "0")); } catch { } }
-        private void brickLoad3D() { try { if (!File.Exists(Brick3DFile)) return; string t = File.ReadAllText(Brick3DFile).Trim(); if (t.Length >= 2) { chk3D1.Checked = t[0] == '1'; chk3D2.Checked = t[1] == '1'; } } catch { } }
+        // 3D style, chosen in Setup > Display > General (0 classic = default, 1 proportional)
+        private string Brick3DStyleFile { get { return Path.Combine(AppDataPath, "display3d_style.txt"); } }
+        public int Brick3DStyle
+        {
+            get { return Display.B3DStyle; }
+            set { Display.B3DStyle = value; try { File.WriteAllText(Brick3DStyleFile, Display.B3DStyle.ToString()); } catch { } }
+        }
+        private void brickLoad3DStyle() { try { int v; if (File.Exists(Brick3DStyleFile) && int.TryParse(File.ReadAllText(Brick3DStyleFile).Trim(), out v)) Display.B3DStyle = v; } catch { } }
+        private void brickLoad3D() { brickLoad3DStyle(); try { if (!File.Exists(Brick3DFile)) return; string t = File.ReadAllText(Brick3DFile).Trim(); if (t.Length >= 2) { chk3D1.Checked = t[0] == '1'; chk3D2.Checked = t[1] == '1'; } } catch { } }
         private readonly List<CheckBox> rx2ZoomButtons = new List<CheckBox>();
         private int rx2ZoomValue = -1;
 

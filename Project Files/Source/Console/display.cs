@@ -3223,7 +3223,7 @@ namespace BrickSDR
             int cnt = _b3dCount[rx];
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
-            float yFront = H - 1, yBack = H * 0.42f;
+            float yFront = H - 1, yBack = H * 0.36f;
             float ampFront = H * 0.58f * B3D_LIFT1;                                    // height of a full-scale peak of the front line; the back lines are cut to the top of the area
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
@@ -3295,7 +3295,7 @@ namespace BrickSDR
 
         // peaks are drawn higher: the level (0..1 of the dB scale) is unchanged up to the knee (noise and its colours stay as they were),
         // above it the height grows B3D_PEAK_GAIN times faster; the colour gradient follows the same curve so a level keeps its colour
-        private const float B3D_KNEE = 0.30f, B3D_PEAK_GAIN = 2.2f;
+        private const float B3D_KNEE = 0.30f, B3D_PEAK_GAIN = 3.5f;
         private static float b3dLift(float v) { return v <= B3D_KNEE ? v : B3D_KNEE + (v - B3D_KNEE) * B3D_PEAK_GAIN; }
         private static readonly float B3D_LIFT1 = B3D_KNEE + (1f - B3D_KNEE) * B3D_PEAK_GAIN;
         private static bool _b3dSlant = false, _b3dGridPass = false;
@@ -9486,7 +9486,7 @@ namespace BrickSDR
                     {
                         // 3D: the ridges narrow towards the back (scale 0.72 at the back line), so the notch follows them: a slanted band from
                         // the front line to the back line, then straight up behind the highest peaks
-                        float yF = nVerticalShift + H - 1, yB = nVerticalShift + H * 0.42f, yT = nVerticalShift + top;
+                        float yF = nVerticalShift + H - 1, yB = nVerticalShift + H * 0.36f, yT = nVerticalShift + top;
                         Func<float, float> back = x => W * 0.5f * (1f - 0.72f) + 0.72f * x;
                         drawLineDX2D(p, notch_centre_x, yF, back(notch_centre_x), yB);
                         if (yT < yB) drawLineDX2D(p, back(notch_centre_x), yB, back(notch_centre_x), yT);

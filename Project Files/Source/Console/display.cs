@@ -3227,12 +3227,12 @@ namespace BrickSDR
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
             float yFront = H - 1, yBack = H * 0.36f;
-            float ampFront = H;                                                        // b3dG = 1 (the waterfall's top colour) is the full height of the area
+            float ampFront = Math.Min(H - 2f, W * B3D_ASPECT);                        // b3dG = 1: full height of a low area, in a tall one the proportions of the width
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
                 float yBase = yBack + (yFront - yBack) * t;
-                float amp = ampFront, hMax = yBase - 2f;                    // peaks that would leave the area are cut at its top
+                float amp = Math.Min(ampFront, yBase - 2f), hMax = yBase - 2f;   // a back line has less room above it: its ridges are lower (perspective), not cut
                 float scale = 0.72f + 0.28f * t;
                 float xl = W * 0.5f * (1f - scale), xs = W * scale / (B3D_POINTS - 1);
                 float[] line = hist[k];
@@ -3301,13 +3301,16 @@ namespace BrickSDR
         // height of a level (0..1 of the dB scale) as part of the area height: up to the waterfall's low threshold (the noise) as before
         // (0.58 of the area per unit of level), from there straight up to the full height at the waterfall's high threshold, so the
         // signals the waterfall paints red hit the ceiling. The colour gradient uses the same curve: a level keeps its waterfall colour.
+        private const float B3D_NOISE = 0.06f, B3D_TOP = 0.88f;      // height of the noise at the low threshold, of a signal at the high threshold
+        private const float B3D_ASPECT = 0.22f;                       // the highest peak is at most this part of the width: a tall area doesn't stretch the ridges
         private static readonly float[] _b3dVLow = { 0.3f, 0.3f, 0.3f }, _b3dVHigh = { 0.8f, 0.8f, 0.8f };
         private static float b3dG(int rx, float v)
         {
             float lo = _b3dVLow[rx], hi = Math.Max(lo + 0.05f, _b3dVHigh[rx]);
-            if (v <= lo) return Math.Max(0f, v * 0.58f);
-            float a = lo * 0.58f;
-            return Math.Min(1f, a + (1f - a) * (v - lo) / (hi - lo));
+            if (v <= lo) return lo <= 0f ? 0f : Math.Max(0f, B3D_NOISE * v / lo);         // the noise stays a low carpet
+            float x = B3D_NOISE + (B3D_TOP - B3D_NOISE) * (v - lo) / (hi - lo);             // linear in dB up to the high threshold
+            if (x > B3D_TOP) x = B3D_TOP + (1f - B3D_TOP) * (1f - (float)Math.Exp(-(x - B3D_TOP) / (1f - B3D_TOP)));   // above it bends softly, never a flat top
+            return Math.Min(1f, x);
         }
         private static bool _b3dSlant = false, _b3dGridPass = false;
         private static object[] _b3dNotchArgs = null;

@@ -3295,6 +3295,7 @@ namespace BrickSDR
 
         private static bool _b3dSlant = false, _b3dGridPass = false;
         private static object[] _b3dNotchArgs = null;
+        private static readonly List<object[]> _b3dDbLabels = new List<object[]>();
 
         unsafe private static void Draw3DDX2D(int nVerticalShift, int W, int H, int rx)
         {
@@ -3358,7 +3359,7 @@ namespace BrickSDR
 
             // back wall: the normal frequency grid
             long le, re;
-            _b3dNotchArgs = null; _b3dGridPass = true;
+            _b3dNotchArgs = null; _b3dGridPass = true; _b3dDbLabels.Clear();
             try { drawPanadapterAndWaterfallGridDX2D(nVerticalShift, W, H, rx, rx == 2, out le, out re, false); }
             finally { _b3dGridPass = false; }
 
@@ -3384,6 +3385,11 @@ namespace BrickSDR
                 try { handleNotches((int)a[0], (bool)a[1], (int)a[2], (int)a[3], (int)a[4], (int)a[5], (int)a[6], (int)a[7], (int)a[8], (int)a[9], true); }
                 finally { _b3dSlant = false; }
             }
+
+            // the dB scale on the left, in front of the ridges
+            foreach (object[] l in _b3dDbLabels.ToArray())
+                drawStringDX2D((string)l[0], fontDX2d_font9, (SharpDX.Direct2D1.Brush)l[1], (int)l[2], (int)l[3]);
+            _b3dDbLabels.Clear();
 
             // the band edge lines in front of the ridges too
             foreach (int ex in _brickEdgeX[rx == 2 ? 1 : 0].ToArray())
@@ -10479,7 +10485,8 @@ namespace BrickSDR
                         y -= 8;
                         if (y + 9 < H)
                         {
-                            drawStringDX2D(label, fontDX2d_font9, brTextLabel, x, nVerticalShift + y);
+                            if (_b3dGridPass) _b3dDbLabels.Add(new object[] { label, brTextLabel, x, nVerticalShift + y });   // 3D draws the dB scale after the ridges
+                            else drawStringDX2D(label, fontDX2d_font9, brTextLabel, x, nVerticalShift + y);
                         }
                     }
                 }

@@ -3201,7 +3201,7 @@ namespace BrickSDR
                 Color c = waterfallEnhancedColour((dbm - lowT) / (highT - lowT), low);
                 // the darkest part of the palette would disappear on the dark background: keep a minimum brightness
                 int r = Math.Max((int)c.R, 30), gg = Math.Max((int)c.G, 50), b = Math.Max((int)c.B, 120);
-                stops[n] = new GradientStop { Position = pos, Color = new SharpDX.Mathematics.Interop.RawColor4(r / 255f, gg / 255f, b / 255f, 1f) };
+                stops[n] = new GradientStop { Position = b3dLift(pos) / B3D_LIFT1, Color = new SharpDX.Mathematics.Interop.RawColor4(r / 255f, gg / 255f, b / 255f, 1f) };
             }
             using (GradientStopCollection sc = new GradientStopCollection(_d2dRenderTarget, stops))
                 _b3dLineGrad[rx] = new SharpDX.Direct2D1.LinearGradientBrush(_d2dRenderTarget, new LinearGradientBrushProperties { StartPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 0), EndPoint = new SharpDX.Mathematics.Interop.RawVector2(0, 1) }, sc);
@@ -3224,12 +3224,12 @@ namespace BrickSDR
             if (_b3dFill[rx] == null) { _b3dFill[rx] = new PathGeometry[B3D_LAYERS]; _b3dEdge[rx] = new PathGeometry[B3D_LAYERS]; _b3dBase[rx] = new float[B3D_LAYERS]; _b3dAmp[rx] = new float[B3D_LAYERS]; }
             b3dDisposeGeometry(rx);
             float yFront = H - 1, yBack = H * 0.42f;
-            float ampFront = H * 0.85f;                                                // peak height of the front line; the back lines are cut to the top of the area
+            float ampFront = H * 0.58f * B3D_LIFT1;                                    // height of a full-scale peak of the front line; the back lines are cut to the top of the area
             for (int k = B3D_LAYERS - cnt; k < B3D_LAYERS; k++)
             {
                 float t = (k - (B3D_LAYERS - cnt)) / (float)Math.Max(1, cnt - 1);      // 0 = back, 1 = front
                 float yBase = yBack + (yFront - yBack) * t;
-                float amp = Math.Min(ampFront, yBase - 2f);
+                float amp = ampFront, hMax = yBase - 2f;                    // peaks that would leave the area are cut at its top
                 float scale = 0.72f + 0.28f * t;
                 float xl = W * 0.5f * (1f - scale), xs = W * scale / (B3D_POINTS - 1);
                 float[] line = hist[k];
@@ -3239,7 +3239,7 @@ namespace BrickSDR
                 using (GeometrySink sink = fill.Open())
                 {
                     sink.BeginFigure(new SharpDX.Vector2(xl, yBase), FigureBegin.Filled);
-                    for (int p = 0; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - line[p] * amp));
+                    for (int p = 0; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - Math.Min(hMax, b3dLift(line[p]) / B3D_LIFT1 * amp)));
                     sink.AddLine(new SharpDX.Vector2(xl + W * scale, yBase));
                     sink.EndFigure(FigureEnd.Closed);
                     sink.Close();
@@ -3247,8 +3247,8 @@ namespace BrickSDR
                 PathGeometry edge = new PathGeometry(_d2dFactory);
                 using (GeometrySink sink = edge.Open())
                 {
-                    sink.BeginFigure(new SharpDX.Vector2(xl, yBase - line[0] * amp), FigureBegin.Hollow);
-                    for (int p = 1; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - line[p] * amp));
+                    sink.BeginFigure(new SharpDX.Vector2(xl, yBase - Math.Min(hMax, b3dLift(line[0]) / B3D_LIFT1 * amp)), FigureBegin.Hollow);
+                    for (int p = 1; p < B3D_POINTS; p++) sink.AddLine(new SharpDX.Vector2(xl + xs * p, yBase - Math.Min(hMax, b3dLift(line[p]) / B3D_LIFT1 * amp)));
                     sink.EndFigure(FigureEnd.Open);
                     sink.Close();
                 }
@@ -3293,7 +3293,11 @@ namespace BrickSDR
             _b3dDirty[rx] = false;
         }
 
-        private const float B3D_HEIGHT_GAIN = 3f;
+        // peaks are drawn higher: the level (0..1 of the dB scale) is unchanged up to the knee (noise and its colours stay as they were),
+        // above it the height grows B3D_PEAK_GAIN times faster; the colour gradient follows the same curve so a level keeps its colour
+        private const float B3D_KNEE = 0.30f, B3D_PEAK_GAIN = 2.2f;
+        private static float b3dLift(float v) { return v <= B3D_KNEE ? v : B3D_KNEE + (v - B3D_KNEE) * B3D_PEAK_GAIN; }
+        private static readonly float B3D_LIFT1 = B3D_KNEE + (1f - B3D_KNEE) * B3D_PEAK_GAIN;
         private static bool _b3dSlant = false, _b3dGridPass = false;
         private static object[] _b3dNotchArgs = null;
         private static readonly List<object[]> _b3dDbLabels = new List<object[]>();
@@ -3352,7 +3356,7 @@ namespace BrickSDR
                     int a = p * n / B3D_POINTS, b = Math.Max(a + 1, (p + 1) * n / B3D_POINTS);
                     float mx = float.MinValue;
                     for (int i = a; i < b && i < n; i++) if (data[i] > mx) mx = data[i];
-                    line[p] = Math.Max(0f, Math.Min(1f, B3D_HEIGHT_GAIN * (mx + offset - grid_min) / range));       // ridges are drawn 3 times higher than the plain dB scale gives
+                    line[p] = Math.Max(0f, Math.Min(1f, (mx + offset - grid_min) / range));
                 }
                 if (_b3dCount[rx] < B3D_LAYERS) _b3dCount[rx]++;
                 _b3dDirty[rx] = true;

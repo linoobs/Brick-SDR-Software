@@ -15512,8 +15512,8 @@ namespace BrickSDR
             if (initializing) return;
             UpdateAlexTXFilter();
             UpdateAlexRXFilter();
-            
-            Display.CentreFreqRX2 = rx2_dds_freq_mhz;            
+
+            Display.CentreFreqRX2 = rx2_dds_freq_mhz;
 
             if (HardwareSpecific.Model == HPSDRModel.ORIONMKII ||
                 HardwareSpecific.Model == HPSDRModel.ANAN7000D ||
@@ -47662,10 +47662,7 @@ namespace BrickSDR
 
             if (!bShowLimitValue)
             {                
-                if (ptbTune.IsConstrained)
-                    lblTune.Text = sHeader + ":  (" + sValue + ")";
-                else
-                    lblTune.Text = sHeader + ":  " + sValue;
+                lblTune.Text = sHeader + ":  " + sValue;      // Brick: no brackets round a limited value
             }
             else
             {
@@ -47775,6 +47772,7 @@ namespace BrickSDR
 
             lblPWR.Enabled = ptbPWR.Enabled;
             lblTune.Enabled = ptbTune.Enabled;
+            brickApplyTuneState();                      // Brick: the right look at once, not at the next 200 ms tick (the slider lit up / the label darkened for a moment)
         }
         private int setPowerFromDriveSlider(out bool bConstrain, bool bAdjustedBySliderControl)
         {

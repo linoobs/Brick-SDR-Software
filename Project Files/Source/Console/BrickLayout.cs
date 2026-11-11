@@ -792,12 +792,23 @@ namespace BrickSDR
                 xx += brickX(3);
                 put(chk3D1, brickX(40));
             }
-            bool two = chkRX2 != null && chkRX2.Checked && !_mox;
-            picMultiMeterDigital.SetBounds(6, brickY(4), meterW - 12, brickY(two ? 74 : 128));
-            picRX2Meter.SetBounds(6, brickY(80), meterW - 12, brickY(52));
-            picRX2Meter.Visible = two;
-            picMultiMeterDigital.Invalidate();
+            brickMeterW = meterW;
+            brickLayoutMeters(meterW);
             if (brickYOrig.Count > 0) brickApplyScale();
+        }
+        private int brickMeterW;
+
+        // the two S-meters: one tall meter while transmitting (or without RX2), two small ones with RX2 on receive.
+        // Only this changes at the MOX edge; laying out the whole top bar again made the VFO boxes flash.
+        private void brickLayoutMeters(int meterW)
+        {
+            bool two = chkRX2 != null && chkRX2.Checked && !_mox;
+            Rectangle a = new Rectangle(6, brickY(4), meterW - 12, brickY(two ? 74 : 128));
+            if (picMultiMeterDigital.Bounds != a) picMultiMeterDigital.SetBounds(a.X, a.Y, a.Width, a.Height);
+            Rectangle b = new Rectangle(6, brickY(80), meterW - 12, brickY(52));
+            if (picRX2Meter.Bounds != b) picRX2Meter.SetBounds(b.X, b.Y, b.Width, b.Height);
+            if (picRX2Meter.Visible != two) picRX2Meter.Visible = two;
+            picMultiMeterDigital.Invalidate();
         }
 
         #endregion
@@ -2011,6 +2022,25 @@ namespace BrickSDR
 
         private ToolStripStatusLabel brickSpeedLabel;
 
+        // tune power slider and its label: lit while Setup - Transmit makes TUNE or 2TONE use this slider; also called from
+        // setupTuneDriveSlider, which the old code runs on every TUNE / 2TONE change (it enables the slider and darkens the label first)
+        private void brickApplyTuneState()
+        {
+            if (!brickActive || lblTune == null || ptbTune == null) return;
+            bool tuneOn = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER || TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+            Color want = tuneOn ? lblPWR.ForeColor : cMuted;
+            if (!lblTune.Enabled) lblTune.Enabled = true;   // a disabled label would ignore the colour
+            if (lblTune.ForeColor != want) lblTune.ForeColor = want;
+            if (lblTune.Text.StartsWith("Tu | 2T")) lblTune.Text = "Tune" + lblTune.Text.Substring(7);
+            // like Drive: while transmitting, the slider works only for the mode that uses it (TUNE / 2TONE), not for a normal over
+            bool tuneCan;
+            if (chkTUN.Checked) tuneCan = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+            else if (chk2TONE.Checked) tuneCan = TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
+            else if (_mox) tuneCan = false;
+            else tuneCan = tuneOn;
+            if (ptbTune.Enabled != tuneCan) ptbTune.Enabled = tuneCan;
+        }
+
         private void brickTick(object sender, EventArgs e)
         {
             brickHideDigitalSettings();
@@ -2034,7 +2064,7 @@ namespace BrickSDR
                 catch { }
             }
             try { radeAutoLevelTick(); digiTapAutoLevelTick(); brickLogBarUpdate(); } catch { }
-            if (_mox != brickLastMox) { brickLastMox = _mox; layoutTop(); }
+            if (_mox != brickLastMox) { brickLastMox = _mox; if (brickMeterW > 0) brickLayoutMeters(brickMeterW); else layoutTop(); }
             if (!initializing && !IsSetupFormNull)
             {
                 // moving a volume slider ends MUTE
@@ -2047,21 +2077,7 @@ namespace BrickSDR
                 }
             }
             foreach (Action a in brickAgcSyncs) a();
-            {
-                // tune power: lit while Setup - Transmit makes TUNE or 2TONE use this slider
-                bool tuneOn = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER || TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
-                Color want = tuneOn ? lblPWR.ForeColor : cMuted;
-                if (!lblTune.Enabled) lblTune.Enabled = true;   // a disabled label would ignore the colour
-                if (lblTune.ForeColor != want) lblTune.ForeColor = want;
-                if (lblTune.Text.StartsWith("Tu | 2T")) lblTune.Text = "Tune" + lblTune.Text.Substring(7);
-                // like Drive: while transmitting, the slider works only for the mode that uses it (TUNE / 2TONE), not for a normal over
-                bool tuneCan;
-                if (chkTUN.Checked) tuneCan = TuneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
-                else if (chk2TONE.Checked) tuneCan = TwoToneDrivePowerOrigin == DrivePowerSource.TUNE_SLIDER;
-                else if (_mox) tuneCan = false;
-                else tuneCan = tuneOn;
-                if (ptbTune.Enabled != tuneCan) ptbTune.Enabled = tuneCan;
-            }
+            brickApplyTuneState();
             brickKeepBandFont(txtVFOABand); brickKeepBandFont(txtVFOBBand);
             pbAutoAttWarningRX1.Visible = false; pbAutoAttWarningRX2.Visible = false;
             brickMirrorLabel(lblFbMirror, infoBar.FeedbackLabel); brickMirrorLabel(lblPsMirror, infoBar.PureSignalLabel);

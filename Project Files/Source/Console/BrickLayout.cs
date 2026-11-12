@@ -2064,6 +2064,7 @@ namespace BrickSDR
                 catch { }
             }
             try { radeAutoLevelTick(); digiTapAutoLevelTick(); brickLogBarUpdate(); } catch { }
+            brickUpdateTick();
             if (_mox != brickLastMox) { brickLastMox = _mox; if (brickMeterW > 0) brickLayoutMeters(brickMeterW); else layoutTop(); }
             if (!initializing && !IsSetupFormNull)
             {

@@ -91,6 +91,22 @@ namespace BrickSDR
             btnVisit.Enabled = false;
             btnUpdatedRelease.Visible = false;
 
+            // Brick-SDR: check for a new Brick-SDR release (BrickUpdate.cs)
+            ButtonTS bUpd = new ButtonTS { Name = "brickBtnCheckUpdate", Text = "Check for\r\nupdates", FlatStyle = FlatStyle.Flat, BackColor = System.Drawing.SystemColors.ControlLight, Location = new System.Drawing.Point(524, 449), Size = new System.Drawing.Size(88, 36) };
+            System.Windows.Forms.Timer tUpd = new System.Windows.Forms.Timer { Interval = 400 };
+            tUpd.Tick += (s, e) =>
+            {
+                if (console.UpdateBusy) return;
+                tUpd.Stop();
+                bUpd.Enabled = true;
+                if (console.UpdateAvailable) { bUpd.Text = "Check for\r\nupdates"; console.UpdateShow(); }
+                else bUpd.Text = console.UpdateStatus.StartsWith("Check failed") || console.UpdateStatus.StartsWith("Could not") ? "Check failed" : "Up to date";
+            };
+            bUpd.Click += (s, e) => { bUpd.Enabled = false; bUpd.Text = "Checking..."; console.updCheck(true); tUpd.Start(); };
+            Controls.Add(bUpd);
+            bUpd.BringToFront();
+            FormClosed += (s, e) => tUpd.Dispose();
+
             _cancellationTokenSource = new CancellationTokenSource();
             _fetchJsonTask = fetchJsonAsync(_cancellationTokenSource.Token);
         }

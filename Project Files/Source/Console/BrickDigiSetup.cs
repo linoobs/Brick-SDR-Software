@@ -261,6 +261,20 @@ namespace BrickSDR
 
             tcGeneral.TabPages.Add(tpBrickDigi);       // the last page, after Navigation
 
+            // Updates: automatic check of the GitHub releases (BrickUpdate.cs)
+            TabPage up = new TabPage("Updates") { Name = "tpBrickUpdates", BackColor = SystemColors.Control };
+            CheckBox cu = new CheckBox { Text = "Check for new versions automatically", AutoSize = true, Location = new Point(16, 18), Checked = console.UpdateAuto };
+            cu.CheckedChanged += (s, e) => console.UpdateAuto = cu.Checked;
+            Button bu = new Button { Text = "Check now", Location = new Point(16, 50), Size = new Size(110, 26) };
+            Label lu = new Label { AutoSize = false, Location = new Point(136, 54), Size = new Size(540, 20), Text = "Installed: " + BrickBranding.Version };
+            bu.Click += (s, e) => { console.updCheck(true); };
+            Timer tu = new Timer { Interval = 700 };
+            tu.Tick += (s, e) => { if (up.Visible && !string.IsNullOrEmpty(console.UpdateStatus) && lu.Text != console.UpdateStatus) lu.Text = console.UpdateStatus; };
+            tu.Start();
+            up.Controls.AddRange(new Control[] { cu, bu, lu, new Label { AutoSize = false, Location = new Point(16, 90), Size = new Size(660, 50),
+                Text = "When a newer release is on GitHub, the status bar shows \"Update x.y.z available\"; click it to read what changed, download the installer or update." } });
+            tcGeneral.TabPages.Add(up);
+
             // the status line follows the reporter while the tab is shown
             brickDigiTimer = new Timer { Interval = 1000 };
             brickDigiTimer.Tick += (s, e) =>

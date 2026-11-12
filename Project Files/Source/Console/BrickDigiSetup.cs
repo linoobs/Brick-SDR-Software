@@ -148,7 +148,7 @@ namespace BrickSDR
             if (tpBrickDigi != null) return;
             tpBrickDigi = new TabPage("DIGI MODES") { Name = "tpBrickDigiModes", BackColor = SystemColors.Control };
             TabControl tc = new TabControl { Name = "brickTcDigiModes", Dock = DockStyle.Fill };
-            TabPage ft = new TabPage("FT8/FT4") { BackColor = SystemColors.Control };
+            TabPage ft = new TabPage("FT8/FT4") { BackColor = SystemColors.Control, AutoScroll = true };
             TabPage rtty = new TabPage("RTTY") { BackColor = SystemColors.Control };
             TabPage fdv = new TabPage("FreeDV") { BackColor = SystemColors.Control };
             tc.TabPages.AddRange(new[] { ft, rtty, fdv });
@@ -170,11 +170,11 @@ namespace BrickSDR
             ft.Controls.Add(grp);
 
             // FT8 / FT4: stations that are not answered
-            GroupBox gb = new GroupBox { Text = "Stations that are not answered", Location = new Point(10, 146), Size = new Size(680, 256) };
+            GroupBox gb = new GroupBox { Text = "Stations that are not answered", Location = new Point(10, 146), Size = new Size(680, 214) };
             ComboBox cb = new ComboBox { Location = new Point(16, 54), Width = 250, DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems };
             try { cb.Items.AddRange(CountryData.AllCountries().ToArray()); } catch { }
             Button add = new Button { Text = "Add", Location = new Point(274, 52), Size = new Size(70, 25) };
-            ListBox lb = new ListBox { Location = new Point(16, 88), Size = new Size(328, 132), IntegralHeight = false };
+            ListBox lb = new ListBox { Location = new Point(16, 88), Size = new Size(328, 96), IntegralHeight = false };
             Button rem = new Button { Text = "Remove", Location = new Point(354, 88), Size = new Size(80, 25) };
             Label ghelp = new Label
             {
@@ -183,10 +183,10 @@ namespace BrickSDR
             };
             Label gnote = new Label
             {
-                AutoSize = false, Location = new Point(354, 120), Size = new Size(312, 100), ForeColor = SystemColors.GrayText,
+                AutoSize = false, Location = new Point(354, 120), Size = new Size(312, 76), ForeColor = SystemColors.GrayText,
                 Text = "A call sign entry works too: \"3Y0K\" is that call only, \"UA*\" is every call starting with UA. Use it for expedition calls and new prefixes: the country table inside the program is from March 2026 and doesn't know them. A call the table doesn't know is never blocked."
             };
-            CheckBox unk = new CheckBox { Text = "Do not answer stations whose country is unknown to the table (hashed calls, new prefixes, expeditions)", AutoSize = true, Location = new Point(16, 226) };
+            CheckBox unk = new CheckBox { Text = "Do not answer stations whose country is unknown to the table (hashed calls, new prefixes, expeditions)", AutoSize = true, Location = new Point(16, 188) };
             unk.Checked = console.FtBlockUnknown;
             unk.CheckedChanged += (s, e) => console.FtBlockUnknown = unk.Checked;
             Button upd = new Button { Text = "Update prefix table", Location = new Point(354, 52), Size = new Size(140, 25) };

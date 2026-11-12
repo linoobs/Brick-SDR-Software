@@ -23681,6 +23681,18 @@ namespace BrickSDR
             Firewall.Setup();
         }
 
+        // Brick-SDR: Brick boards have no external 10 MHz reference input, the option is switched off and locked while one is connected
+        public void BrickLockExt10MHz(bool brick)
+        {
+            if (brick)
+            {
+                chkUsing10MHzRef.Checked = false;
+                if (chkExt10MHz.Checked) chkExt10MHz.Checked = false;
+            }
+            chkUsing10MHzRef.Enabled = !brick;
+            chkExt10MHz.Enabled = !brick;
+        }
+
         private void chkUsing10MHzRef_CheckedChanged(object sender, EventArgs e)
         {
             if (initializing) return;

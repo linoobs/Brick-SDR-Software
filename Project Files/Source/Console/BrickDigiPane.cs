@@ -43,7 +43,7 @@ namespace BrickSDR
             {
                 new[] { "CQ", "CQ CQ CQ DE {MY} {MY} {MY} PSE K\r\n" },
                 new[] { "Answer", "{CALL} DE {MY} {MY} KN\r\n" },
-                new[] { "Report", "{CALL} DE {MY} UR RST 599 599 NAME OP QTH HR = HW? {CALL} DE {MY} KN\r\n" },
+                new[] { "Report", "{CALL} DE {MY} UR RST 599 599 NAME {NAME} QTH {QTH} = HW? {CALL} DE {MY} KN\r\n" },
                 new[] { "73", "{CALL} DE {MY} TNX FER QSO 73 SK\r\n" },
             };
 
@@ -233,8 +233,9 @@ namespace BrickSDR
 
             private void macro(string text)
             {
-                string t = text.Replace("{MY}", c._digiMyCall).Replace("{CALL}", their.Text.Trim().ToUpperInvariant());
+                string t = text.Replace("{MY}", c._digiMyCall).Replace("{CALL}", their.Text.Trim().ToUpperInvariant()).Replace("{NAME}", c._digiMyName).Replace("{QTH}", c._digiMyQth);
                 if (c._digiMyCall.Length == 0) { status.Text = "Enter your call sign first"; return; }
+                if (text.Contains("{NAME}") && (c._digiMyName.Length == 0 || c._digiMyQth.Length == 0)) { status.Text = "Enter your name and QTH: Setup - General - DIGI MODES - CW / RTTY macros"; return; }
                 if (mode == "RTTY") c.RttySend(t, true);
                 else c.CwSend(t.Replace("\r\n", " "));
             }

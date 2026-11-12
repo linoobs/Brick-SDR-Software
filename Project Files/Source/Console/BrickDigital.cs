@@ -30,6 +30,7 @@ namespace BrickSDR
 
         // settings (digital.txt in the data folder)
         private string _digiMyCall = "";
+        internal string _digiMyName = "", _digiMyQth = "";
         internal bool _digiAutoLevel = true;          // automatic RX level of the digital modes (BrickRade.cs radeAutoLevelTick, BrickDigiLevel.cs)
         private int _digiRx;
         private double _rttyShift = 170, _rttyBaud = 45.45;
@@ -77,6 +78,8 @@ namespace BrickSDR
                     switch (k)
                     {
                         case "mycall": _digiMyCall = v.Trim().ToUpperInvariant(); break;
+                        case "myname": _digiMyName = v.Trim().ToUpperInvariant(); break;
+                        case "myqth": _digiMyQth = v.Trim().ToUpperInvariant(); break;
                         case "ftdual": _ftDual = v == "1"; break;
                         case "rx": if (num) _digiRx = d >= 1 ? 1 : 0; break;
                         case "shift": if (num && d > 20 && d < 2000) _rttyShift = d; break;
@@ -111,14 +114,14 @@ namespace BrickSDR
             catch { }
         }
 
-        private void digiSaveSettings()
+        internal void digiSaveSettings()
         {
             if (!_digiLoaded) digiLoadSettings();
             try
             {
                 File.WriteAllLines(DigiFile, new[]
                 {
-                    "mycall=" + _digiMyCall, "rx=" + _digiRx,
+                    "mycall=" + _digiMyCall, "myname=" + _digiMyName, "myqth=" + _digiMyQth, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
                     "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
                     "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "autolvl=" + (_digiAutoLevel ? 1 : 0), "logbar=" + (_digiLogBar ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "blocked=" + string.Join(";", _ftBlocked), "blockunknown=" + (_ftBlockUnknown ? 1 : 0), "cwdec=" + _cwKind, "ftdual=" + (_ftDual ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"

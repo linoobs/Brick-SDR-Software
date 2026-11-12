@@ -129,6 +129,7 @@ namespace BrickSDR
                 // not a Brick board: the model has to fit the board id the radio reports in discovery (Hermes Lite 2, Hermes, Angelia, Orion, Saturn ...);
                 // when the model chosen in Setup already belongs to that hardware family it stays (ANAN-10 / ANAN-100 / Hermes, ...)
                 IdentifiedBrick = false;
+                console.SetupForm.BrickLockExt10MHz(false);
                 HPSDRModel def;
                 if (DefaultModelFor(radio.DeviceType, out def) && HardwareSpecific.Hardware != radio.DeviceType)
                     console.SetupForm.SelectRadioModel(def);
@@ -137,6 +138,7 @@ namespace BrickSDR
 
             IdentifiedBrick = true;
             _name = name;
+            console.SetupForm.BrickLockExt10MHz(true);
             console.SetupForm.SelectRadioModel(model);
             BrickProfiles.ApplyOnce(console, name, _mac);
         }

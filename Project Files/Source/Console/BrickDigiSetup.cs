@@ -244,6 +244,19 @@ namespace BrickSDR
                        "of the FreeDV window, for the others it is applied to the copy of the audio the decoders read."
             });
 
+            // name and QTH sent by the Report macro of the CW / RTTY window
+            TabPage mc = new TabPage("CW / RTTY macros") { BackColor = SystemColors.Control };
+            tc.TabPages.Add(mc);
+            mc.Controls.Add(new Label { Text = "My name", AutoSize = true, Location = new Point(16, 19) });
+            TextBox tnm = new TextBox { Location = new Point(110, 16), Width = 160, Text = console._digiMyName };
+            mc.Controls.Add(new Label { Text = "My QTH", AutoSize = true, Location = new Point(16, 49) });
+            TextBox tqt = new TextBox { Location = new Point(110, 46), Width = 160, Text = console._digiMyQth };
+            tnm.TextChanged += (s, e) => { console._digiMyName = tnm.Text.Trim().ToUpperInvariant(); console.digiSaveSettings(); };
+            tqt.TextChanged += (s, e) => { console._digiMyQth = tqt.Text.Trim().ToUpperInvariant(); console.digiSaveSettings(); };
+            mc.Controls.Add(tnm); mc.Controls.Add(tqt);
+            mc.Controls.Add(new Label { AutoSize = false, Location = new Point(16, 80), Size = new Size(640, 40),
+                Text = "The Report button of the CW and RTTY windows sends \"NAME <name> QTH <QTH>\" with these values." });
+
             BrickBuildOnlineLogsPage(tc);
 
             tcGeneral.TabPages.Add(tpBrickDigi);       // the last page, after Navigation

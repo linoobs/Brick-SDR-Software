@@ -273,7 +273,79 @@ namespace BrickSDR
             tu.Start();
             up.Controls.AddRange(new Control[] { cu, bu, lu, new Label { AutoSize = false, Location = new Point(16, 90), Size = new Size(660, 50),
                 Text = "When a newer release is on GitHub, the status bar shows \"Update x.y.z available\"; click it to read what changed, download the installer or update." } });
-            tcGeneral.TabPages.Add(up);
+            tcSetup.TabPages.Add(up);          // top row of Setup, after Tests
+
+            // DX Cluster: call signs on the panadapter (BrickCluster.cs, BrickClusterDraw.cs)
+            TabPage dx = new TabPage("DX Cluster") { Name = "tpBrickDxCluster", BackColor = SystemColors.Control, AutoScroll = true };
+            CheckBox dOn = new CheckBox { Text = "Show DX cluster spots on the spectrum (the DXC button next to 3D)", AutoSize = true, Location = new Point(16, 14), Checked = DxCluster.Enabled };
+            dx.Controls.Add(new Label { Text = "Server", AutoSize = true, Location = new Point(16, 48) });
+            ComboBox dPre = new ComboBox { Location = new Point(110, 44), Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
+            dPre.Items.Add("Custom");
+            foreach (string[] p in DxCluster.Presets) dPre.Items.Add(p[0]);
+            dx.Controls.Add(new Label { Text = "Host / port", AutoSize = true, Location = new Point(16, 78) });
+            TextBox dHost = new TextBox { Location = new Point(110, 74), Width = 220, Text = DxCluster.Host };
+            NumericUpDown dPort = new NumericUpDown { Location = new Point(338, 74), Width = 72, Minimum = 1, Maximum = 65535, Value = Math.Max(1, Math.Min(65535, DxCluster.Port)) };
+            dx.Controls.Add(new Label { Text = "Log in as", AutoSize = true, Location = new Point(16, 108) });
+            TextBox dLogin = new TextBox { Location = new Point(110, 104), Width = 110, Text = DxCluster.Login, CharacterCasing = CharacterCasing.Upper };
+            dx.Controls.Add(new Label { Text = "empty = the call sign of the FT8 / RTTY / CW window", AutoSize = true, ForeColor = SystemColors.GrayText, Location = new Point(230, 108) });
+            Button dApply = new Button { Text = "Apply and reconnect", Location = new Point(110, 136), Size = new Size(150, 26) };
+            Button dClear = new Button { Text = "Clear spots", Location = new Point(268, 136), Size = new Size(110, 26) };
+            Label dStat = new Label { AutoSize = false, Location = new Point(16, 170), Size = new Size(660, 20), Text = "Status: " + DxCluster.Status };
+
+            GroupBox dg = new GroupBox { Text = "Labels", Location = new Point(10, 198), Size = new Size(680, 130) };
+            dg.Controls.Add(new Label { Text = "Show spots for the last", AutoSize = true, Location = new Point(16, 26) });
+            NumericUpDown dAge = new NumericUpDown { Location = new Point(150, 22), Width = 60, Minimum = 1, Maximum = 720, Value = Math.Max(1, Math.Min(720, DxCluster.MaxAgeMin)) };
+            dg.Controls.Add(new Label { Text = "minutes", AutoSize = true, Location = new Point(216, 26) });
+            dg.Controls.Add(new Label { Text = "Rows of labels", AutoSize = true, Location = new Point(300, 26) });
+            NumericUpDown dRows = new NumericUpDown { Location = new Point(392, 22), Width = 50, Minimum = 1, Maximum = 8, Value = Math.Max(1, Math.Min(8, DxCluster.Rows)) };
+            CheckBox dCw = new CheckBox { Text = "CW", AutoSize = true, Location = new Point(16, 58), Checked = DxCluster.ShowCw, ForeColor = Color.FromArgb(190, 130, 20) };
+            CheckBox dPh = new CheckBox { Text = "Phone", AutoSize = true, Location = new Point(76, 58), Checked = DxCluster.ShowPhone, ForeColor = Color.FromArgb(30, 150, 60) };
+            CheckBox dDg = new CheckBox { Text = "Digital", AutoSize = true, Location = new Point(150, 58), Checked = DxCluster.ShowDigital, ForeColor = Color.FromArgb(130, 70, 200) };
+            CheckBox dUn = new CheckBox { Text = "Mode not given", AutoSize = true, Location = new Point(230, 58), Checked = DxCluster.ShowUnknown };
+            CheckBox dFq = new CheckBox { Text = "Frequency after the call sign", AutoSize = true, Location = new Point(16, 88), Checked = DxCluster.ShowFreq };
+            dg.Controls.AddRange(new Control[] { dAge, dRows, dCw, dPh, dDg, dUn, dFq });
+            dx.Controls.Add(new Label { AutoSize = false, Location = new Point(16, 336), Size = new Size(660, 60), ForeColor = SystemColors.GrayText,
+                Text = "A click on a label tunes the receiver to the spot. Colours: CW orange, phone green, digital violet, mode not given white; older spots fade. " +
+                       "The Reverse Beacon Network entries show what skimmers hear (CW / RTTY, or FT8 / FT4), the others are spots made by operators." });
+
+            dx.Controls.AddRange(new Control[] { dOn, dPre, dHost, dPort, dLogin, dApply, dClear, dStat, dg });
+
+            int hit = 0;
+            for (int i = 0; i < DxCluster.Presets.Length; i++) if (DxCluster.Presets[i][1] == DxCluster.Host && DxCluster.Presets[i][2] == DxCluster.Port.ToString()) hit = i + 1;
+            dPre.SelectedIndex = hit;
+            dPre.SelectedIndexChanged += (s, e) =>
+            {
+                if (dPre.SelectedIndex <= 0) return;
+                string[] p = DxCluster.Presets[dPre.SelectedIndex - 1];
+                dHost.Text = p[1]; dPort.Value = int.Parse(p[2]);
+            };
+            dOn.CheckedChanged += (s, e) => { console.BrickDxClusterOn = dOn.Checked; };
+            dApply.Click += (s, e) =>
+            {
+                DxCluster.Host = dHost.Text.Trim().Length > 0 ? dHost.Text.Trim() : DxCluster.Host;
+                DxCluster.Port = (int)dPort.Value;
+                DxCluster.Login = dLogin.Text.Trim().ToUpperInvariant();
+                console.BrickDxClusterChanged(true);
+            };
+            dClear.Click += (s, e) => DxCluster.Clear();
+            dAge.ValueChanged += (s, e) => { DxCluster.MaxAgeMin = (int)dAge.Value; console.BrickDxClusterChanged(false); };
+            dRows.ValueChanged += (s, e) => { DxCluster.Rows = (int)dRows.Value; console.BrickDxClusterChanged(false); };
+            EventHandler flt = (s, e) =>
+            {
+                DxCluster.ShowCw = dCw.Checked; DxCluster.ShowPhone = dPh.Checked; DxCluster.ShowDigital = dDg.Checked; DxCluster.ShowUnknown = dUn.Checked; DxCluster.ShowFreq = dFq.Checked;
+                console.BrickDxClusterChanged(false);
+            };
+            dCw.CheckedChanged += flt; dPh.CheckedChanged += flt; dDg.CheckedChanged += flt; dUn.CheckedChanged += flt; dFq.CheckedChanged += flt;
+            Timer dt = new Timer { Interval = 800 };
+            dt.Tick += (s, e) =>
+            {
+                if (!dx.Visible) return;
+                string t = "Status: " + DxCluster.Status + (DxCluster.Enabled ? "   (" + DxCluster.Count() + " spots held)" : "");
+                if (dStat.Text != t) dStat.Text = t;
+                if (dOn.Checked != DxCluster.Enabled) dOn.Checked = DxCluster.Enabled;
+            };
+            dt.Start();
+            tcSetup.TabPages.Add(dx);          // top row of Setup, after Tests
 
             // the status line follows the reporter while the tab is shown
             brickDigiTimer = new Timer { Interval = 1000 };

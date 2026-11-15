@@ -3,7 +3,7 @@
     Update check: the program asks the GitHub releases of the project (latest release) a short time after the start and then every 6 hours.
     A newer version shows "Update x.y.z available" in the status bar; a click opens a window with a "What's new" button (the change log
     of the release), Download and install (downloads the .msi and starts the installer, the program closes and starts again) and
-    Skip this version. The check can be switched off in Setup - General - Updates (update.txt: auto=, skip=). The check is a plain
+    Skip this version. The check can be switched off in Setup - Updates (update.txt: auto=, skip=). The check is a plain
     GET of the public release data, nothing about the user or the program is sent.
 */
 

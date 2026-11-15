@@ -9,6 +9,32 @@ namespace BrickSDR
     public partial class Console
     {
         // Two modes on one button (LSB / USB): a click switches to the other one, the active name is lit
+        // thin strip with a small arrow at the side of the receiver displays: a click folds the side column away (and back)
+        private sealed class BrickSideHandle : Control
+        {
+            public bool PointLeft;            // the arrow points to the left when the column is open on the left side
+            private bool _hot;
+            public BrickSideHandle()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+                Cursor = Cursors.Hand;
+            }
+            protected override void OnMouseEnter(EventArgs e) { _hot = true; Invalidate(); base.OnMouseEnter(e); }
+            protected override void OnMouseLeave(EventArgs e) { _hot = false; Invalidate(); base.OnMouseLeave(e); }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                Graphics g = e.Graphics;
+                g.Clear(Parent != null ? Parent.BackColor : Color.Black);
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                int cx = Width / 2, cy = Height / 2, a = 5;
+                Point[] tri = PointLeft
+                    ? new[] { new Point(cx + 3, cy - a), new Point(cx + 3, cy + a), new Point(cx - 3, cy) }
+                    : new[] { new Point(cx - 3, cy - a), new Point(cx - 3, cy + a), new Point(cx + 3, cy) };
+                using (SolidBrush b = new SolidBrush(_hot ? Color.FromArgb(255, 138, 31) : Color.FromArgb(140, 146, 160)))
+                    g.FillPolygon(b, tri);
+            }
+        }
+
         private sealed class BrickModePair : Control
         {
             public string NameA, NameB, Extra; // Extra: small tag at the left (FT8)

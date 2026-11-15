@@ -66030,7 +66030,7 @@
             this.lblTXProfileWarning.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblTXProfileWarning.ForeColor = System.Drawing.Color.Black;
             this.lblTXProfileWarning.Image = null;
-            this.lblTXProfileWarning.Location = new System.Drawing.Point(609, 2);
+            this.lblTXProfileWarning.Location = new System.Drawing.Point(8, 476); // Brick: bottom left, the top row is full of tabs
             this.lblTXProfileWarning.Name = "lblTXProfileWarning";
             this.lblTXProfileWarning.Size = new System.Drawing.Size(134, 33);
             this.lblTXProfileWarning.TabIndex = 24;

@@ -50084,6 +50084,7 @@ namespace BrickSDR
         // Brick-SDR: the frequency can only be dragged by grabbing the visor (filter area of VFO A / B or the sub receiver)
         private void pnlDisplay_MouseDown(object sender, MouseEventArgs e)
         {
+            if (brickActive && e.Button == MouseButtons.Left && brickDxClick(e.X, e.Y)) return;      // a DX cluster label: tune to the spot
             bool onVisor = true;
             if (brickActive && e.Button == MouseButtons.Left && e.Y >= 15 && !m_bDraggingRx2Split)
                 onVisor = brickOverVisor(e);

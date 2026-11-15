@@ -532,6 +532,10 @@ namespace BrickSDR
             chk3D1.SetBounds(668, 3, 40, 22);
             row3.Controls.Add(chk3D1);
             chk3D1.CheckedChanged += (s, e) => { Display.Use3DRX1 = chk3D1.Checked; brickSave3D(); };
+            chkDxc = new CheckBox { Name = "brickDxc", Text = "DXC", Appearance = Appearance.Button };
+            chkDxc.SetBounds(712, 3, 44, 22);
+            row3.Controls.Add(chkDxc);
+            chkDxc.CheckedChanged += (s, e) => brickDxClusterToggle(chkDxc.Checked);
             // --- S-meters, the second one only while RX2 runs
             cardMeter = brickCard(pnlTop);
             cardMeter.SetBounds(1094, 6, 372, 154);
@@ -781,7 +785,7 @@ namespace BrickSDR
             {
                 // pan / zoom row: when the row is short the two sliders give room
                 int avail = cardOptsRow3.Width;
-                int panW = brickX(150), zoomW = brickX(130), deficit = Math.Max(0, brickX(712) - avail);
+                int panW = brickX(150), zoomW = brickX(130), deficit = Math.Max(0, brickX(760) - avail);
                 int cut = Math.Min((deficit + 1) / 2, panW - 60); panW -= cut; deficit -= cut;
                 cut = Math.Min(deficit, zoomW - 60); zoomW -= cut;
                 int xx = 0;
@@ -790,7 +794,8 @@ namespace BrickSDR
                 put(lblDisplayZoom, brickX(42)); put(ptbDisplayZoom, zoomW); xx += brickX(6);
                 foreach (Control zc in new Control[] { radDisplayZoom05, radDisplayZoom1x, radDisplayZoom2x, radDisplayZoom4x, btnDisplayZTB }) { put(zc, brickX(44)); xx += brickX(3); }
                 xx += brickX(3);
-                put(chk3D1, brickX(40));
+                put(chk3D1, brickX(40)); xx += brickX(4);
+                put(chkDxc, brickX(44));
             }
             brickMeterW = meterW;
             brickLayoutMeters(meterW);
@@ -1440,7 +1445,7 @@ namespace BrickSDR
             {
                 RadioButton ra = pairs[i][0], rb = pairs[i][1];
                 bool rx2Card = ra.Name.StartsWith("radRX2");
-                bool digi = i == 3 && !rx2Card;   // RX1: the DIGI drop-down, RX2 keeps DIGL / DIGU
+                bool digi = i == 3;   // the DIGI drop-down on both receivers
                 BrickModePair bp = new BrickModePair { NameA = digi ? "DIGU" : names[i][0], NameB = digi ? null : names[i][1], Font = new Font("Segoe UI", 8.5f) };
                 bp.SetBounds(8 + (i % 2) * (cw + gap), y0 + (i / 2) * (h + gap), cw, h);
                 bp.GetState = () => ra.Checked ? 1 : (rb.Checked ? 2 : 0);
@@ -1453,11 +1458,12 @@ namespace BrickSDR
                 };
                 if (digi)
                 {
-                    bp.GetState = () => (ra.Checked || rb.Checked || (brickDigiChoice == "CW" && (RX1DSPMode == DSPMode.CWL || RX1DSPMode == DSPMode.CWU))) ? 1 : 0;
-                    bp.TextFn = () => brickDigiLabel() + "  \u25BE";
-                    brickDigiButton = bp;
+                    Func<DSPMode> dm = () => rx2Card ? RX2DSPMode : RX1DSPMode;
+                    bp.GetState = () => (ra.Checked || rb.Checked || (brickDigiChoiceFor(rx2Card) == "CW" && (dm() == DSPMode.CWL || dm() == DSPMode.CWU))) ? 1 : 0;
+                    bp.TextFn = () => brickDigiLabel(rx2Card) + "  \u25BE";
+                    if (rx2Card) brickDigiButton2 = bp; else brickDigiButton = bp;
                     string digiSig = null;
-                    brickAgcSyncs.Add(() => { string sig = brickDigiLabel() + "|" + bp.GetState(); if (sig != digiSig) { digiSig = sig; bp.Invalidate(); } });   // follows mode changes made elsewhere (the CW buttons)
+                    brickAgcSyncs.Add(() => { string sig = brickDigiLabel(rx2Card) + "|" + bp.GetState(); if (sig != digiSig) { digiSig = sig; bp.Invalidate(); } });   // follows mode changes made elsewhere (the CW buttons)
                 }
                 ra.CheckedChanged += (s, e) => bp.Invalidate();
                 rb.CheckedChanged += (s, e) => bp.Invalidate();
@@ -1485,7 +1491,14 @@ namespace BrickSDR
 
         // what the DIGI button shows: the last choice from its menu (DIGU on a fresh install), kept in line with the real mode
         private string brickDigiChoiceValue;
-        private BrickModePair brickDigiButton;
+        private BrickModePair brickDigiButton, brickDigiButton2;
+        private string brickDigiChoice2 = "DIGU";   // RX2: kept for the session only
+        private string brickDigiChoiceFor(bool rx2) { return rx2 ? brickDigiChoice2 : brickDigiChoice; }
+        private void brickSetDigiChoice(bool rx2, string v)
+        {
+            if (rx2) { brickDigiChoice2 = v; if (brickDigiButton2 != null) brickDigiButton2.Invalidate(); }
+            else brickDigiChoice = v;
+        }
         private string BrickDigiFile { get { return Path.Combine(AppDataPath, "digi_choice.txt"); } }
         private string brickDigiChoice
         {
@@ -1506,11 +1519,11 @@ namespace BrickSDR
             }
         }
 
-        private string brickDigiLabel()
+        private string brickDigiLabel(bool rx2 = false)
         {
-            string c = brickDigiChoice;
-            DSPMode m = RX1DSPMode;
-            if (RadeEnabledOn(0)) return "FreeDV";
+            string c = brickDigiChoiceFor(rx2);
+            DSPMode m = rx2 ? RX2DSPMode : RX1DSPMode;
+            if (RadeEnabledOn(rx2 ? 1 : 0)) return "FreeDV";
             if (c == "RADE") c = m == DSPMode.DIGL ? "DIGL" : "DIGU";   // RADE was switched off: the mode it left
             // the real mode wins when it contradicts the choice (e.g. the mode was changed elsewhere)
             if (m == DSPMode.DIGL && (c == "DIGU" || c == "FT8" || c == "FT4" || c == "CW")) return "DIGL";
@@ -1553,14 +1566,14 @@ namespace BrickSDR
             };
             double[] ft;
             brickDigiFreq.TryGetValue(band, out ft);
-            add("DIGL", cur == DSPMode.DIGL, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "DIGL"; }, true);
-            add("DIGU", cur == DSPMode.DIGU, () => { brickDigiSet(rx2, DSPMode.DIGU, null); brickDigiChoice = "DIGU"; }, true);
+            add("DIGL", cur == DSPMode.DIGL, () => { brickDigiSet(rx2, DSPMode.DIGL, null); brickSetDigiChoice(rx2, "DIGL"); }, true);
+            add("DIGU", cur == DSPMode.DIGU, () => { brickDigiSet(rx2, DSPMode.DIGU, null); brickSetDigiChoice(rx2, "DIGU"); }, true);
             m.Items.Add(new ToolStripSeparator());
-            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT8", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickDigiChoice = "FT8"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT8"); }, ft != null);
-            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT4", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickDigiChoice = "FT4"; _digiRx = rx2 ? 1 : 0; brickFtOpen("FT4"); }, ft != null);
-            add("FreeDV", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(rx2 ? 1 : 0); SetRadeEnabled(rx2 ? 1 : 0, true); if (!rx2) brickDigiChoice = "RADE"; }, true);
-            add("RTTY", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGL, null); brickDigiChoice = "RTTY"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
-            add("CW", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickDigiChoice = "CW"; _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
+            add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT8", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickSetDigiChoice(rx2, "FT8"); _digiRx = rx2 ? 1 : 0; brickFtOpen("FT8"); }, ft != null);
+            add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT4", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickSetDigiChoice(rx2, "FT4"); _digiRx = rx2 ? 1 : 0; brickFtOpen("FT4"); }, ft != null);
+            add("FreeDV", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(rx2 ? 1 : 0); SetRadeEnabled(rx2 ? 1 : 0, true); brickSetDigiChoice(rx2, "RADE"); }, true);
+            add("RTTY", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGL, null); brickSetDigiChoice(rx2, "RTTY"); _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
+            add("CW", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickSetDigiChoice(rx2, "CW"); _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
             m.Items.Add(new ToolStripSeparator());
             add("Log bar", _digiLogBar, () => { _digiLogBar = !_digiLogBar; digiSaveSettings(); brickLogBarUpdate(); }, true);
             add("Log QSO...", false, () => brickLogQsoDialog("", rx2 ? 1 : 0), true);
@@ -1601,12 +1614,46 @@ namespace BrickSDR
 
         #region centre
 
+        // arrows at both sides of the receiver displays fold the left (receive / transmit) and right (band / mode / filter) columns away; the displays take their room
+        private string BrickSidesFile { get { return Path.Combine(AppDataPath, "side_panels.txt"); } }
+        private void brickBuildSideHandles(Panel dispCard)
+        {
+            pnlCenter.Padding = new Padding(0);
+            BrickSideHandle hl = new BrickSideHandle { Name = "brickSideL", Dock = DockStyle.Left, Width = 16 };
+            BrickSideHandle hr = new BrickSideHandle { Name = "brickSideR", Dock = DockStyle.Right, Width = 16 };
+            pnlCenter.Controls.Add(hl);
+            pnlCenter.Controls.Add(hr);
+            dispCard.BringToFront();   // the filling card is laid out last
+            ToolTip tt = new ToolTip(); bool hideL = false, hideR = false;   // own flags: Control.Visible is false while the form is not shown yet
+            Action refresh = () =>
+            {
+                hl.PointLeft = !hideL; hr.PointLeft = hideR;
+                hl.Invalidate(); hr.Invalidate();
+                tt.SetToolTip(hl, !hideL ? "Hide the left column" : "Show the left column");
+                tt.SetToolTip(hr, !hideR ? "Hide the right column" : "Show the right column");
+            };
+            Action save = () => { try { File.WriteAllText(BrickSidesFile, (hideL ? "0" : "1") + "," + (hideR ? "0" : "1")); } catch { } };
+            hl.Click += (s, e) => { hideL = !hideL; pnlLeft.Visible = !hideL; refresh(); save(); m_bResizeDX2Display = true; };
+            hr.Click += (s, e) => { hideR = !hideR; pnlRight.Visible = !hideR; refresh(); save(); m_bResizeDX2Display = true; };
+            try
+            {
+                if (File.Exists(BrickSidesFile))
+                {
+                    string[] t = File.ReadAllText(BrickSidesFile).Trim().Split(',');
+                    if (t.Length == 2) { hideL = t[0] == "0"; hideR = t[1] == "0"; pnlLeft.Visible = !hideL; pnlRight.Visible = !hideR; }
+                }
+            }
+            catch { }
+            refresh();
+        }
+
         private void buildCenter()
         {
             Panel dispCard = brickCard(pnlCenter);
             dispCard.Dock = DockStyle.Fill;
             dispCard.Padding = new Padding(4);
             brickDispCard = dispCard;
+            brickBuildSideHandles(dispCard);
 
             // pan and zoom of the second receiver, below the bottom waterfall (only while RX2 runs)
             pnlRx2View = new Panel { Dock = DockStyle.Bottom, Height = 30, BackColor = cCard, Visible = false };
@@ -1642,6 +1689,7 @@ namespace BrickSDR
             pnlRx2View.Controls.Add(chk3D2);
             chk3D2.CheckedChanged += (s, e) => { Display.Use3DRX2 = chk3D2.Checked; brickSave3D(); };
             brickLoad3D();
+            brickDxClusterInit();
             rx2ZoomValue = z2.Value;
             foreach (CheckBox zb3 in rx2ZoomButtons) zb3.Checked = (int)zb3.Tag == z2.Value;
             p2.Scroll += (s, e) => applyRx2View(p2, z2);

@@ -200,7 +200,7 @@ namespace BrickSDR
                 if (brickDigiFreq.TryGetValue(b, out f))
                 {
                     brickDigiSet(rx2, DSPMode.DIGU, f[_ftMode == "FT4" ? 1 : 0]);
-                    if (!rx2) brickDigiChoice = _ftMode;
+                    brickSetDigiChoice(rx2, _ftMode);
                 }
                 else brickDigiSet(rx2, DSPMode.DIGU, null);
             }
@@ -234,7 +234,7 @@ namespace BrickSDR
             {
                 if (_ftDual == value) return;
                 _ftDual = value;
-                if (value) ftPrepareSecondReceiver(); else ftDualRelease();
+                if (value) ftPrepareSecondReceiver(); else ftDualRelease(true);
                 digiSaveSettings();
                 if (_ftPane != null) _ftPane.Refresh2();
             }
@@ -245,9 +245,11 @@ namespace BrickSDR
 
         // RX2 was switched on by Dual RX (it was off): it goes off again when Dual RX ends or the window closes
         private bool _ftDualOpenedRx2;
-        private void ftDualRelease()
+        private void ftDualRelease(bool force = false)
         {
             ftShowAllReceivers();
+            // the Dual RX button itself: RX2 goes off even when it was already on before (it is the second receiver of Dual RX, the transmit one is RX1)
+            if (force && _digiRx == 0 && RX2Enabled) _ftDualOpenedRx2 = true;
             if (!_ftDualOpenedRx2) return;
             _ftDualOpenedRx2 = false;
             try { if (RX2Enabled) chkRX2.Checked = false; } catch { }

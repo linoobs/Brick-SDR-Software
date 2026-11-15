@@ -140,6 +140,7 @@ namespace BrickSDR
             _name = name;
             console.SetupForm.BrickLockExt10MHz(true);
             console.SetupForm.SelectRadioModel(model);
+            console.SetupForm.BrickEnableAutoAtt();
             BrickProfiles.ApplyOnce(console, name, _mac);
         }
 

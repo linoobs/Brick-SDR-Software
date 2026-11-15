@@ -854,6 +854,10 @@ namespace BrickSDR
             if (HardwareSpecific.Model == HPSDRModel.HERMESLITE)
                 include_extra_p1_rate = true;
 
+            // Brick-SDR: Hermes on protocol 1 can also be set to the 384 kHz view (the P1 sample rate code 3, ChannelMaster handles it)
+            if (HardwareSpecific.Model == HPSDRModel.HERMES)
+                include_extra_p1_rate = true;
+
             int[] p1_rates = include_extra_p1_rate ? new int[] { 48000, 96000, 192000, 384000 } : new int[] { 48000, 96000, 192000 };
             int[] p2_rates = { 48000, 96000, 192000, 384000, 768000, 1536000 };
 
@@ -23691,6 +23695,15 @@ namespace BrickSDR
             }
             chkUsing10MHzRef.Enabled = !brick;
             chkExt10MHz.Enabled = !brick;
+        }
+
+        // Brick-SDR: Auto Attenuate RX is available on every Brick board (the model switch above disables it for some models)
+        public void BrickEnableAutoAtt()
+        {
+            chkAutoATTRx1.Enabled = true;
+            chkAutoATTRx2.Enabled = true;
+            chkAutoATTRx1_CheckedChanged(this, EventArgs.Empty);
+            chkAutoATTRx2_CheckedChanged(this, EventArgs.Empty);
         }
 
         private void chkUsing10MHzRef_CheckedChanged(object sender, EventArgs e)

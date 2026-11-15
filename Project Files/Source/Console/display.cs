@@ -3434,6 +3434,8 @@ namespace BrickSDR
             int zx = _brickZeroX[rx == 2 ? 1 : 0];
             SharpDX.Direct2D1.Brush zp = _brickZeroPen[rx == 2 ? 1 : 0];
             if (zx >= 0 && zx <= W && zp != null) drawLineDX2D(zp, zx, nVerticalShift, zx, nVerticalShift + H, _brickZeroW[rx == 2 ? 1 : 0]);
+
+            drawDxSpotsDX2D(rx, W, H, nVerticalShift);      // DX cluster call signs (BrickClusterDraw.cs)
         }
 
         public static float RX2SplitRatio
@@ -6408,6 +6410,7 @@ namespace BrickSDR
 
                 drawRadeOverlayDX2D(rx, W, H, nVerticalShift);
                 drawKainosDigiMarkersDX2D(rx, W, H, nVerticalShift);       // RTTY tone markers (BrickDigiMarkers.cs)
+                drawDxSpotsDX2D(rx, W, H, nVerticalShift);                 // DX cluster call signs (BrickClusterDraw.cs)
 
                 _d2dRenderTarget.PopAxisAlignedClip();
             }

@@ -501,6 +501,8 @@
     <Compile Include="BrickModeStep.cs" />
     <Compile Include="BrickDigiPane.cs" />
     <Compile Include="BrickUpdate.cs" />
+    <Compile Include="BrickCluster.cs" />
+    <Compile Include="BrickClusterDraw.cs" />
     <Compile Include="BrickRadeCore.cs" />
     <Compile Include="BrickRade.cs" />
     <Compile Include="BrickRadeUi.cs" />

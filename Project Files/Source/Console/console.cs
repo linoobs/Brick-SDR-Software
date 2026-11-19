@@ -1,4 +1,4 @@
-﻿//=================================================================
+//=================================================================
 // console.cs
 //=================================================================
 // Thetis is a C# implementation of a Software Defined Radio.
@@ -40290,7 +40290,7 @@ namespace BrickSDR
             string sBand = BandToString(b);
             SetupRX2Band(sBand, is_for_rx1_vfo_b);
         }
-        private struct BrickBandMemo { public double Freq; public DSPMode Mode; public Filter Filter; }
+        private struct BrickBandMemo { public double Freq; public DSPMode Mode; public Filter Filter; public int Pan, Zoom; public bool HasView; public bool Ctun; public double Centre; public bool HasCtun; }
         private readonly Dictionary<Band, BrickBandMemo> brickRx2Memo = new Dictionary<Band, BrickBandMemo>();
         private bool brickRx2MemoLoaded = false;
         private string BrickVac2File { get { return Path.Combine(AppDataPath, "vac2_state.txt"); } }
@@ -40309,11 +40309,13 @@ namespace BrickSDR
                 foreach (string line in File.ReadAllLines(BrickRx2MemoFile))
                 {
                     string[] p = line.Split(';');
-                    if (p.Length != 4) continue;
+                    if (p.Length != 4 && p.Length != 6 && p.Length != 8) continue;
                     BrickBandMemo m = new BrickBandMemo();
                     m.Freq = double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture);
                     m.Mode = (DSPMode)Enum.Parse(typeof(DSPMode), p[2]);
                     m.Filter = (Filter)Enum.Parse(typeof(Filter), p[3]);
+                    if (p.Length == 6) { m.Pan = int.Parse(p[4]); m.Zoom = int.Parse(p[5]); m.HasView = true; }
+                    if (p.Length == 8) { m.Ctun = p[6] == "1"; m.Centre = double.Parse(p[7], System.Globalization.CultureInfo.InvariantCulture); m.HasCtun = true; }
                     brickRx2Memo[(Band)Enum.Parse(typeof(Band), p[0])] = m;
                 }
             }
@@ -40325,13 +40327,20 @@ namespace BrickSDR
             brickRx2Load();
             if (band == Band.FIRST || band == Band.LAST) return;
             if (_rx2_dsp_mode == DSPMode.FIRST || _rx2_dsp_mode == DSPMode.LAST) return;
+            // RX2Band lags behind VFO B during a band change: a memo is only written while the frequency really lies in that band
+            if (BandByFreq(VFOBFreq, rx2_xvtr_index, current_region) != band) return;
             BrickBandMemo m = new BrickBandMemo { Freq = VFOBFreq, Mode = _rx2_dsp_mode, Filter = rx2_filter };
+            // pan / zoom / CTUN are the live ones only while the controls belong to this band; during a band change they still hold the old band's values
+            BrickBandMemo prev;
+            bool had = brickRx2Memo.TryGetValue(band, out prev);
+            if (brickRx2PanBar != null && band == brickRx2BarsBand) { m.Pan = brickRx2PanBar.Value; m.Zoom = brickRx2ZoomBar.Value; m.HasView = true; m.Ctun = ClickTuneRX2Display; m.Centre = CentreRX2Frequency; m.HasCtun = true; }
+            else if (had) { m.Pan = prev.Pan; m.Zoom = prev.Zoom; m.HasView = prev.HasView; m.Ctun = prev.Ctun; m.Centre = prev.Centre; m.HasCtun = prev.HasCtun; }
             brickRx2Memo[band] = m;
             try
             {
                 List<string> lines = new List<string>();
                 foreach (KeyValuePair<Band, BrickBandMemo> kv in brickRx2Memo)
-                    lines.Add(kv.Key + ";" + kv.Value.Freq.ToString(System.Globalization.CultureInfo.InvariantCulture) + ";" + kv.Value.Mode + ";" + kv.Value.Filter);
+                    lines.Add(kv.Key + ";" + kv.Value.Freq.ToString(System.Globalization.CultureInfo.InvariantCulture) + ";" + kv.Value.Mode + ";" + kv.Value.Filter + (kv.Value.HasView && kv.Value.HasCtun ? ";" + kv.Value.Pan + ";" + kv.Value.Zoom + ";" + (kv.Value.Ctun ? "1" : "0") + ";" + kv.Value.Centre.ToString(System.Globalization.CultureInfo.InvariantCulture) : (kv.Value.HasView ? ";" + kv.Value.Pan + ";" + kv.Value.Zoom : "")));
                 File.WriteAllLines(BrickRx2MemoFile, lines.ToArray());
             }
             catch { }
@@ -40370,7 +40379,9 @@ namespace BrickSDR
                             RX2DSPMode = memo.Mode;
                             RX2Filter = memo.Filter;
                         }
+                        if (!is_for_rx1_vfo_b) brickRx2ApplyCtun(memo.HasCtun, memo.Ctun, memo.Centre);   // CTUN and its centre first, then the frequency (the way the RX1 band stack does)
                         VFOBFreq = memo.Freq;
+                        if (!is_for_rx1_vfo_b) brickRx2ApplyView(memo);
                     }
                     else
                     {
@@ -40383,6 +40394,7 @@ namespace BrickSDR
                         RX2DSPMode = autoMode;
                         RX2Filter = bse.Filter;
                     }
+                    if (!is_for_rx1_vfo_b) brickRx2ApplyCtun(true, false, 0);   // a band seen for the first time: no CTUN left over from the other band
                     VFOBFreq = bse.Frequency;
                     }
                 }

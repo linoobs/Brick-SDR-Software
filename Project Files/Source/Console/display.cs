@@ -3084,7 +3084,33 @@ namespace BrickSDR
 
         private static void brickSpectrum(int nVerticalShift, int W, int H, int rx, bool bottom)
         {
-            if (rx == 1 ? Use3DRX1 : Use3DRX2) Draw3DDX2D(nVerticalShift, W, H, rx);
+            if (rx == 1 ? Use3DRX1 : Use3DRX2)
+            {
+                // two-tone IMD readings come from the peak search of the 2D spectrum: run it invisibly (opacity 0 layer) so the box is queued
+                if (rx == 1 && localMox(1) && _testing_imd && _show_imd_measurements && isRxDuplex(1))
+                {
+                    SharpDX.Direct2D1.Layer lay = null;
+                    bool pushed = false;
+                    try
+                    {
+                        lay = new SharpDX.Direct2D1.Layer(_d2dRenderTarget);
+                        SharpDX.Direct2D1.LayerParameters lp = new SharpDX.Direct2D1.LayerParameters();
+                        lp.ContentBounds = new SharpDX.Mathematics.Interop.RawRectangleF(-float.MaxValue, -float.MaxValue, float.MaxValue, float.MaxValue);
+                        lp.Opacity = 0f;
+                        lp.MaskTransform = Matrix3x2.Identity;
+                        _d2dRenderTarget.PushLayer(ref lp, lay);
+                        pushed = true;
+                        DrawPanadapterDX2D(nVerticalShift, W, H, rx, bottom);
+                    }
+                    catch { }
+                    finally
+                    {
+                        if (pushed) { try { _d2dRenderTarget.PopLayer(); } catch { } }
+                        if (lay != null) lay.Dispose();
+                    }
+                }
+                Draw3DDX2D(nVerticalShift, W, H, rx);
+            }
             else DrawPanadapterDX2D(nVerticalShift, W, H, rx, bottom);
         }
 
@@ -4619,6 +4645,19 @@ namespace BrickSDR
                             }
                         }                    }
 
+                    // two-tone IMD readings, queued by the spectrum: drawn last so they can lie over the divider and the waterfall
+                    if (_brickImdOps.Count > 0)
+                    {
+                        Matrix3x2 imdOld = _d2dRenderTarget.Transform;
+                        try
+                        {
+                            _d2dRenderTarget.Transform = _brickImdXform * imdOld;
+                            foreach (Action op in _brickImdOps) op();
+                        }
+                        catch { }
+                        finally { _d2dRenderTarget.Transform = imdOld; _brickImdOps.Clear(); }
+                    }
+
                     // for linear grad brush rebuilding. Do these all the time, even if m_bUseLinearGradient=false, so we can rebuild if need be
                     if (m_nRX1DisplayHeight != _nOldHeightRX1)
                     {
@@ -5403,6 +5442,8 @@ namespace BrickSDR
 
         private static float _ema_f0l;
         private static float _ema_f0u;
+        private static readonly List<Action> _brickImdOps = new List<Action>();
+        private static Matrix3x2 _brickImdXform = Matrix3x2.Identity;
         private static float _ema_imd3l;
         private static float _ema_imd3u;
         private static float _ema_imd5l;
@@ -6201,25 +6242,25 @@ namespace BrickSDR
                             // two receivers: the readings are shrunk so they stay inside the spectrum, above the frequency strip
                             float imdSpec = _rx2_enabled ? m_nRX1DisplayHeight / 2f : m_nRX1DisplayHeight;
                             // normal size; when the spectrum is low (two receivers) the box moves up instead of shrinking
-                            float imdBottom = imdSpec - 30f;
-                            float imdTop = 50f;
-                            float imdScale = 1f;
-                            if (imdTop + 185f > imdBottom)
-                            {
-                                imdTop = Math.Max(4f, imdBottom - 185f);
-                                if (imdTop + 185f > imdBottom) imdScale = Math.Max(0.75f, (imdBottom - imdTop) / 185f);
-                            }
+                            // Brick: the box is drawn larger (1.5x) and may reach over the divider into the waterfall, so the clip of the
+                            // spectrum is widened while it is drawn
+                            float imdScale = 1.5f;
+                            if (W < 900) imdScale = Math.Max(1f, W / 600f);
+                            float imdTop = Math.Max(4f, imdSpec - 185f * imdScale * 0.55f);
                             float imdCx = _two_tone_readings_X_offset;
-                            Matrix3x2 imdOld = _d2dRenderTarget.Transform;
-                            if (imdTop != 50f || imdScale < 1f)
-                                _d2dRenderTarget.Transform = Matrix3x2.Translation(-imdCx, -50f) * Matrix3x2.Scaling(imdScale, imdScale) * Matrix3x2.Translation(imdCx, imdTop) * imdOld;
+                            // the drawing is queued (_brickImdOps) and runs after the waterfall, over the whole display
+                            _brickImdOps.Clear();
+                            _brickImdXform = Matrix3x2.Translation(-imdCx, -50f) * Matrix3x2.Scaling(imdScale, imdScale) * Matrix3x2.Translation(imdCx, imdTop);
                             // the box
                             RoundedRectangle rr = new RoundedRectangle();
                             rr.Rect = new RectangleF(_two_tone_readings_X_offset, 50, 260, 180);
                             rr.RadiusX = 14f;
                             rr.RadiusY = 14f;
-                            _d2dRenderTarget.FillRoundedRectangle(rr, m_bDX2_m_bHightlightNumberScale);
-                            _d2dRenderTarget.DrawRoundedRectangle(rr, m_bDX2_m_bHightlightNumbers);
+                            _brickImdOps.Add(() =>
+                            {
+                                _d2dRenderTarget.FillRoundedRectangle(rr, m_bDX2_m_bHightlightNumberScale);
+                                _d2dRenderTarget.DrawRoundedRectangle(rr, m_bDX2_m_bHightlightNumbers);
+                            });
                             //
 
                             int pixel_diff = Math.Abs(sorted[0].X - sorted[1].X);
@@ -6277,7 +6318,7 @@ namespace BrickSDR
                                     float oip3 = dbc_min + (imd3dBc / 2f);
                                     float oip5 = dbc_min + (imd5dBc / 2f);
 
-                                    _two_tone_readings_X_offset = imd5L_X - (int)(rr.Rect.Right - rr.Rect.Left) - pixel_diff;
+                                    _two_tone_readings_X_offset = imd5L_X - (int)((rr.Rect.Right - rr.Rect.Left) * imdScale) - pixel_diff;
                                     if (_two_tone_readings_X_offset < 50) _two_tone_readings_X_offset = 50;
 
                                     //ExponentialMovingAverage
@@ -6384,25 +6425,24 @@ namespace BrickSDR
                                         (_ema_imd5h_freq * 1e-6).ToString("f6") + " MHz\n\n\n" +
                                         "  " + diff.ToString("F3") + " kHz";
 
-                                    _d2dRenderTarget.DrawText("dBm        dBc           frequency", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 70, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
-                                    _d2dRenderTarget.DrawText(readings, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
-                                    _d2dRenderTarget.DrawText(val1, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 64, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
-                                    _d2dRenderTarget.DrawText(val2, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 114, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
-                                    _d2dRenderTarget.DrawText(val3, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 170, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
-                                    _d2dRenderTarget.DrawText("f0 diff", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 190, 166, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText("dBm        dBc           frequency", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 70, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText(readings, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText(val1, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 64, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText(val2, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 114, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText(val3, fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 170, 70, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText("f0 diff", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 190, 166, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
                                 }
                                 else
                                 {
                                     _two_tone_readings_X_offset = 50;
-                                    _d2dRenderTarget.DrawText("Peaks not found !\n\nEnsure that IMD3 lower/upper and\nIMD5 lower/upper are in the display.\n\nTry changing FFT windowing method.", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
+                                    _brickImdOps.Add(() => _d2dRenderTarget.DrawText("Peaks not found !\n\nEnsure that IMD3 lower/upper and\nIMD5 lower/upper are in the display.\n\nTry changing FFT windowing method.", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
                                 }
                             }
                             else
                             {
                                 _two_tone_readings_X_offset = 50;
-                                _d2dRenderTarget.DrawText("Peaks not found !\n\nTry increasing zoom and/or\nchanging sample rate.\n\nFundamental peak separation needs to be increased.\n\nTry changing FFT windowing method.", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None);
+                                _brickImdOps.Add(() => _d2dRenderTarget.DrawText("Peaks not found !\n\nTry increasing zoom and/or\nchanging sample rate.\n\nFundamental peak separation needs to be increased.\n\nTry changing FFT windowing method.", fontDX2d_callout, new RectangleF(_two_tone_readings_X_offset + 10, 54, 200, 120), m_bDX2_PeakBlobText, DrawTextOptions.None));
                             }
-                            _d2dRenderTarget.Transform = imdOld;
                         }
                     }
                     else if (_ema_dbc != -999) _ema_dbc = -999;

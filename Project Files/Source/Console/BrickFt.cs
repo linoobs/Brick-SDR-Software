@@ -110,6 +110,8 @@ namespace BrickSDR
             brickDockShow("ft", _ftPane);
             _digiOpenKey = _ftMode; digiSaveSettings();
             ftStartEngine();
+            int frx = _digiRx;
+            BeginInvoke(new Action(() => ftWideFilter(frx)));
             if (_ftDual) BeginInvoke(new Action(ftPrepareSecondReceiver));       // Dual RX was left on: the second receiver has to run again
         }
 
@@ -132,6 +134,7 @@ namespace BrickSDR
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
+            ftRestoreFilters();
             brickDockHide("ft");
             _digiOpenKey = ""; digiSaveSettings();
         }
@@ -144,6 +147,7 @@ namespace BrickSDR
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
+            ftRestoreFilters();
         }
 
         private void ftStartEngine()
@@ -265,6 +269,83 @@ namespace BrickSDR
                 double[] f;
                 if (brickDigiFreq.TryGetValue(b, out f)) brickDigiSet(rx2, DSPMode.DIGU, f[_ftMode == "FT4" ? 1 : 0]);
                 else brickDigiSet(rx2, DSPMode.DIGU, null);
+            }
+            catch { }
+            BeginInvoke(new Action(() => ftWideFilter(rx)));
+        }
+
+        // FT8 / FT4: the receiver filter is set to 3 kHz (100..3100 Hz) and the one it came with is remembered (ft_filter.txt: rx;slot;low;high)
+        // so it can be put back when FT8 / FT4 ends; the DIGU slot is written directly, the mode may already be another one then
+        private string FtFilterFile { get { return Path.Combine(AppDataPath, "ft_filter.txt"); } }
+        private readonly Dictionary<int, int[]> _ftFiltSaved = new Dictionary<int, int[]>();
+        private bool _ftFiltLoaded;
+
+        private void ftFilterLoad()
+        {
+            if (_ftFiltLoaded) return;
+            _ftFiltLoaded = true;
+            try
+            {
+                if (!File.Exists(FtFilterFile)) return;
+                foreach (string line in File.ReadAllLines(FtFilterFile))
+                {
+                    string[] p = line.Split(';');
+                    int rx, slot, lo, hi;
+                    if (p.Length == 4 && int.TryParse(p[0], out rx) && int.TryParse(p[1], out slot) && int.TryParse(p[2], out lo) && int.TryParse(p[3], out hi))
+                        _ftFiltSaved[rx] = new[] { slot, lo, hi };
+                }
+            }
+            catch { }
+        }
+
+        private void ftFilterSave()
+        {
+            try
+            {
+                if (_ftFiltSaved.Count == 0) { if (File.Exists(FtFilterFile)) File.Delete(FtFilterFile); return; }
+                File.WriteAllLines(FtFilterFile, _ftFiltSaved.Select(kv => kv.Key + ";" + kv.Value[0] + ";" + kv.Value[1] + ";" + kv.Value[2]).ToArray());
+            }
+            catch { }
+        }
+
+        private void ftWideFilter(int rx)
+        {
+            try
+            {
+                if (rx < 0 || rx > 1) return;
+                ftFilterLoad();
+                DSPMode m = rx == 1 ? RX2DSPMode : RX1DSPMode;
+                if (m != DSPMode.DIGU) return;
+                if (!_ftFiltSaved.ContainsKey(rx))
+                {
+                    Filter slot = rx == 1 ? rx2_filter : rx1_filter;
+                    FilterPreset fp = rx == 1 ? rx2_filters[(int)DSPMode.DIGU] : rx1_filters[(int)DSPMode.DIGU];
+                    _ftFiltSaved[rx] = new[] { (int)slot, fp.GetLow(slot), fp.GetHigh(slot) };
+                    ftFilterSave();
+                }
+                if (rx == 1) UpdateRX2Filters(100, 3100, true); else UpdateRX1Filters(100, 3100, true);
+            }
+            catch { }
+        }
+
+        private void ftRestoreFilters()
+        {
+            try
+            {
+                ftFilterLoad();
+                foreach (KeyValuePair<int, int[]> kv in _ftFiltSaved.ToList())
+                {
+                    int rx = kv.Key; Filter slot = (Filter)kv.Value[0]; int lo = kv.Value[1], hi = kv.Value[2];
+                    FilterPreset fp = rx == 1 ? rx2_filters[(int)DSPMode.DIGU] : rx1_filters[(int)DSPMode.DIGU];
+                    fp.SetLow(slot, lo); fp.SetHigh(slot, hi);
+                    DSPMode m = rx == 1 ? RX2DSPMode : RX1DSPMode;
+                    if (m == DSPMode.DIGU)
+                    {
+                        if (rx == 1) UpdateRX2Filters(lo, hi, true); else UpdateRX1Filters(lo, hi, true);
+                    }
+                }
+                _ftFiltSaved.Clear();
+                ftFilterSave();
             }
             catch { }
         }

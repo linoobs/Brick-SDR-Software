@@ -74,7 +74,7 @@ namespace BrickSDR
 
             private void toggle()
             {
-                bool on = !c.RadeEnabledOn(rx);
+                bool on = !c.RadeEnabledOn(rx); if (on) c.radeTuneToCallFreq(rx);
                 if (!c.SetRadeEnabled(rx, on)) status.Text = on && rx == 1 && !c.RX2Enabled ? "Turn RX2 on first" : "Can't switch while transmitting";
                 sync_();
             }

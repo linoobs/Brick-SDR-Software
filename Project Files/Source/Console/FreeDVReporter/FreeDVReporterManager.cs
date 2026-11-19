@@ -199,9 +199,10 @@ namespace BrickSDR.FreeDVReporter
         }
 
         // V1 / V2 changed: report the new mode now
-        public static void NotifyProtocolChanged()
+        public static void NotifyProtocolChanged()   // also called from radeApply: only a real change of V1 / V2 is sent
         {
             if (_client == null || _console == null) return;
+            if (_client.LastMode == modeTag()) return;
             try
             {
                 _lastReportedTransmitting = computeRealTx(_console);

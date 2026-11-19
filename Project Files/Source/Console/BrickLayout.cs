@@ -705,10 +705,40 @@ namespace BrickSDR
         private void brickLoad3D() { brickLoad3DStyle(); try { if (!File.Exists(Brick3DFile)) return; string t = File.ReadAllText(Brick3DFile).Trim(); if (t.Length >= 2) { chk3D1.Checked = t[0] == '1'; chk3D2.Checked = t[1] == '1'; } } catch { } }
         private readonly List<CheckBox> rx2ZoomButtons = new List<CheckBox>();
         private int rx2ZoomValue = -1;
+        private PrettyTrackBar brickRx2PanBar, brickRx2ZoomBar;
+        private bool brickRx2ViewApplying;
+        private Band brickRx2BarsBand = Band.FIRST;   // the band the Pan / Zoom bars (and CTUN) belong to
+        private void brickRx2ApplyCtun(bool has, bool ctun, double centre)
+        {
+            if (!has) return;
+            bool was = brickRx2ViewApplying;
+            brickRx2ViewApplying = true;
+            try
+            {
+                if (chkX2TR.Checked != ctun) chkX2TR.Checked = ctun;
+                if (ctun && centre > 0) CentreRX2Frequency = centre;
+            }
+            finally { brickRx2ViewApplying = was; }
+        }
+        // the second receiver's pan and zoom come back with its band (BrickBandMemo)
+        private void brickRx2ApplyView(BrickBandMemo m)
+        {
+            if (!m.HasView || brickRx2PanBar == null) return;
+            bool wasV = brickRx2ViewApplying;
+            brickRx2ViewApplying = true;
+            try
+            {
+                brickRx2PanBar.Value = Math.Max(brickRx2PanBar.Minimum, Math.Min(brickRx2PanBar.Maximum, m.Pan));
+                brickRx2ZoomBar.Value = Math.Max(brickRx2ZoomBar.Minimum, Math.Min(brickRx2ZoomBar.Maximum, m.Zoom));
+                applyRx2View(brickRx2PanBar, brickRx2ZoomBar);
+            }
+            finally { brickRx2ViewApplying = wasV; brickRx2BarsBand = RX2Band; }
+        }
 
         private void applyRx2View(PrettyTrackBar pan, PrettyTrackBar zoom)
         {
             rx2ZoomValue = zoom.Value;
+            if (!brickRx2ViewApplying) { brickRx2BarsBand = RX2Band; brickRx2Remember(RX2Band); }   // a change of pan / zoom is kept for this band
             foreach (CheckBox b in rx2ZoomButtons) b.Checked = (int)b.Tag == zoom.Value;
             specRX.GetSpecRX(1).PanSlider = (double)pan.Value / 1000.0;
             specRX.GetSpecRX(1).ZoomSlider = ((double)zoom.Value - 10.0) / 230.0;
@@ -761,6 +791,10 @@ namespace BrickSDR
             int meterW = Math.Max(brickX(300), Math.Min(brickX(372), w - (x0 + fw + 32) - 2 * brickX(223)));
             picMultiMeterDigital.MouseDown -= brickMeterMouseDown;
             picMultiMeterDigital.MouseDown += brickMeterMouseDown;
+            picRX2Meter.MouseDown -= brickMeterMouseDown;
+            picRX2Meter.MouseDown += brickMeterMouseDown;
+            cardMeter.MouseDown -= brickMeterMouseDown;
+            cardMeter.MouseDown += brickMeterMouseDown;
             cardMeter.SetBounds(Math.Max(850, w - 8 - meterW), 6, meterW, 154);
             int aw = Math.Max(200, (cardMeter.Left - 8 - x0 - fw - 16) / 2);
             boxA.SetBounds(x0, 6, aw, 92);
@@ -1571,7 +1605,7 @@ namespace BrickSDR
             m.Items.Add(new ToolStripSeparator());
             add("FT8" + (ft != null ? "   " + ft[0].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT8", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[0]); brickSetDigiChoice(rx2, "FT8"); _digiRx = rx2 ? 1 : 0; brickFtOpen("FT8"); }, ft != null);
             add("FT4" + (ft != null ? "   " + ft[1].ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) : ""), _ftPane != null && brickDockKey == "ft" && _ftMode == "FT4", () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGU, ft[1]); brickSetDigiChoice(rx2, "FT4"); _digiRx = rx2 ? 1 : 0; brickFtOpen("FT4"); }, ft != null);
-            add("FreeDV", RadeEnabledOn(rx2 ? 1 : 0), () => { brickRadeOpen(rx2 ? 1 : 0); SetRadeEnabled(rx2 ? 1 : 0, true); brickSetDigiChoice(rx2, "RADE"); }, true);
+            add("FreeDV", RadeEnabledOn(rx2 ? 1 : 0), () => { if (!RadeEnabledOn(rx2 ? 1 : 0)) radeTuneToCallFreq(rx2 ? 1 : 0); brickRadeOpen(rx2 ? 1 : 0); SetRadeEnabled(rx2 ? 1 : 0, true); brickSetDigiChoice(rx2, "RADE"); }, true);
             add("RTTY", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, DSPMode.DIGL, null); brickSetDigiChoice(rx2, "RTTY"); _digiRx = rx2 ? 1 : 0; brickDigitalOpen("RTTY"); }, true);
             add("CW", false, () => { ftRadeOffForTerminal(); brickDigiSet(rx2, freq < 10.0 ? DSPMode.CWL : DSPMode.CWU, null); brickSetDigiChoice(rx2, "CW"); _digiRx = rx2 ? 1 : 0; brickDigitalOpen("CW"); }, true);
             m.Items.Add(new ToolStripSeparator());
@@ -1690,6 +1724,27 @@ namespace BrickSDR
             chk3D2.CheckedChanged += (s, e) => { Display.Use3DRX2 = chk3D2.Checked; brickSave3D(); };
             brickLoad3D();
             brickDxClusterInit();
+            brickRx2PanBar = p2; brickRx2ZoomBar = z2;
+            if (brickRx2BarsBand == Band.FIRST) brickRx2BarsBand = RX2Band;
+            chkX2TR.CheckedChanged += (s, e) => { if (!brickRx2ViewApplying && RX2Band == brickRx2BarsBand) brickRx2Remember(RX2Band); };
+            // any change of the RX2 band (spot click, typed frequency, band button): its remembered view comes back
+            VFOBFrequencyChangeHandlers += (ob, nb, om, nm, of, nf, ofr, nfr, oc, nc, octun, nctun, oz, nz, off, rx) =>
+            {
+                if (rx != 2 || ob == nb) return;
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        BrickBandMemo mm;
+                        if (brickRx2Memo.TryGetValue(RX2Band, out mm) && mm.HasView) { brickRx2ApplyCtun(mm.HasCtun, mm.Ctun, mm.Centre); brickRx2ApplyView(mm); }
+                        else brickRx2BarsBand = RX2Band;   // first visit: the bars stay as they are and now belong to this band
+                    }));
+                }
+                catch { }
+            };
+            CentreFrequencyHandlers += (rx, o, n, b, osc) => { if (rx == 2 && ClickTuneRX2Display && !brickRx2ViewApplying && RX2Band == brickRx2BarsBand) brickRx2Remember(RX2Band); };
+            brickRx2Load();
+            { BrickBandMemo m0; if (brickRx2Memo.TryGetValue(RX2Band, out m0)) brickRx2ApplyView(m0); }   // the view of the band RX2 starts on
             rx2ZoomValue = z2.Value;
             foreach (CheckBox zb3 in rx2ZoomButtons) zb3.Checked = (int)zb3.Tag == z2.Value;
             p2.Scroll += (s, e) => applyRx2View(p2, z2);
@@ -2103,7 +2158,8 @@ namespace BrickSDR
                     if (brickSpeedLabel == null)
                     {
                         brickSpeedLabel = new ToolStripStatusLabel { Name = "brickSpeedLabel", ForeColor = cText, BackColor = Color.Transparent, Overflow = ToolStripItemOverflow.Never, Margin = new Padding(0, 0, 10, 0) };
-                        int at = statusStripMain.Items.IndexOf(toolStripStatusLabel_CatTCPip);
+                        // the link speed sits directly left of the N1MM / TCI / CAT icons (not at the far left of the bar)
+                        int at = statusStripMain.Items.IndexOf(toolStripStatusLabel_N1MM);
                         statusStripMain.Items.Insert(at < 0 ? statusStripMain.Items.Count : at, brickSpeedLabel);
                     }
                     string sp = BrickHardware.SpeedText(chkPower.Checked).Trim();

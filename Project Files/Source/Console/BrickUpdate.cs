@@ -100,7 +100,7 @@ namespace BrickSDR
                     _updLabel.MouseEnter += (s, e) => { if (statusStripMain != null) statusStripMain.Cursor = Cursors.Hand; };
                     _updLabel.MouseLeave += (s, e) => { if (statusStripMain != null) statusStripMain.Cursor = Cursors.Default; };
                     int at = statusStripMain.Items.IndexOf(brickSpeedLabel);
-                    statusStripMain.Items.Insert(at < 0 ? statusStripMain.Items.Count : at, _updLabel);
+                    statusStripMain.Items.Insert(at < 0 ? 0 : at + 1, _updLabel);      // right after the link speed, at the left
                 }
                 if (_updAuto && !_updBusy && DateTime.UtcNow >= _updNext && (DateTime.UtcNow - _updStart).TotalSeconds > 25)
                     updCheck(false);

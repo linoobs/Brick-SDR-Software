@@ -111,6 +111,7 @@ namespace BrickSDR.FreeDVReporter
          * the server's view of us is consistent. */
         private ulong  _lastFreqHz;
         private string _lastMode = "";
+        public string LastMode { get { return _lastMode; } }
         private bool   _lastTransmitting;
         private string _lastMessage = "";
         private bool   _haveFreq, _haveTxState, _haveMessage;

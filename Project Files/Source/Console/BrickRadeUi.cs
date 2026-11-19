@@ -116,6 +116,7 @@ namespace BrickSDR
             {
                 Rade.SetRadaeProtocolV2(0, _rs.V2Rx1 ? 1 : 0);
                 Rade.SetRadaeProtocolV2(1, _rs.V2Rx2 ? 1 : 0);
+                FreeDVReporter.FreeDVReporterManager.NotifyProtocolChanged();
                 Rade.SetRadaeMicScale(Math.Pow(10.0, _rs.MicDb / 20.0));
                 radeApplyRxScale(0);
                 radeApplyRxScale(1);
@@ -316,7 +317,7 @@ namespace BrickSDR
 
             private void toggle()
             {
-                bool on = !c.RadeEnabledOn(rx);
+                bool on = !c.RadeEnabledOn(rx); if (on) c.radeTuneToCallFreq(rx);
                 if (!c.SetRadeEnabled(rx, on))
                 {
                     status.Text = on && rx == 1 && !c.RX2Enabled ? "Turn RX2 on first" : "Can't switch while transmitting";

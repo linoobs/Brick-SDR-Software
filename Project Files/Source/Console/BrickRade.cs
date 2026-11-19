@@ -175,6 +175,23 @@ namespace BrickSDR
             }
         }
 
+        // FreeDV calling frequencies (MHz) by band: selecting FreeDV puts the receiver on the one of its band, like FT8 / FT4 do
+        private static readonly Dictionary<Band, double> radeCallFreq = new Dictionary<Band, double>
+        {
+            { Band.B80M, 3.643 }, { Band.B40M, 7.177 }, { Band.B20M, 14.236 }, { Band.B17M, 18.118 },
+            { Band.B15M, 21.313 }, { Band.B12M, 24.933 }, { Band.B10M, 28.330 }
+        };
+        internal void radeTuneToCallFreq(int rx)
+        {
+            try
+            {
+                double f;
+                if (!radeCallFreq.TryGetValue(rx == 1 ? RX2Band : RX1Band, out f)) return;   // no entry for this band: stay where we are
+                if (rx == 1) VFOBFreq = f; else VFOAFreq = f;
+            }
+            catch { }
+        }
+
         // a station was picked in the FreeDV Reporter: tune the receiver there. A change of band loads the mode of the band stack, which is not the
         // mode RADE forces (DIGL / DIGU by frequency), and brickDigitalModeChanged would switch RADE off; so the forced mode is renewed first.
         internal void RadeRetune(int rx, double mhz)

@@ -128,8 +128,27 @@ namespace BrickSDR
             catch { }
         }
 
+        // Setup > General > Options "Keep my tuning step": mode / band changes and the start never change the step (file tune_step_keep.txt)
+        internal bool BrickKeepStep
+        {
+            get
+            {
+                try { return File.Exists(Path.Combine(AppDataPath, "tune_step_keep.txt")); } catch { return false; }
+            }
+            set
+            {
+                try
+                {
+                    string f = Path.Combine(AppDataPath, "tune_step_keep.txt");
+                    if (value) File.WriteAllText(f, "1"); else if (File.Exists(f)) File.Delete(f);
+                }
+                catch { }
+            }
+        }
+
         private void brickApplyModeStep(DSPMode mode)
         {
+            if (BrickKeepStep) return;
             string name;
             switch (mode)
             {

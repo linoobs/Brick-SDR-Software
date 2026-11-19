@@ -24,7 +24,47 @@ namespace BrickSDR
             wbdisplay.ADC = i;
             wbdisplay.create_wideband(i);
             wbdisplay.initWideband();
+            brickAddAdcClockMenu();
             GetWideBand();
+            brickSyncAdcClock();
+        }
+
+        // Brick-SDR: ADC clock of the radio. At 122.88 MHz the display spans 0 - 61.44 MHz, at 61.44 MHz the whole spectrum is 0 - 30.72 MHz
+        private ToolStripMenuItem wbAdcClockMenuItem;
+        private ToolStripComboBox wbAdcClockComboBox;
+        private bool brickAdcSync;
+
+        private void brickAddAdcClockMenu()
+        {
+            wbAdcClockComboBox = new ToolStripComboBox();
+            wbAdcClockComboBox.AutoSize = false;
+            wbAdcClockComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            wbAdcClockComboBox.DropDownWidth = 90;
+            wbAdcClockComboBox.Font = wbUpdatetoolStripComboBox.Font;
+            wbAdcClockComboBox.Items.AddRange(new object[] { "61.440 MHz", "122.880 MHz" });
+            wbAdcClockComboBox.Size = new Size(90, 21);
+            wbAdcClockComboBox.SelectedIndexChanged += wbAdcClockComboBox_SelectedIndexChanged;
+            wbAdcClockComboBox.MouseEnter += ToolStripMenuItem_MouseEnter;
+            wbAdcClockComboBox.MouseLeave += ToolStripMenuItem_MouseLeave;
+            wbAdcClockMenuItem = new ToolStripMenuItem("ADC Clock");
+            wbAdcClockMenuItem.ForeColor = wbFrameSizetoolStripMenuItem.ForeColor;
+            wbAdcClockMenuItem.DropDownItems.Add(wbAdcClockComboBox);
+            wbAdcClockMenuItem.MouseEnter += ToolStripMenuItem_MouseEnter;
+            wbAdcClockMenuItem.MouseLeave += ToolStripMenuItem_MouseLeave;
+            contextMenuStripWideBand.Items.Add(wbAdcClockMenuItem);
+        }
+
+        private void brickSyncAdcClock()
+        {
+            brickAdcSync = true;
+            try { wbAdcClockComboBox.SelectedIndex = wbdisplay.SampleRate == 61440000 ? 0 : 1; }
+            finally { brickAdcSync = false; }
+        }
+
+        private void wbAdcClockComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (brickAdcSync || wbAdcClockComboBox.SelectedIndex < 0) return;
+            wbdisplay.SampleRate = wbAdcClockComboBox.SelectedIndex == 0 ? 61440000 : 122880000;
         }
 
         public wbDisplay WBdisplay
@@ -64,6 +104,7 @@ namespace BrickSDR
             wbAvgtoolStripMenuItem.Checked = wbdisplay.AverageOn;
             wbUpdatetoolStripComboBox.Text = wbdisplay.UpdateRate;
             wbFrameSizetoolStripComboBox.Text = wbdisplay.FrameSize;
+            brickSyncAdcClock();
         }
 
         private ToolStripMenuItem ContextMenuToolStripMenuItem = null;
@@ -133,6 +174,7 @@ namespace BrickSDR
             a.Add("average_on/" + wbdisplay.AverageOn);
             a.Add("update_rate/" + wbdisplay.UpdateRate);
             a.Add("frame_size/" + wbdisplay.FrameSize);
+            a.Add("adc_clock/" + (wbdisplay.SampleRate == 61440000 ? "61440000" : "122880000"));
             a.Add("spectrum_grid_max/" + wbdisplay.SpectrumGridMax);
             a.Add("spectrum_grid_min/" + wbdisplay.SpectrumGridMin);
 
@@ -186,6 +228,9 @@ namespace BrickSDR
                         break;
                     case "update_rate":
                         wbdisplay.UpdateRate = val;
+                        break;
+                    case "adc_clock":
+                        wbdisplay.SampleRate = val == "61440000" ? 61440000 : 122880000;
                         break;
                     case "frame_size":
                         wbdisplay.FrameSize = val;

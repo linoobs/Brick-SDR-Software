@@ -34,6 +34,7 @@ namespace BrickSDR
             BrickAddBootloaderButton();
             BrickAddRadeMeterOption();
             BrickAddDigiModesTab();
+            BrickAddKeepStepOption();
             grpRNnoise.Visible = false;
             groupBoxTS55.Text = "NNR (NR3 / NR4) RX1";
             groupBoxTS56.Text = "NNR (NR3 / NR4) RX2";
@@ -52,6 +53,28 @@ namespace BrickSDR
                 g.Height = 70;
             }
             groupBoxTS56.Top = groupBoxTS55.Bottom + 6;
+        }
+
+        // "Keep my tuning step" under "Recover TuneStep per Mode": no automatic step per mode (SSB 500 Hz, CW 10 Hz...)
+        private void BrickAddKeepStepOption()
+        {
+            try
+            {
+                CheckBox c = new CheckBox();
+                c.Name = "brickChkKeepStep";
+                c.Text = "Keep my tuning step";
+                c.AutoSize = false;
+                c.Size = new System.Drawing.Size(240, 16);
+                c.ForeColor = chkTuneStepPerModeRX1.ForeColor;
+                c.Location = new System.Drawing.Point(chkTuneStepPerModeRX1.Left, chkTuneStepPerModeRX1.Bottom);
+                c.Checked = console.BrickKeepStep;
+                c.CheckedChanged += (s, e) => console.BrickKeepStep = c.Checked;
+                chkTuneStepPerModeRX1.Parent.Controls.Add(c);
+                Control g = chkTuneStepPerModeRX1.Parent;      // the group grows by the new line and moves up so it still fits the tab page
+                g.Height = c.Bottom + 6;
+                g.Top = Math.Max(2, Math.Min(g.Top, g.Parent.ClientSize.Height - g.Height - 2));
+            }
+            catch { }
         }
 
         // the panadapter / waterfall mode menus of the main window live in the Panadapter groups of RX1 / RX2,

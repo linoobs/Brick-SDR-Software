@@ -1385,6 +1385,9 @@ void WriteUDPFrame(int id, char* bufp, int buflen) {
 	}
 }
 
+// Brick: time of the last datagram that really carried data to the radio (QPC ticks); the keep-alive below only fires after a gap
+static volatile LONGLONG brickLastSendQpc = 0;
+
 int sendPacket(SOCKET sock, char* data, int length, int port)
 {
 	int ret;
@@ -1398,6 +1401,7 @@ int sendPacket(SOCKET sock, char* data, int length, int port)
 	LeaveCriticalSection(&prn->sndpkt);
 
 	if (ret > 0) bandwidth_monitor_out(ret);
+	if (port != 9) { LARGE_INTEGER q; QueryPerformanceCounter(&q); brickLastSendQpc = q.QuadPart; }
 
 	if (ret == SOCKET_ERROR)
 	{
@@ -1440,8 +1444,13 @@ void KeepAliveLoop(void)
 			}
 			else
 			{
-				char ka[4] = { 0, 0, 0, 0 };
-				sendPacket(listenSock, ka, sizeof(ka), 9);
+				// only after a gap: while audio / IQ / control frames flow the link is not idle, and 1000 extra datagrams per second hurt Wi-Fi and routers
+				LARGE_INTEGER now, fq; QueryPerformanceCounter(&now); QueryPerformanceFrequency(&fq);
+				if ((now.QuadPart - brickLastSendQpc) * 1000 >= 8 * fq.QuadPart)
+				{
+					char ka[4] = { 0, 0, 0, 0 };
+					sendPacket(listenSock, ka, sizeof(ka), 9);
+				}
 			}
 		}
 

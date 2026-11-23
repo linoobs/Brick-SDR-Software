@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brick-SDR 1.4.7 - User Guide and Change Log</title>
+<style>
+@page { size: A4; margin: 17mm 16mm 18mm 16mm; @bottom-center { content: counter(page); font: 9pt "Segoe UI", Arial, sans-serif; color: #6b7280; } }
+@page :first { margin: 0; @bottom-center { content: none; } }
+* { box-sizing: border-box; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1b1d24; margin: 0; }
+a { color: #1f5fa8; text-decoration: none; }
+h1 { font-size: 19pt; margin: 0 0 8pt; color: #12304f; page-break-after: avoid; }
+h2 { font-size: 13pt; margin: 16pt 0 5pt; color: #12304f; border-bottom: 1px solid #c9d1de; padding-bottom: 2pt; page-break-after: avoid; }
+h3 { font-size: 11pt; margin: 11pt 0 3pt; color: #1b1d24; page-break-after: avoid; }
+p { margin: 3pt 0 6pt; }
+ul, ol { margin: 3pt 0 7pt 18pt; padding: 0; }
+li { margin: 2pt 0; }
+code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: #eef1f6; padding: 0 3pt; border-radius: 2pt; }
+.chapter { page-break-before: auto; margin-top: 8pt; }
+#c10 { page-break-before: always; }
+figure { margin: 8pt 0 10pt; text-align: center; page-break-inside: avoid; }
+figure img { max-width: 100%; border: 1px solid #c9d1de; }
+figcaption { font-size: 8.5pt; color: #5b6370; margin-top: 3pt; }
+.note { background: #fff6e0; border-left: 3px solid #e0a020; padding: 5pt 9pt; margin: 8pt 0; page-break-inside: avoid; }
+.tip { background: #eaf3fb; border-left: 3px solid #4a90d9; padding: 5pt 9pt; margin: 8pt 0; page-break-inside: avoid; }
+table { border-collapse: collapse; margin: 6pt 0 10pt; width: 100%; font-size: 9.2pt; page-break-inside: avoid; }
+th, td { border: 1px solid #c9d1de; padding: 3pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eef1f6; }
+.cover { page-break-after: always; height: 297mm; padding: 22mm 18mm 0; background: linear-gradient(#10243b, #1a3556 55%, #1a3556); color: #fff; }
+.cover h1 { color: #fff; font-size: 38pt; margin: 0; letter-spacing: 0.5pt; }
+.cover .sub { font-size: 15pt; color: #c8d6ea; margin: 6pt 0 18pt; }
+.cover .meta { font-size: 11pt; color: #aebfd6; margin-top: 14pt; }
+.cover img { width: 100%; border: 1px solid #3c5a82; border-radius: 4px; margin-top: 8pt; }
+.cover p { color: #dbe5f3; font-size: 11pt; max-width: 165mm; }
+.toc { columns: 2; column-gap: 14mm; }
+.toc ol { list-style: none; margin: 0; }
+.toc li { margin: 3pt 0; }
+.toc .sub { margin-left: 12pt; font-size: 9.2pt; color: #4a5260; }
+ul.cl { list-style: none; margin-left: 0; }
+ul.cl li { margin: 2pt 0; padding-left: 0; }
+.tag { display: inline-block; min-width: 40pt; font-size: 8pt; font-weight: 700; text-transform: uppercase; text-align: center; border-radius: 3px; padding: 0 3pt; margin-right: 4pt; color: #fff; }
+.tag.add { background: #2f8f4e; } .tag.change { background: #3a74c0; } .tag.fix { background: #b8741a; }
+.kbd { font-family: Consolas, monospace; font-size: 9pt; border: 1px solid #b6bfce; border-bottom-width: 2px; padding: 0 4pt; border-radius: 3px; background: #f6f8fb; }
+</style>
+</head>
+<body>
+
+<!-- ===================== cover ===================== -->
+<section class="cover">
+  <h1>Brick-SDR</h1>
+  <div class="sub">User guide and complete change log</div>
+  <p>Brick-SDR is a restyled fork of Thetis 2.10.3.x, the SDR console for OpenHPSDR / ANAN / Hermes Lite 2 radios, with a new dark interface, automatic Brick2 / Brick3 detection, the official WDSP 2.11 (including the new NNR noise reduction) and built-in digital modes: FT8 / FT4 with Auto CQ, CW, RTTY and FreeDV.</p>
+  <div class="meta">Version 1.4.7 &middot; 23 November 2026 &middot; GNU GPL v2 &middot; Windows, .NET Framework 4.8, x64<br>
+  github.com/linoobs/Brick-SDR-Software</div>
+  <img src="img/main.png" alt="Brick-SDR main window">
+</section>
+
+<!-- ===================== contents ===================== -->
+<section class="chapter first" id="contents">
+<h1>Contents</h1>
+<div class="toc">
+<ol>
+<li><a href="#c1">1. Installation</a></li>
+<li><a href="#c2">2. First start and connecting the radio</a>
+  <div class="sub"><a href="#c2-model">Radio model list (Brick2 / Brick3)</a><br><a href="#c2-fw">Firmware and IP address</a></div></li>
+<li><a href="#c3">3. Main window</a>
+  <div class="sub"><a href="#c3-mouse">Tuning with the mouse</a><br><a href="#c3-step">Tuning step</a><br><a href="#c3-3d">3D spectrum</a><br><a href="#c3-rx2">RX2, SUB-RX, per band memories</a><br><a href="#c3-menus">Menus</a></div></li>
+<li><a href="#c4">4. Digital modes (DIGI menu)</a>
+  <div class="sub"><a href="#c4-ft">FT8 / FT4</a><br><a href="#c4-auto">Auto CQ (no operator)</a><br><a href="#c4-ntp">Time from an NTP server</a><br><a href="#c4-cw">CW</a><br><a href="#c4-rtty">RTTY</a><br><a href="#c4-fdv">FreeDV (RADE)</a><br><a href="#c4-common">Common digital features</a></div></li>
+<li><a href="#c5">5. DX cluster</a></li>
+<li><a href="#c6">6. Transmit, PureSignal, safety</a></li>
+<li><a href="#c7">7. Hermes Lite 2 and other radios</a></li>
+<li><a href="#c8">8. Display options and appearance</a>
+  <div class="sub"><a href="#c8-look">Frequency display and colours</a></div></li>
+<li><a href="#c9">9. Files, troubleshooting, build</a></li>
+<li><a href="#c10">10. Complete change log</a>
+  <div class="sub"><a href="#v1-4-7">v1.4.7</a> &middot; <a href="#v1-4-6">v1.4.6</a> &middot; <a href="#v1-4-5">v1.4.5</a> &middot; <a href="#v1-4-4">v1.4.4</a> &middot; <a href="#v1-4-3">v1.4.3</a> &middot; <a href="#v1-4-2">v1.4.2</a> &middot; <a href="#v1-4-1">v1.4.1</a> &middot; <a href="#v1-4">v1.4</a> &middot; <a href="#v1-4-hl2">v1.4_hl2</a> &middot; <a href="#v1-3-8">v1.3.8</a> &middot; <a href="#v1-3-7">v1.3.7</a> &middot; <a href="#v1-3-6">v1.3.6</a> &middot; <a href="#v1-3-5">v1.3.5</a> &middot; <a href="#v1-3-4">v1.3.4</a> &middot; <a href="#v1-3-3">v1.3.3</a> &middot; <a href="#v1-3-2">v1.3.2</a> &middot; <a href="#v1-3-1">v1.3.1</a> &middot; <a href="#v1-3">v1.3</a> &middot; <a href="#v1-2">v1.2</a> &middot; <a href="#v1-1">v1.1</a></div></li>
+</ol>
+</div>
+
+<h2>What is new in 1.4.7</h2>
+<ul>
+<li><b>FT8 / FT4 Auto CQ</b> with a timer: the program calls CQ, answers callers, logs the QSOs and calls CQ again without an operator &mdash; <a href="#c4-auto">section 4.2</a>.</li>
+<li><b>Time from an NTP server</b> for the FT8 / FT4 slots (Setup &rarr; DIGI MODES) &mdash; <a href="#c4-ntp">section 4.3</a>.</li>
+<li><b>Appearance</b>: accent colour applied live, frequency font, size and colour &mdash; <a href="#c8-look">section 8.1</a>.</li>
+<li><b>Brick2 and Brick3</b> are entries of the radio model list &mdash; <a href="#c2-model">section 2</a>.</li>
+<li><b>Keep my tuning step</b> remembers the step of each mode &mdash; <a href="#c3-step">section 3</a>.</li>
+</ul>
+</section>
+
+<!-- ===================== 1 ===================== -->
+<section class="chapter" id="c1">
+<h1>1. Installation</h1>
+<ol>
+<li>If an older version (1.3.x or earlier) was installed with the previous installer, uninstall it first (Windows Settings &rarr; Apps &rarr; Brick-SDR). The settings stay in <code>%APPDATA%\OpenHPSDR\Brick-SDR-x64</code>.</li>
+<li>Download <code>BrickSDR-Setup_&lt;version&gt;.msi</code> from the Releases page and run it. Administrator rights are needed: the program goes to Program Files and a Windows Firewall exception is added for it.</li>
+<li>Start Brick-SDR from the Start menu or the desktop shortcut.</li>
+</ol>
+<p>The package installs to <code>C:\Program Files\Brick-SDR</code>, adds the shortcuts and the firewall exception and sets the graphics preference to the high performance GPU. A newer <code>.msi</code> updates the installed version. Silent install: <code>msiexec /i BrickSDR-Setup_&lt;version&gt;.msi /qn</code>.</p>
+<p>The installer is not code-signed: SmartScreen may show an unknown-publisher warning (More info &rarr; Run anyway). Every release carries <code>VirusTotal_url.txt</code> with the VirusTotal report of that file.</p>
+<h3>Updates</h3>
+<p>The program checks GitHub for a newer release (a notice in the status bar). A window shows the change log with one <b>Download and install</b> button; the program updates itself and restarts. Controls: <b>About &rarr; Check for updates</b> and <b>Setup &rarr; Updates</b> (on / off, Check now, Skip this version).</p>
+</section>
+
+<!-- ===================== 2 ===================== -->
+<section class="chapter" id="c2">
+<h1>2. First start and connecting the radio</h1>
+<ol>
+<li><b>Setup &rarr; General &rarr; H/W Select &rarr; Discover.</b> The radios found are listed; add one to the list.</li>
+<li>Brick2 (14-bit 15 W / 50 W, 16-bit) and Brick3 are recognised by their MAC address. S-meter calibration and the PA profiles are loaded once per radio. Other boards (Hermes Lite 2, Hermes, Angelia, Orion, Saturn ...) are identified by the board id of the discovery.</li>
+<li>Press the <b>Power</b> button to connect. The title bar shows the radio model and firmware, the status bar the link speed.</li>
+</ol>
+<figure><img src="img/setup_hw.png" alt="Setup, H/W Select" style="width:78%"><figcaption>Setup &rarr; General &rarr; H/W Select: model Brick2, the radio found by Discover (green = connected), Alex ticked, Apollo greyed out.</figcaption></figure>
+<h3 id="c2-model">Radio model list (Brick2 / Brick3)</h3>
+<p>Since 1.4.7 <b>Brick2</b> and <b>Brick3</b> are entries of the <b>Radio Model</b> list. They are a Hermes and an ANAN-100D underneath, so all the settings of those models apply. For these two models <b>Alex</b> is ticked and <b>Apollo</b> is greyed out and unticked (these boards have no Apollo). The model is set by itself when a Brick board is connected; choose it by hand only to prepare the settings without a radio.</p>
+<h3 id="c2-fw">Firmware and IP address</h3>
+<p>In the radio list of H/W Select the buttons <b>Program</b> (firmware upload, also to the bootloader) and <b>IP Set</b> (static IP address, 0.0.0.0 = DHCP) are available. Firmware programming is for experienced users: keep a separate programmer at hand and never interrupt the upload.</p>
+</section>
+
+<!-- ===================== 3 ===================== -->
+<section class="chapter" id="c3">
+<h1>3. Main window</h1>
+<figure><img src="img/main.png" alt="Main window" style="width:100%"><figcaption>The main window with FT8 on 80 m (receive only). Top: menus, VFO A / VFO B, meters; left: receive and transmit controls; centre: RX1 (orange frame) and RX2 (green frame) displays with the FT8 window below; right: band, mode and filter.</figcaption></figure>
+<p><b>Top bar:</b> menus, the VFO A / VFO B boxes, the S-meter / power / SWR meter, Power, MOX, TUNE and the Drive and Tune power sliders.</p>
+<p><b>Left column</b> (Receive / Transmit): AF, RF (right click = auto AGC, the knob turns green), mic, RX EQ, <b>MIC HW / MIC VAC</b> (the TX audio source: the radio microphone, green, or VAC, blue) and the mode specific panels (SSB, CW, FM, digital). In CW the Zero beat button is shown.</p>
+<p><b>Right column:</b> bands, modes (pairs LSB/USB, CW-L/CW-U, AM/SAM, DIGL/DIGU), filters, AGC buttons and the DIGI drop-down. The arrows at both sides of the displays fold the left and the right column away; the state is remembered.</p>
+<p><b>Displays:</b> panadapter and waterfall for RX1 (orange frame) and RX2 (green frame) with an independent spectrum / waterfall splitter for each receiver. Buttons beside Zoom: <b>3D</b> (per receiver) and <b>DXC</b> (DX cluster spots).</p>
+<p><b>Window size:</b> from 1280 &times; 721 up to the size of the monitor; the layout scales (compact mode). The digits of VFO A and VFO B always have the same size, whatever the band.</p>
+<p><b>Mute</b> (right click on MUTE = mute all) and the TX levels strip (MIC, EQ, LVLR, CFC, COMP, ALC; right click on the meter to show or hide it) are under the panadapter.</p>
+<h3 id="c3-mouse">Tuning with the mouse</h3>
+<p>A left click on the waterfall or the spectrum (outside the visor, the top strip and the dB scale) tunes to the nearest station (LSB: upper edge, USB: lower edge, rounded to 500 Hz). The cursor stays an arrow. The grey strip tunes; the filter edges are not dragged on the panadapter. A right click on the display switches the frequency box at the pointer on and off.</p>
+<h3 id="c3-step">Tuning step</h3>
+<p>The step follows the mode (SSB 500 Hz, CW / digital 10 Hz, AM / FM 1 kHz). <b>Setup &rarr; General &rarr; Options &rarr; Miscellaneous &rarr; Keep my tuning step</b> turns this automatic step off. With it on, every mode <b>remembers the step you chose in it</b> (file <code>tune_step_modes.txt</code>): a change of mode or band brings back the step of the new mode, and a mode that was not used before keeps the current step.</p>
+<h3 id="c3-3d">3D spectrum</h3>
+<p>The <b>3D</b> button replaces the panadapter with ridges coloured like the waterfall (the waterfall itself stays 2D). The style is chosen in Setup &rarr; Display &rarr; General: Classic (default), Proportional, Custom (peak height in %). The 0 Hz and band edge lines, the dB scale and the MNF notches follow the 3D perspective; the two-tone IMD readings are shown in 3D too.</p>
+<h3 id="c3-rx2">RX2, SUB-RX, per band memories</h3>
+<p>RX1 uses the Thetis band stacks. RX2 has its own band memory, with Pan, Zoom and CTUN per band. With RX2 off, SUB-RX works through VFO B and the RX2 AF slider is its volume.</p>
+<h3 id="c3-menus">Menus</h3>
+<p>The menu bar, the drop-down menus and the status bar are in the Brick-SDR style (flat buttons, the accent colour on hover). The DIGI drop-down offers DIGL, DIGU, FT8, FT4, FreeDV, RTTY and CW (RX2 has the same); the DIGI menu also has <b>Log QSO...</b> and <b>Log bar</b>.</p>
+</section>
+
+<!-- ===================== 4 ===================== -->
+<section class="chapter" id="c4">
+<h1>4. Digital modes (DIGI menu)</h1>
+<p>The digital windows dock under the panadapter and are restored at the next start. They close when the mode changes; the receiver is the one whose DIGI menu opened them. The DIGI menu remembers the dial frequency before a digital mode: LSB / USB returns to it.</p>
+
+<h2 id="c4-ft">4.1 FT8 / FT4</h2>
+<figure><img src="img/ft8_pane.png" alt="FT8 window" style="width:92%"><figcaption>The FT8 / FT4 window. Row 1: mode, call sign, locator, DX call, Log, Clear. Row 2: Rx / Tx audio frequency, Auto-sequence, Dual RX, RX1 / RX2, the Auto CQ time and the Auto CQ button. Below: close-up waterfall, Band activity and Your QSO lists, status line, message buttons Tx1 &hellip; Tx5, Enable TX and Halt.</figcaption></figure>
+<ul>
+<li>Decoder and encoder: mfsk-core (WSJT-X class sensitivity). The lists show the band activity and your QSO; a <b>click</b> on a line selects the station (DX call, Tx1, slot parity, frequency), a <b>double click</b> or Enter in DX call also enables TX.</li>
+<li>Automatic QSO sequencing Tx1 &hellip; Tx6. To answer a call type it in DX call and press Enter.</li>
+<li>The slot clock is corrected from the DT of the stations heard (and from an NTP server, see 4.3). Early decode passes answer a click + Enable TX in the next slot; CQ uses the soonest slot.</li>
+<li><b>Dual RX:</b> both receivers are decoded into one list (the stations are marked with their band); TX goes out on the receiver whose TX tag (VFO A / B) is lit. The RX1 / RX2 buttons hide a whole receiver display.</li>
+<li>FT8 / FT4 put the receiver on the calling frequency of the band, set the filter to 3 kHz and restore the previous filter at the end. The band label shows, for example, 80M FT8.</li>
+<li><b>Stations that are not answered</b> (Setup &rarr; General &rarr; DIGI MODES &rarr; FT8/FT4): countries or call patterns (<code>UA*</code>, <code>3Y0K</code>) are shown dimmed, cannot be clicked and are never answered. <b>Update prefix table</b> loads Big CTY. The option <i>Do not answer stations whose country is unknown to the table</i> is an extra, stricter rule for hashed calls and new prefixes; the list itself works without it.</li>
+<li>The close-up waterfall over the filter band: click = Rx, right click = Tx, click on a call = select.</li>
+<li>Non-standard calls (for example <code>/QRP</code>) are answered with the WSJT-X compatible form.</li>
+<li>Transmit uses the full audio level; the main <b>Drive</b> slider sets the power, exactly as in CW. After TX with PureSignal on, check the TX ATT value (the auto-attenuate may raise it).</li>
+</ul>
+<figure><img src="img/setup_digi_top.png" alt="Setup, DIGI MODES" style="width:70%"><figcaption>Setup &rarr; General &rarr; DIGI MODES &rarr; FT8/FT4: PSK Reporter spotting and the list of stations that are not answered.</figcaption></figure>
+
+<h2 id="c4-auto">4.2 Auto CQ (no operator)</h2>
+<p>The <b>Auto CQ</b> button (second row of the FT8 / FT4 window, right) works without the operator: it calls CQ, answers the stations that call, logs every QSO and calls CQ again. <b>Enable TX</b> does not have to be pressed for every round. The box beside the button is the time it may work, in minutes (1 to 1440, remembered). While it runs the button shows the time left.</p>
+<h3>Starting and stopping</h3>
+<ol>
+<li>Enter your call sign and locator, put the receiver on DIGU on the FT8 / FT4 frequency, choose the Rx / Tx audio frequency and set the <b>Drive</b> slider as you want it &mdash; the program never changes the power.</li>
+<li>Set the minutes and press <b>Auto CQ</b>. The auto-sequence is switched on by it. Press the button again, or <b>Halt</b>, to stop at once.</li>
+<li>Auto CQ also stops when the timer ends (a QSO in progress is finished first, 2 minutes at most), when the FT8 / FT4 window is closed, when the mode is changed, when the radio is switched off and when the transmitter is un-keyed by hand.</li>
+</ol>
+<h3>What it does</h3>
+<table>
+<tr><th style="width:30%">Situation</th><th>Reaction</th></tr>
+<tr><td>A station answers the CQ</td><td>The normal auto-sequence (report, RR73); the QSO is logged. After RR73 the QSO counts as finished and the next one starts at once, without waiting for the 73.</td></tr>
+<tr><td>Stations call while a QSO is in progress</td><td>They are remembered (a call is valid for 8 slots, about 2 minutes in FT8). When the partner does not answer after RR73, or after our report went out twice, the <b>farthest</b> of the waiting stations is answered first: great circle distance from your locator to theirs; a station with an unknown locator comes last.</td></tr>
+<tr><td>No answer to 5 CQs in a row</td><td>The program calls the <b>farthest station that is itself calling CQ</b> (heard in the last 6 slots). With Dual RX on, both bands are searched and the transmission moves to the receiver of that station.</td></tr>
+<tr><td>A called station does not answer two calls</td><td>It is dropped for this run; the next farthest station is called, or the program goes back to its own CQ when none is left.</td></tr>
+<tr><td>Station of a blocked country</td><td>Never called and never answered.</td></tr>
+</table>
+<p>The slot of the own CQ stays the same, so every other slot is free for listening. The distance uses the locators in the decoded messages; the call signs and the QSOs worked in the run are kept only until Auto CQ is stopped.</p>
+<div class="note"><b>Auto CQ transmits on the air without an operator at the keyboard.</b> Stay near the radio, check the antenna and the Drive setting and respect the rules of your licence. Use it with the antenna connected: into a dummy load nobody can answer.</div>
+
+<h2 id="c4-ntp">4.3 Time from an NTP server</h2>
+<p>FT8 and FT4 need the clock to within about a second. <b>Setup &rarr; General &rarr; DIGI MODES &rarr; FT8/FT4 &rarr; Time (NTP)</b> measures the offset of the PC clock to an NTP server (default <code>pool.ntp.org</code>, UDP port 123; the answer with the shortest round trip of five tries is used) and applies it to the slot timing. <b>The Windows clock itself is not changed</b> (that would need administrator rights); the clock in the FT8 / FT4 window is corrected as well.</p>
+<figure><img src="img/setup_digi_time.png" alt="Setup, Time (NTP)" style="width:70%"><figcaption>The Time (NTP) group. The line at the bottom shows the result of Sync now: here the PC clock is 1.5 s ahead.</figcaption></figure>
+<ul>
+<li><b>Sync now</b> measures at once; the line under the button gives the result, for example &ldquo;The PC clock is ahead by 1.5 s&rdquo;.</li>
+<li><b>Measure at start and every 30 minutes</b> (on by default) keeps the offset up to date. The server and the option are stored in <code>ntp.txt</code> in the data folder.</li>
+<li>The automatic fine adjustment from the decoded stations still works on top of it.</li>
+<li>If the Windows time service is not running the clock drifts: use the NTP offset, or start the service (Settings &rarr; Time &amp; language &rarr; Sync now).</li>
+</ul>
+
+<h2 id="c4-cw">4.4 CW</h2>
+<figure><img src="img/cw.png" alt="CW window" style="width:88%"><figcaption>The CW window with the decoder drop-down (picture of version 1.3.5).</figcaption></figure>
+<p>Three decoders can be switched on the fly (Decoder drop-down): <b>Basic</b> (envelope), <b>DeepCW</b> (neural network, ONNX) and <b>Goertzel</b> (port of ggmorse). DeepCW is usually the cleanest. If its model cannot be loaded, the basic decoder is used. Transmit goes through CWX; the macros include the Report macro with your name and QTH (Setup &rarr; General &rarr; DIGI MODES &rarr; CW / RTTY macros).</p>
+<h2 id="c4-rtty">4.5 RTTY</h2>
+<p>A terminal with the decoder, the macros and transmit. The mark tone comes from Setup &rarr; CAT Control &rarr; RTTY Offset; the status line shows the radio frequency of the mark; mark / space markers are drawn on the panadapter. The Drive slider sets the power.</p>
+<h2 id="c4-fdv">4.6 FreeDV (RADE)</h2>
+<p>FreeDV RX / TX per receiver, a strip under the panadapter and a settings window, an overlay on the panadapter, meter readings and the FreeDV Reporter (a double click on a station retunes). The receiver is put on the calling frequency of its band.</p>
+<h2 id="c4-common">4.7 Common digital features</h2>
+<ul>
+<li><b>Automatic RX level</b> (Setup &rarr; DIGI MODES &rarr; RX level): lowers the decoder level when the audio clips, raises it when it stays low. The decoder audio does not depend on RX AF or MUTE.</li>
+<li><b>PSK Reporter</b> spotting (off by default; Setup &rarr; General &rarr; DIGI MODES &rarr; FT8/FT4 &rarr; Network Services).</li>
+<li><b>Logging:</b> every QSO goes to <code>digi_modes\qso_log.adi</code> and, if enabled, to QRZ.com Logbook, eQSL, Club Log and LoTW (TQSL). The keys are stored encrypted for the Windows user; failed uploads are retried. Without a paid QRZ subscription the QSOs are collected in <code>qrz_manual.adi</code> for a manual import (Setup &rarr; DIGI MODES &rarr; Online logs).</li>
+<li><b>Log bar</b> under the panadapter (SSB, AM, FM, CW, RTTY by hand): call, report, name, QTH, Save, QRZ.com and Google buttons; look-up while typing (callook.info, HamDB, RadioID, own logs, country table; HamQTH / QRZ XML with log-in). It is hidden while the FT8 / FT4 window is open.</li>
+</ul>
+</section>
+
+<!-- ===================== 5 ===================== -->
+<section class="chapter" id="c5">
+<h1>5. DX cluster</h1>
+<p>Spots are drawn as labels on the spectrum; a click on a label tunes the receiver (VFO B on RX2). The <b>DXC</b> button beside 3D switches them; the settings are in <b>Setup &rarr; DX Cluster</b> (a telnet cluster, and the Reverse Beacon Network ports 7000 for CW / RTTY and 7001 for FT8 / FT4). Enter your own call sign for the login.</p>
+</section>
+
+<!-- ===================== 6 ===================== -->
+<section class="chapter" id="c6">
+<h1>6. Transmit, PureSignal, safety</h1>
+<ul>
+<li>PureSignal uses the Thetis 2.10.3.15 algorithm (calcc / iqc), which converged faster in tests than the WDSP 2.11 rewrite. The PIN, MAP, STBL and TINT options work.</li>
+<li>The TX leveler is switched on in LSB / USB; the Brick TX profiles have it on.</li>
+<li>The ranges of Drive and S-ATT follow the radio model. Drive is stored per band.</li>
+<li>The power bar holds the forward power peak (red mark, 1.2 s); the SWR bar has marks at 1.5 (yellow) and 2.0 (red).</li>
+<li>The two VFO TX tags are never off at the same time.</li>
+<li>Digital modes transmit at full audio level; the Drive slider sets the power. With PureSignal on, check the TX ATT value after FT8 / FT4 transmissions.</li>
+</ul>
+</section>
+
+<!-- ===================== 7 ===================== -->
+<section class="chapter" id="c7">
+<h1>7. Hermes Lite 2 and other radios</h1>
+<p>Hermes Lite 2 support comes from the MI0BOT Thetis version (the same base): HL2 model, drive in dB, I/O board, extended attenuator range, temperature and current in the status bar. It was tested on one board (receive, TUNE at low power). Hermes protocol 1 offers a 384 kHz sample rate (not tried on hardware). Keep-alive packets are sent only after an idle gap.</p>
+<p>Other boards are identified by the board id of the discovery. Brick2 and Brick3 have their own entries in the model list (see chapter 2).</p>
+</section>
+
+<!-- ===================== 8 ===================== -->
+<section class="chapter" id="c8">
+<h1>8. Display options and appearance</h1>
+<p><b>Setup &rarr; Display &rarr; General:</b> 3D style, line colour modes, spectrum fill colour, <i>Ignore spectral area image</i> (kept between runs). The line mode <i>noise fill colour + WF</i> and the waterfall colours drive the 3D ridges.</p>
+<p><b>Holiday splash screens</b> (world, Ukraine, Germany). Switch them off with an empty file <code>no_holiday_splash.txt</code> in the data folder; preview one with the environment variable <code>BRICKSDR_HOLIDAY=xmas</code> (halloween, newyear, hearts, flowers, radio, eggs, flagua, flagde, nicholas, advent).</p>
+<h2 id="c8-look">8.1 Frequency display and colours</h2>
+<figure><img src="img/setup_appearance.png" alt="Setup, Appearance" style="width:70%"><figcaption>Setup &rarr; Appearance &rarr; General, the group &ldquo;Frequency display and colours&rdquo; (left, below the waterfall time labels).</figcaption></figure>
+<table>
+<tr><th style="width:24%">Setting</th><th>What it does</th></tr>
+<tr><td>Frequency font</td><td>The font of the VFO digits. <b>Load font...</b> adds a font file of your own (it is copied to the data folder).</td></tr>
+<tr><td>Font size, %</td><td>Size of the digits, 40 to 300 %. VFO A and VFO B always use the same size, whatever the band; a narrow window shrinks both together.</td></tr>
+<tr><td>Frequency colour</td><td>Colour of the digits of the active VFO.</td></tr>
+<tr><td>Lit buttons colour</td><td>The accent colour of the whole program: lit buttons, sliders, frames, meters, hover marks. A change is applied at once to all open windows, including Setup. An inactive slider (for example the Tune slider while TUNE does not use it) takes a dimmed shade of the accent.</td></tr>
+<tr><td>Default</td><td>Each setting has its own Default button.</td></tr>
+</table>
+<p>The settings are stored in <code>appearance.txt</code> in the data folder.</p>
+</section>
+
+<!-- ===================== 9 ===================== -->
+<section class="chapter" id="c9">
+<h1>9. Files, troubleshooting, build</h1>
+<h3>User data</h3>
+<p>Everything is in <code>%APPDATA%\OpenHPSDR\Brick-SDR-x64</code>: the settings database, <code>digital.txt</code>, <code>rade.txt</code>, <code>appearance.txt</code>, <code>ntp.txt</code>, <code>tune_step_modes.txt</code>, the <code>digi_modes\</code> logs and <code>ErrorLog.txt</code>.</p>
+<h3>Reporting a problem</h3>
+<p>Open a GitHub issue with the radio model and firmware, <code>ErrorLog.txt</code> and screenshots of the problem and of the related Setup pages.</p>
+<h3>Build</h3>
+<p>In <code>Project Files\Source</code> run <code>MSBuild.exe Console\BrickSDR.csproj -p:Configuration=Release -p:Platform=x64</code>; the result is in <code>Project Files\bin\x64\Release</code>. The installer is built with <code>Installer\build-msi.ps1</code> (WiX 5). The source of this manual is in <code>docs\manual</code>.</p>
+<h3>Licence and credits</h3>
+<p>GNU GPL v2. Based on Thetis (MW0LGE) and PowerSDR; WDSP by Warren Pratt (NR0V); FT8 / FT4 by mfsk-core; DeepCW by e04; ggmorse by G. Gerganov; the HL2 changes by MI0BOT; the RTTY / CW / FreeDV integration after Kainos and Thetis-RADE.</p>
+</section>
+
+<!-- ===================== 10 ===================== -->
+<section class="chapter" id="c10">
+<h1>10. Complete change log</h1>
+<h3 id="v1-4-7">v1.4.7</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> FT8 / FT4: Auto CQ button with a timer (minutes). It calls CQ, answers callers, logs every QSO and starts the next CQ without an operator; Enable TX does not have to be pressed each time. It stops on Halt, when the timer ends (a QSO in progress is finished), when the window is closed or the mode changes.</li>
+<li><span class="tag add">add</span> Auto CQ: stations that call during a QSO are remembered. If the partner does not answer after RR73 or after two reports, the farthest caller is answered first (distance from your locator).</li>
+<li><span class="tag add">add</span> Auto CQ: after 5 CQs without an answer the farthest station that is calling CQ is called (Dual RX searches both bands). A station that does not answer two calls is dropped: the next station, or an own CQ.</li>
+<li><span class="tag add">add</span> Setup &gt; General &gt; DIGI MODES &gt; FT8/FT4 &gt; Time (NTP): offset of the PC clock to an NTP server (Sync now, automatic at start and every 30 minutes) for the FT8 / FT4 slots and the clock of the window. The Windows clock is not changed.</li>
+<li><span class="tag add">add</span> Setup &gt; Appearance: accent colour (applied live to all windows), frequency display font (own font files can be loaded), size and colour, Default buttons.</li>
+<li><span class="tag add">add</span> Brick2 and Brick3 in the radio model list (Alex ticked, Apollo greyed out).</li>
+<li><span class="tag add">add</span> Manual: rewritten for 1.4.7, with new pictures, the manual source in docs/manual.</li>
+<li><span class="tag change">change</span> &quot;Keep my tuning step&quot; remembers the step of every mode.</li>
+<li><span class="tag change">change</span> The frequency digits of VFO A and VFO B are the same size and do not depend on the band.</li>
+<li><span class="tag fix">fix</span> Brick2: the RX1 step attenuator and auto ATT are available.</li>
+<li><span class="tag fix">fix</span> The inactive Tune slider takes the accent colour.</li>
+<li><span class="tag fix">fix</span> Setup &gt; DIGI MODES: the &quot;not answered&quot; block no longer runs over the edge.</li>
+</ul>
+<h3 id="v1-4-6">v1.4.6</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Setup &gt; General &gt; Options &gt; Miscellaneous: &quot;Keep my tuning step&quot;; the step is no longer set by mode / band changes or at start.</li>
+<li><span class="tag add">add</span> RX2 remembers Pan, Zoom and CTUN per band.</li>
+<li><span class="tag add">add</span> FreeDV puts the receiver on the calling frequency of its band, like FT8 / FT4.</li>
+<li><span class="tag add">add</span> FT8 / FT4 set the receiver filter to 3 kHz and put the previous one back when they end.</li>
+<li><span class="tag change">change</span> Keep-alive packets are sent only after an idle gap (less traffic on Wi-Fi and routers).</li>
+<li><span class="tag change">change</span> Status bar: link speed sits left of the N1MM / TCI / CAT icons.</li>
+<li><span class="tag change">change</span> Two-tone IMD box is 1.5x and drawn over the divider.</li>
+<li><span class="tag fix">fix</span> IMD readings were missing in 3D mode.</li>
+<li><span class="tag fix">fix</span> FreeDV Reporter sends protocol changes only when they really change.</li>
+</ul>
+<h3 id="v1-4-5">v1.4.5</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> DX cluster: spots as labels on the spectrum, click tunes (VFO B on RX2); DXC button next to 3D; Setup - DX Cluster (telnet, RBN ports 7000 / 7001).</li>
+<li><span class="tag add">add</span> Arrows at both sides of the displays fold the left and right columns away; the state is remembered.</li>
+<li><span class="tag add">add</span> RX2 has the same DIGI drop-down as RX1.</li>
+<li><span class="tag add">add</span> Setup tabs &quot;Updates&quot; and &quot;DX Cluster&quot; in the top row.</li>
+<li><span class="tag add">add</span> Hermes (protocol 1): 384 kHz sample rate option (not tried on hardware).</li>
+<li><span class="tag change">change</span> Auto ATT for RX1 / RX2 is enabled on all Brick boards.</li>
+<li><span class="tag fix">fix</span> FT8 / FT4: the Dual RX button switches the second receiver off again.</li>
+<li><span class="tag fix">fix</span> The orange &quot;TX Profile modified&quot; notice no longer covers the Setup tab row.</li>
+</ul>
+<h3 id="v1-4-4">v1.4.4</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Automatic update check: status bar notice, &quot;What&#x27;s new&quot; window, one &quot;Download and install&quot; button, &quot;Skip this version&quot;.</li>
+<li><span class="tag add">add</span> &quot;Check for updates&quot; button in About; on/off and &quot;Check now&quot; in Setup - General - Updates.</li>
+<li><span class="tag add">add</span> README: firmware upload to the bootloader.</li>
+<li><span class="tag fix">fix</span> Setup - DIGI MODES - FT8/FT4: the last check box of the blocked stations group was cut off.</li>
+</ul>
+<h3 id="v1-4-3">v1.4.3</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> 3D spectrum style in Setup &gt; Display &gt; General: Classic, Proportional, Custom.</li>
+<li><span class="tag add">add</span> CW / RTTY Report macro sends your own name and QTH.</li>
+<li><span class="tag change">change</span> 3D: dB scale in front of the ridges; MNF notch bands follow the 3D perspective.</li>
+<li><span class="tag change">change</span> External 10 MHz reference is locked off for Brick2 / Brick3.</li>
+<li><span class="tag change">change</span> Tune label has no brackets and keeps its look when TUNE is switched.</li>
+<li><span class="tag fix">fix</span> FT8 / FT4: stations with a non-standard call (e.g. /QRP) can be answered.</li>
+<li><span class="tag fix">fix</span> RX2 showed a carrier at zero frequency (DDC frequency not sent when both TX tags were off).</li>
+<li><span class="tag fix">fix</span> VFO A / B boxes flashed at the switch to transmit.</li>
+<li><span class="tag fix">fix</span> Tune slider was highlighted for a moment when returning to receive.</li>
+</ul>
+<h3 id="v1-4-2">v1.4.2</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> FT8 / FT4 Dual RX: both receivers decoded into one list, stations marked with their band, TX on the receiver whose TX tag is lit.</li>
+<li><span class="tag add">add</span> RX1 / RX2 buttons in the FT8 window show or hide a whole receiver display.</li>
+<li><span class="tag add">add</span> SUB-RX works like RX2 without opening it (VFO B, RX2 AF slider = sub receiver volume).</li>
+<li><span class="tag add">add</span> MSI installer with a setup wizard.</li>
+<li><span class="tag add">add</span> MIC HW / MIC VAC button under RX EQ.</li>
+<li><span class="tag change">change</span> RTTY takes the mark tone from the RTTY Offset of Thetis, shows the mark frequency, no TX level control.</li>
+<li><span class="tag change">change</span> The band label shows 20M FT8 / FT4 on the FT8 / FT4 frequency.</li>
+<li><span class="tag change">change</span> 3D: the 0 Hz line and band edge lines are drawn in front of the ridges.</li>
+<li><span class="tag change">change</span> Setup, Appearance: General block and skin list removed.</li>
+<li><span class="tag change">change</span> FT8 lists keep the heading words over their columns; the QSO list keeps a minimum width.</li>
+<li><span class="tag fix">fix</span> No &quot;Skins files not found&quot; message at first start.</li>
+<li><span class="tag fix">fix</span> Hermes Lite 2 Drive / ATT limits no longer stay when another board is connected.</li>
+<li><span class="tag fix">fix</span> DirectX error (&quot;Parameter is incorrect&quot;) when the window is made very low.</li>
+</ul>
+<h3 id="v1-4-1">v1.4.1</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> MIC HW / MIC VAC button: transmit audio source (radio microphone or VAC), remembered.</li>
+<li><span class="tag fix">fix</span> In MIC VAC mode the MIC slider sets the VAC TX gain.</li>
+<li><span class="tag fix">fix</span> Drive and S-ATT ranges follow the radio model.</li>
+<li><span class="tag change">change</span> Hermes Lite 2: one wheel click on Drive is one drive step.</li>
+<li><span class="tag fix">fix</span> S-ATT value no longer wraps to a second line.</li>
+</ul>
+<h3 id="v1-4">v1.4</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Hermes Lite 2 support (MI0BOT changes merged): HL2 model, drive in dB, I/O board, temperature and current in the status bar.</li>
+<li><span class="tag add">add</span> Model selected from the board id in discovery; Brick2 / Brick3 recognised by MAC with calibration and PA profiles.</li>
+<li><span class="tag add">add</span> Link speed (receive / transmit) in the status bar.</li>
+<li><span class="tag add">add</span> TX levels strip (MIC, EQ, LVLR, CFC, COMP, ALC) under the panadapter.</li>
+<li><span class="tag add">add</span> Slider knob aura on mouse over.</li>
+<li><span class="tag change">change</span> No more &quot;Model version issue&quot; warning at start.</li>
+<li><span class="tag fix">fix</span> Hermes Lite 2 was treated as a Hermes (Drive had almost no effect).</li>
+<li><span class="tag fix">fix</span> S-ATT value no longer wraps (-28 dB).</li>
+</ul>
+<h3 id="v1-4-hl2">v1.4_hl2 (pre-release)</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Hermes Lite 2 support from the MI0BOT Thetis version (not tested on real HL2 hardware at that time).</li>
+<li><span class="tag add">add</span> Windows Installer (.msi) package, built with WiX.</li>
+</ul>
+<h3 id="v1-3-8">v1.3.8</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Log bar under the panadapter with call sign look-up in several sources.</li>
+<li><span class="tag add">add</span> CW: Zero beat button back in the CW panel.</li>
+<li><span class="tag add">add</span> PSK Reporter receiver record carries the radio name.</li>
+<li><span class="tag change">change</span> Frequency box at the pointer sits level with the pointer; right click toggles it.</li>
+</ul>
+<h3 id="v1-3-7">v1.3.7</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Online logbooks: QRZ.com, eQSL, Club Log, LoTW (through TQSL); manual import file without a QRZ subscription.</li>
+<li><span class="tag add">add</span> Automatic RX level for the digital modes.</li>
+<li><span class="tag add">add</span> &quot;Log QSO...&quot; in the DIGI menu and in the RTTY / CW window.</li>
+<li><span class="tag change">change</span> FreeDV Reporter: picking a station no longer switches FreeDV off on a band change; client name carries the Brick-SDR version.</li>
+<li><span class="tag change">change</span> FT8 / FT4: blocked-country refinements, partial-period decoding, faster decode passes.</li>
+</ul>
+<h3 id="v1-3-6">v1.3.6</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Holiday start pictures on the splash screen.</li>
+<li><span class="tag add">add</span> FT8 / FT4 stations that are not answered (countries or call patterns), Update prefix table (Big CTY).</li>
+<li><span class="tag add">add</span> Close-up waterfall for FT8 / FT4.</li>
+<li><span class="tag fix">fix</span> FreeDV strip follows FreeDV when switched from the settings window.</li>
+</ul>
+<h3 id="v1-3-5">v1.3.5</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Three CW decoders: Basic, DeepCW, Goertzel.</li>
+<li><span class="tag add">add</span> PSK Reporter spotting.</li>
+<li><span class="tag add">add</span> FT8 / FT4 answered in the next slot (early decode); click selects, double click enables TX.</li>
+<li><span class="tag change">change</span> Digital windows without Close / RX buttons; RADE named FreeDV; VAC panel hidden while digital modes are in use; DIGI menu remembers the dial frequency; TX leveler on in SSB.</li>
+<li><span class="tag fix">fix</span> DirectX error on minimize with &quot;Maintain aspect ratio&quot;.</li>
+<li><span class="tag fix">fix</span> &quot;Ignore spectral area image&quot; kept between runs; Auto AGC knob turns green.</li>
+</ul>
+<h3 id="v1-3-4">v1.3.4</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Digital modes (DIGI menu): FT8 and FT4, RTTY and CW terminals, FreeDV RADE with FreeDV Reporter, panadapter overlay, meter readings, RTTY markers; docking under the panadapter.</li>
+<li><span class="tag add">add</span> ADIF log, UTC clock correction.</li>
+<li><span class="tag change">change</span> Decoder audio independent of RX AF / MUTE; RTTY and FT8/FT4 transmit at full audio level; tuning step follows the mode.</li>
+<li><span class="tag fix">fix</span> PA settings of Brick boards were skipped when the board was found before Setup existed.</li>
+</ul>
+<h3 id="v1-3-3">v1.3.3</h3>
+<ul class="cl">
+<li><span class="tag change">change</span> Menu bar, drop-down menus and status bar in the Brick-SDR style.</li>
+<li><span class="tag add">add</span> DIGI drop-down for RX1 (DIGL, DIGU, FT8, FT4, RTTY, CW, DX, POTA).</li>
+<li><span class="tag change">change</span> Leaving another mode for LSB / USB picks the sideband that suits the band.</li>
+<li><span class="tag change">change</span> Tune power slider back next to Drive; Leveler on in the Brick TX profiles; installer file name carries the version.</li>
+</ul>
+<h3 id="v1-3-2">v1.3.2</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> Click on the spectrum (outside the visor) tunes to the nearest station.</li>
+<li><span class="tag change">change</span> The exe product version shows the Brick-SDR version.</li>
+</ul>
+<h3 id="v1-3-1">v1.3.1</h3>
+<ul class="cl">
+<li><span class="tag change">change</span> PureSignal uses the Thetis 2.10.3.15 algorithm (IMD3 about -50 dBc within seconds).</li>
+<li><span class="tag add">add</span> SWR bar: yellow mark at 1.5, red from 2.0.</li>
+</ul>
+<h3 id="v1-3">v1.3</h3>
+<ul class="cl">
+<li><span class="tag add">add</span> 3D spectrum per receiver, contour in the waterfall colours.</li>
+<li><span class="tag add">add</span> Click on the waterfall tunes to the nearest station; arrow cursor.</li>
+<li><span class="tag add">add</span> S-meter and SWR gradients; radio model shown in the title for non-Brick radios.</li>
+<li><span class="tag add">add</span> Setup: line mode &quot;noise fill colour + WF&quot;, spectrum fill colour.</li>
+<li><span class="tag fix">fix</span> Display thread no longer stops after a failed frame (frozen waterfall); zero-width display buffers.</li>
+</ul>
+<h3 id="v1-2">v1.2</h3>
+<ul class="cl">
+<li><span class="tag change">change</span> Window size from 1280x721 up to the monitor size, compact layout.</li>
+<li><span class="tag add">add</span> Independent spectrum/waterfall splitter per receiver, RX2 frame, mode pairs.</li>
+<li><span class="tag add">add</span> Brick2 / Brick3 15 W / 50 W detection by MAC, calibration and PA profiles per model.</li>
+<li><span class="tag add">add</span> Program / IP Set buttons for discovered radios.</li>
+<li><span class="tag fix">fix</span> Freeze after TX, fixed SWR text, Pan/Zoom of RX2 at start.</li>
+</ul>
+<h3 id="v1-1">v1.1</h3>
+<ul class="cl">
+<li>First release: Thetis 2.10.3.x with WDSP 2.11 and the Brick-SDR interface.</li>
+</ul>
+</section>
+
+</body>
+</html>

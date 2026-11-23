@@ -139,8 +139,9 @@ namespace BrickSDR
             IdentifiedBrick = true;
             _name = name;
             console.SetupForm.BrickLockExt10MHz(true);
-            console.SetupForm.SelectRadioModel(model);
+            console.SetupForm.SelectRadioModel(model, name.StartsWith("Brick3") ? "Brick3" : "Brick2");
             console.SetupForm.BrickEnableAutoAtt();
+            console.SetupForm.BrickApplyModelRestrictions();
             BrickProfiles.ApplyOnce(console, name, _mac);
         }
 

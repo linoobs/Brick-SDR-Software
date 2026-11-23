@@ -28,9 +28,102 @@ namespace BrickSDR
             groupBoxTS70.Top = grpAppSkins.Bottom + 8;
         }
 
+        // Brick2 (Hermes) and Brick3 (ANAN-100D) in the model list: Alex is present (ticked), Apollo does not exist (unticked, greyed)
+        public void BrickApplyModelRestrictions()
+        {
+            string m = comboRadioModel.Text ?? "";
+            if (!m.Equals("Brick2", StringComparison.OrdinalIgnoreCase) && !m.Equals("Brick3", StringComparison.OrdinalIgnoreCase)) return;
+            try
+            {
+                chkApolloPresent.Checked = false;
+                chkApolloPresent.Enabled = false;
+                chkAlexPresent.Enabled = true;
+                chkAlexPresent.Checked = true;
+            }
+            catch { }
+        }
+
+        // Appearance: font and colour of the frequency display, colour of lit buttons
+        private void BrickAddAppearanceOptions()
+        {
+            try
+            {
+                GroupBox g = new GroupBox { Name = "brickGrpLook", Text = "Frequency display and colours" };
+                int top = Math.Min(groupBoxTS70.Bottom + 8, tpAppearanceGeneral.ClientSize.Height - 158);
+                g.SetBounds(8, top, 294, 152);
+
+                g.Controls.Add(new Label { Text = "Frequency font", AutoSize = true, Location = new Point(8, 26) });
+                ComboBox cb = new ComboBox { Name = "brickVfoFont", DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(96, 22), Width = 114, DropDownWidth = 280, MaxDropDownItems = 16 };
+                Action fill = () =>
+                {
+                    cb.Items.Clear();
+                    int sel = 0;
+                    foreach (BrickAppearance.FontItem it in BrickAppearance.FontItems())
+                    {
+                        int i = cb.Items.Add(it);
+                        if (it.Key == BrickAppearance.VfoFontKey) sel = i;
+                    }
+                    cb.SelectedIndex = sel;
+                };
+                fill();
+                cb.SelectedIndexChanged += (s, e) =>
+                {
+                    BrickAppearance.FontItem it = cb.SelectedItem as BrickAppearance.FontItem;
+                    if (it != null) BrickAppearance.SetVfoFont(it.Key);
+                };
+                Button load = new Button { Name = "brickLoadFont", Text = "Load font...", Location = new Point(216, 21), Size = new Size(70, 24) };
+                load.Click += (s, e) =>
+                {
+                    using (OpenFileDialog ofd = new OpenFileDialog())
+                    {
+                        ofd.Filter = "Fonts (*.ttf, *.otf)|*.ttf;*.otf";
+                        if (ofd.ShowDialog(this) != DialogResult.OK) return;
+                        string fam = BrickAppearance.AddFontFile(ofd.FileName);
+                        if (fam == null) { MessageBox.Show(this, "This file is not a usable font.", "Load font", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                        BrickAppearance.SetVfoFont(fam);
+                        fill();
+                    }
+                };
+                g.Controls.Add(cb); g.Controls.Add(load);
+
+                // size of the digits of any font, in % of the designed size (the box makes them smaller when they do not fit its width)
+                g.Controls.Add(new Label { Text = "Font size, %", AutoSize = true, Location = new Point(8, 58) });
+                NumericUpDown nsz = new NumericUpDown { Name = "brickVfoSize", Minimum = 40, Maximum = 300, Increment = 5, Location = new Point(96, 54), Width = 60 };
+                nsz.Value = Math.Max(nsz.Minimum, Math.Min(nsz.Maximum, BrickAppearance.VfoSizePercent));
+                nsz.ValueChanged += (s, e) => BrickAppearance.SetVfoSize((int)nsz.Value);
+                Button szDef = new Button { Name = "brickVfoSizeDefault", Text = "Default", Location = new Point(164, 53), Size = new Size(60, 24) };
+                szDef.Click += (s, e) => nsz.Value = 100;
+                g.Controls.Add(nsz); g.Controls.Add(szDef);
+
+                // colour pickers: a swatch (click to choose) and Default
+                Func<string, int, Func<Color>, Action<Color>, Action, Button> picker = (text, y, get, set, reset) =>
+                {
+                    g.Controls.Add(new Label { Text = text, AutoSize = true, Location = new Point(8, y + 5) });
+                    Button sw = new Button { Location = new Point(126, y), Size = new Size(60, 24), FlatStyle = FlatStyle.Flat, BackColor = get(), Tag = "brickSwatch" };
+                    sw.FlatAppearance.BorderColor = Color.Gray;
+                    sw.Click += (s, e) =>
+                    {
+                        using (ColorDialog d = new ColorDialog { Color = get(), FullOpen = true })
+                            if (d.ShowDialog(this) == DialogResult.OK) { set(d.Color); sw.BackColor = get(); }
+                    };
+                    Button df = new Button { Text = "Default", Location = new Point(194, y), Size = new Size(60, 24) };
+                    df.Click += (s, e) => { reset(); sw.BackColor = get(); };
+                    g.Controls.Add(sw); g.Controls.Add(df);
+                    return sw;
+                };
+                picker("Frequency colour", 88,() => BrickAppearance.FrequencyColor, c => BrickAppearance.SetVfoColor(c), () => BrickAppearance.SetVfoColor(null));
+                picker("Lit buttons colour", 120,() => BrickAppearance.Accent, c => BrickAppearance.SetAccent(c), () => BrickAppearance.SetAccent(BrickAppearance.DefaultAccent));
+
+                tpAppearanceGeneral.Controls.Add(g);
+                g.BringToFront();
+            }
+            catch { }
+        }
+
         public void BrickSimplifyNR()
         {
             BrickHideSkins();
+            BrickAddAppearanceOptions();
             BrickAddBootloaderButton();
             BrickAddRadeMeterOption();
             BrickAddDigiModesTab();

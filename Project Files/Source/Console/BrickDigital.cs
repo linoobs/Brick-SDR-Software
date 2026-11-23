@@ -97,6 +97,7 @@ namespace BrickSDR
                         case "ftrx": if (num) _ftRxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
                         case "fttx": if (num) _ftTxHz = (int)Math.Max(200, Math.Min(3000, d)); break;
                         case "ftauto": _ftAuto = v != "0"; break;
+                        case "ftrobotmin": if (num) _ftRobotMinutes = (int)Math.Max(1, Math.Min(1440, d)); break;
                         case "autolvl": _digiAutoLevel = v != "0"; break;
                         case "logbar": _digiLogBar = v != "0"; break;
                         case "psk": _ftPsk = v == "1"; break;
@@ -124,7 +125,7 @@ namespace BrickSDR
                     "mycall=" + _digiMyCall, "myname=" + _digiMyName, "myqth=" + _digiMyQth, "rx=" + _digiRx,
                     "shift=" + _rttyShift.ToString(CultureInfo.InvariantCulture), "baud=" + _rttyBaud.ToString(CultureInfo.InvariantCulture),
                     "rev=" + (_rttyReverse ? 1 : 0), "afc=" + (_rttyAfc ? 1 : 0), "rsql=" + _rttySql, "rlevel=" + _rttyLevel, "csql=" + _cwSql, "pop=" + (_digiPopped ? 1 : 0), "open=" + _digiOpenKey,
-                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "autolvl=" + (_digiAutoLevel ? 1 : 0), "logbar=" + (_digiLogBar ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "blocked=" + string.Join(";", _ftBlocked), "blockunknown=" + (_ftBlockUnknown ? 1 : 0), "cwdec=" + _cwKind, "ftdual=" + (_ftDual ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
+                    "grid=" + _ftGrid, "ftmode=" + _ftMode, "ftrx=" + _ftRxHz, "fttx=" + _ftTxHz, "ftauto=" + (_ftAuto ? 1 : 0), "ftrobotmin=" + _ftRobotMinutes,"autolvl=" + (_digiAutoLevel ? 1 : 0), "logbar=" + (_digiLogBar ? 1 : 0), "psk=" + (_ftPsk ? 1 : 0), "blocked=" + string.Join(";", _ftBlocked), "blockunknown=" + (_ftBlockUnknown ? 1 : 0), "cwdec=" + _cwKind, "ftdual=" + (_ftDual ? 1 : 0), "ftlevel=" + _ftLevel.ToString(CultureInfo.InvariantCulture), "lvl=3"
                 });
             }
             catch { }

@@ -354,7 +354,10 @@ namespace BrickSDR
             switch (sModel.ToUpper())
             {
                 case "HERMES":
+                case "BRICK2":      // Brick-SDR boards: Hermes / ANAN-100D hardware underneath
                     return HPSDRModel.HERMES;
+                case "BRICK3":
+                    return HPSDRModel.ANAN100D;
                 case "ANAN-10":
                     return HPSDRModel.ANAN10;
                 case "ANAN-10E":

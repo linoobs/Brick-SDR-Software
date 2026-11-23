@@ -672,7 +672,9 @@ namespace BrickSDR
             if (span < 0) span = 0;
             if (span > 1) span = 1;
             bool on = this.Enabled;
-            Color accent = on ? BrickAccent : Color.FromArgb(110, 80, 50);
+            // an inactive slider is the accent colour dimmed towards the card (it was a fixed brown, which ignored Setup > Appearance)
+            Color accent = on ? BrickAccent : Color.FromArgb(
+                (int)(34 + (BrickAccent.R - 34) * 0.42), (int)(36 + (BrickAccent.G - 36) * 0.42), (int)(48 + (BrickAccent.B - 48) * 0.42));
             Color knob = on ? (m_bGreenThumb ? Color.FromArgb(60, 214, 96) : Color.FromArgb(235, 238, 245)) : Color.FromArgb(120, 124, 136);        // green while Auto AGC is on
             const int r = 9;
             // the knob is small; the pointer on it shows an aura of full size, and while it is held the knob grows to the aura

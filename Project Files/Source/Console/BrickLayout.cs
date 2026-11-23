@@ -19,7 +19,7 @@ namespace BrickSDR
         private static readonly Color cLine = Color.FromArgb(48, 53, 70);
         private static readonly Color cText = Color.FromArgb(225, 228, 235);
         private static readonly Color cMuted = Color.FromArgb(140, 146, 160);
-        private static readonly Color cAccent = Color.FromArgb(255, 138, 31);
+        private static Color cAccent { get { return BrickAppearance.Accent; } }   // orange unless changed in Setup > Appearance
         private static readonly Color cBtn = Color.FromArgb(36, 40, 55);
         private static readonly Color cBtnHover = Color.FromArgb(52, 57, 76);
         private static readonly Color cTx = Color.FromArgb(214, 48, 48);
@@ -273,6 +273,13 @@ namespace BrickSDR
             SuspendLayout();
 
             brickActive = true;
+
+            // look settings of Setup > Appearance: frequency font / colour, colour of lit buttons
+            BrickAppearance.Load(AppDataPath);
+            BrickNtp.Load(AppDataPath);
+            PrettyTrackBar.BrickAccent = BrickAppearance.Accent;
+            BrickAppearance.AccentChanged += (o, n) => { PrettyTrackBar.BrickAccent = n; BrickAppearance.RecolorAll(o, n); };
+            BrickAppearance.Changed += () => { try { if (boxA != null) boxA.Invalidate(); if (boxB != null) boxB.Invalidate(); } catch { } };
 
             // status bar: room for the texts, no size grip, items do not touch the frame
             statusStripMain.AutoSize = false;
@@ -2047,13 +2054,15 @@ namespace BrickSDR
             b.MouseLeave += (s, e) => { brickHover.Remove(b); b.Invalidate(); };
 
             bool isTx = b == chkMOX || b == chkTUN || b == chk2TONE || b == chkVOX || b == chkVFOATX || b == chkVFOBTX;
-            Color on = isTx ? cTx : (b == chkPower ? Color.FromArgb(60, 190, 90) : cAccent);
-            if (b is CheckBox) ((CheckBox)b).FlatAppearance.CheckedBackColor = on;
-            if (b is RadioButton) ((RadioButton)b).FlatAppearance.CheckedBackColor = on;
+            // the lit colour is read when needed: the accent colour can be changed in Setup > Appearance
+            Func<Color> onC = () => isTx ? cTx : (b == chkPower ? Color.FromArgb(60, 190, 90) : cAccent);
+            if (b is CheckBox) ((CheckBox)b).FlatAppearance.CheckedBackColor = onC();
+            if (b is RadioButton) ((RadioButton)b).FlatAppearance.CheckedBackColor = onC();
 
             Action apply = () =>
             {
                 bool state = b is CheckBox ? ((CheckBox)b).Checked : (b is RadioButton ? ((RadioButton)b).Checked : false);
+                Color on = onC();
                 Color back = state ? on : cBtn;
                 Color fore = state ? Color.FromArgb(20, 20, 24) : cText;
                 if (!b.Enabled) fore = cMuted;
@@ -2067,7 +2076,18 @@ namespace BrickSDR
             {
                 bool st = b is CheckBox ? ((CheckBox)b).Checked : (b is RadioButton ? ((RadioButton)b).Checked : false);
                 if (b == chkMUT && brickMuteAll) brickPaintButton(b, e, Color.FromArgb(215, 45, 45), true);
-                else brickPaintButton(b, e, on, st);
+                else brickPaintButton(b, e, onC(), st);
+            };
+            BrickAppearance.AccentChanged += (o, n) =>
+            {
+                try
+                {
+                    if (b.IsDisposed) return;
+                    if (b is CheckBox) ((CheckBox)b).FlatAppearance.CheckedBackColor = onC();
+                    if (b is RadioButton) ((RadioButton)b).FlatAppearance.CheckedBackColor = onC();
+                    apply();
+                }
+                catch { }
             };
 
             // the old code puts its glossy button pictures back whenever the state changes

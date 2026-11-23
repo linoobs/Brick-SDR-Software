@@ -30,7 +30,7 @@ namespace BrickSDR
                 Point[] tri = PointLeft
                     ? new[] { new Point(cx + 3, cy - a), new Point(cx + 3, cy + a), new Point(cx - 3, cy) }
                     : new[] { new Point(cx - 3, cy - a), new Point(cx - 3, cy + a), new Point(cx + 3, cy) };
-                using (SolidBrush b = new SolidBrush(_hot ? Color.FromArgb(255, 138, 31) : Color.FromArgb(140, 146, 160)))
+                using (SolidBrush b = new SolidBrush(_hot ? cAccent : Color.FromArgb(140, 146, 160)))
                     g.FillPolygon(b, tri);
             }
         }
@@ -114,8 +114,11 @@ namespace BrickSDR
             private bool lastActive, lastTx;
             private readonly Timer poll = new Timer();
 
+            private static readonly List<BrickVfoBox> AllBoxes = new List<BrickVfoBox>();
+
             public BrickVfoBox()
             {
+                AllBoxes.Add(this);
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
                 BackColor = cCard;
                 poll.Interval = 80;
@@ -132,7 +135,7 @@ namespace BrickSDR
 
             protected override void Dispose(bool disposing)
             {
-                if (disposing) poll.Dispose();
+                if (disposing) { poll.Dispose(); AllBoxes.Remove(this); }
                 base.Dispose(disposing);
             }
 
@@ -243,19 +246,23 @@ namespace BrickSDR
                 string khz = ((hz / 1000) % 1000).ToString("000");
                 string small = (hz % 1000).ToString("000");
 
-                float kk = Math.Min(1f, Height / 92f); // low box: smaller digits
+                // the digit size is the same for VFO A and B and does not depend on the band: both boxes use the smaller
+                // of their sizes, and the fit is always worked out for a two digit MHz part (only 100 MHz and up is wider)
+                float room = Width - 46, boxH = Height;
+                foreach (BrickVfoBox ob in AllBoxes)
+                    if (ob.Width > 8 && ob.Height > 8) { room = Math.Min(room, ob.Width - 46); boxH = Math.Min(boxH, ob.Height); }
+                float kk = Math.Min(1f, boxH / 92f); // low box: smaller digits
                 float bigSize = 27f * kk, smallSize = 18f * kk;
                 // narrow box: the digits shrink to fit
-                using (Font f0 = new Font("Consolas", bigSize, FontStyle.Bold))
-                using (Font f1 = new Font("Consolas", smallSize, FontStyle.Bold))
+                using (Font f0 = BrickAppearance.MakeVfoFont(bigSize))
+                using (Font f1 = BrickAppearance.MakeVfoFont(smallSize))
                 {
                     StringFormat s0 = StringFormat.GenericTypographic;
-                    float full = (mhz.Length + 3) * g.MeasureString("0", f0, 100, s0).Width + g.MeasureString(".", f0, 100, s0).Width + 3 * g.MeasureString("0", f1, 100, s0).Width + g.MeasureString(".", f1, 100, s0).Width;
-                    float room = Width - 46;
+                    float full = (Math.Max(2, mhz.Length) + 3) * g.MeasureString("0", f0, 100, s0).Width + g.MeasureString(".", f0, 100, s0).Width + 3 * g.MeasureString("0", f1, 100, s0).Width + g.MeasureString(".", f1, 100, s0).Width;
                     if (full > room) { float k = Math.Max(0.55f, room / full); bigSize *= k; smallSize *= k; }
                 }
-                using (Font fbig = new Font("Consolas", bigSize, FontStyle.Bold))
-                using (Font fsm = new Font("Consolas", smallSize, FontStyle.Bold))
+                using (Font fbig = BrickAppearance.MakeVfoFont(bigSize))
+                using (Font fsm = BrickAppearance.MakeVfoFont(smallSize))
                 {
                     StringFormat sf = StringFormat.GenericTypographic;
                     float cwB = g.MeasureString("0", fbig, 100, sf).Width;
@@ -266,8 +273,8 @@ namespace BrickSDR
                     float right = Width - 38;
                     float x = right - total;
                     float yBig = 18 * kk, ySmall = 18 * kk + (fbig.Height - fsm.Height) - 2;
-                    Color col = active ? cAccent : Color.FromArgb(150, 154, 166);
-                    Color colSmall = active ? Color.FromArgb(200, 110, 30) : Color.FromArgb(110, 114, 126);
+                    Color col = active ? BrickAppearance.FrequencyColor : Color.FromArgb(150, 154, 166);
+                    Color colSmall = active ? BrickAppearance.FrequencySmallColor : Color.FromArgb(110, 114, 126);
 
                     digitRects.Clear(); digitStepHz.Clear();
                     using (Brush b = new SolidBrush(col))
@@ -276,7 +283,7 @@ namespace BrickSDR
                         // MHz digits
                         for (int i = 0; i < mhz.Length; i++)
                         {
-                            g.DrawString(mhz[i].ToString(), fbig, b, x, yBig, sf);
+                            DrawDigit(g, mhz[i].ToString(), fbig, b, x, yBig, cwB, sf);
                             digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwB, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, mhz.Length - 1 - i) * 1e6);
                             x += cwB;
@@ -284,7 +291,7 @@ namespace BrickSDR
                         g.DrawString(".", fbig, b, x, yBig, sf); x += dwB;
                         for (int i = 0; i < 3; i++)
                         {
-                            g.DrawString(khz[i].ToString(), fbig, b, x, yBig, sf);
+                            DrawDigit(g, khz[i].ToString(), fbig, b, x, yBig, cwB, sf);
                             digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwB, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, 2 - i) * 1e3);
                             x += cwB;
@@ -292,7 +299,7 @@ namespace BrickSDR
                         g.DrawString(".", fsm, bs, x, ySmall, sf); x += dwS;
                         for (int i = 0; i < 3; i++)
                         {
-                            g.DrawString(small[i].ToString(), fsm, bs, x, ySmall, sf);
+                            DrawDigit(g, small[i].ToString(), fsm, bs, x, ySmall, cwS, sf);
                             digitRects.Add(new Rectangle((int)x, (int)(14 * kk), (int)cwS, fbig.Height + 6));
                             digitStepHz.Add(Math.Pow(10, 2 - i));
                             x += cwS;
@@ -306,6 +313,13 @@ namespace BrickSDR
                             g.DrawLine(p, r.Left, r.Bottom - 2, r.Right, r.Bottom - 2);
                     }
                 }
+            }
+
+            // a digit centred in its cell (fonts whose digits differ in width, such as seven-segment ones, keep an even rhythm)
+            private static void DrawDigit(Graphics g, string s, Font f, Brush b, float x, float y, float cell, StringFormat sf)
+            {
+                float w = g.MeasureString(s, f, 100, sf).Width;
+                g.DrawString(s, f, b, x + (cell - w) / 2f, y, sf);
             }
 
             private static void DrawTag(Graphics g, string text, int x, int y, Color c, bool on)

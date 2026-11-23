@@ -21,7 +21,8 @@ namespace BrickSDR
         }
 
         private static readonly Color cCard = Color.FromArgb(24, 27, 37), cLine = Color.FromArgb(48, 53, 70);
-        private static readonly Color cText = Color.FromArgb(225, 228, 235), cMuted = Color.FromArgb(140, 146, 160), cAccent = Color.FromArgb(255, 138, 31), cTx = Color.FromArgb(214, 48, 48);
+        private static readonly Color cText = Color.FromArgb(225, 228, 235), cMuted = Color.FromArgb(140, 146, 160), cTx = Color.FromArgb(214, 48, 48);
+        private static Color cAccent { get { return BrickAppearance.Accent; } }
 
         private readonly Row[] rows =
         {

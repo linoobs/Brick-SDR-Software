@@ -1,4 +1,4 @@
-//=================================================================
+﻿//=================================================================
 // console.cs
 //=================================================================
 // Thetis is a C# implementation of a Software Defined Radio.
@@ -11355,6 +11355,7 @@ namespace BrickSDR
 
                 txtWheelTune.Text = tune_step_list[tune_step_index].Name;
                 lblStepValue.Text = txtWheelTune.Text;
+                brickNoteStep();
 
                 if (old_index != tune_step_index)
                 {
@@ -21706,7 +21707,8 @@ namespace BrickSDR
                             HardwareSpecific.Model == HPSDRModel.ANAN7000D || HardwareSpecific.Model == HPSDRModel.ANAN8000D ||
                             HardwareSpecific.Model == HPSDRModel.ANAN_G2 || HardwareSpecific.Model == HPSDRModel.ANAN_G2_1K ||
                             HardwareSpecific.Model == HPSDRModel.ANVELINAPRO3 || HardwareSpecific.Model == HPSDRModel.REDPITAYA || //DH1KLM
-                            HardwareSpecific.Model == HPSDRModel.HERMESLITE;
+                            HardwareSpecific.Model == HPSDRModel.HERMESLITE ||
+                            (HardwareSpecific.Model == HPSDRModel.HERMES && BrickHardware.IdentifiedBrick == true);   // Brick2 is a Hermes with a step attenuator on RX1
 
                 if (_auto_att_rx1 && radioHasRx1Att)
                 {

@@ -21063,6 +21063,8 @@ namespace BrickSDR
                 console.PowerOn = true;
             }
 
+            BrickApplyModelRestrictions();
+
             MeterManager.SetAntennaAuxText(RXAntChk1Name, RXAntChk2Name, RXAntChk3Name);
         }
         private void removeHL2Options()
@@ -37136,12 +37138,18 @@ if (chkContainer_hideRADEnotenabled != null) chkContainer_hideRADEnotenabled.Che
         }
 
         // used by BrickHardware to pick the model matching the radio MAC address
-        public void SelectRadioModel(HPSDRModel model)
+        public void SelectRadioModel(HPSDRModel model, string preferredItem = null)
         {
             string text = HardwareSpecific.EnumModelToString(model);
             // the list item can be spelled differently from the enum name ("HERMES LITE" / "HERMES-LITE"): match by model
-            foreach (object it in comboRadioModel.Items)
-                if (HardwareSpecific.StringModelToEnum(it.ToString()) == model) { text = it.ToString(); break; }
+            // (Brick boards pass their own item, "Brick2" / "Brick3", which is Hermes / ANAN-100D underneath)
+            bool found = false;
+            if (preferredItem != null)
+                foreach (object it in comboRadioModel.Items)
+                    if (it.ToString().Equals(preferredItem, StringComparison.OrdinalIgnoreCase) && HardwareSpecific.StringModelToEnum(it.ToString()) == model) { text = it.ToString(); found = true; break; }
+            if (!found)
+                foreach (object it in comboRadioModel.Items)
+                    if (HardwareSpecific.StringModelToEnum(it.ToString()) == model) { text = it.ToString(); break; }
             if (comboRadioModel.Text.Equals(text, StringComparison.OrdinalIgnoreCase)) return;
 
             comboRadioModel.Text = text;

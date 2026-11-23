@@ -47,6 +47,9 @@ namespace BrickSDR
         // The transmit audio level has no control in the window: it is full scale (0 dB), enough for the TX leveler to saturate, so the main Drive slider sets the power as it does in CW.
         private double _ftLevel = 0;            // dB, digital.txt "ftlevel"
         private bool _ftAuto = true;
+        private volatile bool _ftRobot;             // Auto CQ: calls CQ, answers callers, logs and starts again until the timer ends
+        internal int _ftRobotMinutes = 60;          // digital.txt "ftrobotmin"
+        private DateTime _ftRobotEnd, _ftRobotNext;
         private volatile bool _ftRun;
         private Thread _ftThread;
         private readonly ConcurrentQueue<FtRow> _ftRows = new ConcurrentQueue<FtRow>();
@@ -89,7 +92,7 @@ namespace BrickSDR
         internal bool FtTransmitting { get { return _ftTxActive; } }
 
         private static readonly DateTime FtEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        private static double ftUtcSeconds() { return (DateTime.UtcNow - FtEpoch).TotalSeconds; }
+        private static double ftUtcSeconds() { return (DateTime.UtcNow - FtEpoch).TotalSeconds + BrickNtp.Offset; }     // + the offset to an NTP server when it was measured (Setup - DIGI MODES)
 
         // ---- opening and closing ----
 
@@ -119,6 +122,7 @@ namespace BrickSDR
         {
             if (mode == _ftMode) return;
             ftAbortTx();
+            _ftRobot = false;
             _ftTxEnable = false;
             ftDropDecoder();
             _ftMode = mode;
@@ -131,6 +135,7 @@ namespace BrickSDR
         {
             ftShowAllReceivers();
             ftDualRelease();
+            _ftRobot = false;
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
@@ -144,6 +149,7 @@ namespace BrickSDR
         {
             ftShowAllReceivers();
             ftDualRelease();
+            _ftRobot = false;
             _ftTxEnable = false;
             ftAbortTx();
             ftStopEngine();
@@ -580,10 +586,11 @@ namespace BrickSDR
                     _ftRows.Enqueue(row);
                 }
                 ftTrackClock(rows);
-                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz, false, ch.Rx); ftPskAdd(rows, period, mode, dialMHz); }));
+                if (rows.Count > 0) BeginInvoke(new Action(() => { foreach (var r in rows) { ftLearnGrid(r.Text); ftNoteCq(r.Text, r.Snr, period % 2 == 0, r.Hz, ch.Rx); ftAutoSequence(r.Text, r.Snr, period % 2 == 0, r.Hz, false, ch.Rx); } ftPskAdd(rows, period, mode, dialMHz); }));
             }
             catch (Exception ex) { _ftStatus = "Decoder: " + ex.Message; }
         }
+
 
         // most stations keep good time: their median DT is the error of this PC clock
         private void ftTrackClock(List<Mfsk.Decoder.Row> rows)
@@ -683,7 +690,7 @@ namespace BrickSDR
             }
             // on the air
             if (!_ftTxEnable) { ftEndTx(true); return; }
-            if (now - _ftTxBegan > 1.2 && !_mox) { _ftTxEnable = false; ftEndTx(true); return; }          // un-keyed elsewhere
+            if (now - _ftTxBegan > 1.2 && !_mox) { _ftRobot = false; _ftTxEnable = false; ftEndTx(true); return; }          // un-keyed elsewhere
             int rate = KDigi.KDigiTxRate();
             if (rate > 0 && now >= _ftTxAudioStart - 0.02 || _ftTxPos > 0)
             {
@@ -725,7 +732,205 @@ namespace BrickSDR
             try { KDigi.KDigiTxEnable(0); } catch { }
         }
 
-        internal void FtHalt() { _ftTxEnable = false; ftAbortTx(); if (_ftPane != null) _ftPane.Refresh2(); }
+        internal void FtHalt() { _ftRobot = false; _ftTxEnable = false; ftAbortTx(); if (_ftPane != null) _ftPane.Refresh2(); }
+
+        // ---- Auto CQ: no operator needed. CQ goes out by itself, callers are answered by the auto-sequence, every QSO is logged,
+        // then the next CQ follows. It ends when the timer runs out (a QSO that is running is finished first, 2 minutes at most),
+        // on Halt, when the window is closed, or when the radio can't transmit any more. Countries in the block list stay unanswered.
+        internal bool FtRobotOn { get { return _ftRobot; } }
+        internal TimeSpan FtRobotLeft { get { TimeSpan t = _ftRobotEnd - DateTime.UtcNow; return t < TimeSpan.Zero ? TimeSpan.Zero : t; } }
+
+        internal void FtRobotStart()
+        {
+            string p = FtStartProblem;
+            if (p != null) { _ftStatus = p; return; }
+            _ftAuto = true;
+            _ftCallers.Clear(); _ftWorkedNow.Clear(); _ftCqSeen.Clear(); _ftCqCount = 0; _ftCallMode = false; _ftFailedCalls.Clear();
+            _ftRobotEnd = DateTime.UtcNow.AddMinutes(Math.Max(1, _ftRobotMinutes));
+            _ftRobotNext = DateTime.UtcNow;
+            _ftRobot = true;
+            _ftStatus = "Auto CQ until " + _ftRobotEnd.ToString("HH:mm") + " UTC";
+            FtSetMessage(6);
+            FtCallCq();
+            if (!_ftTxEnable) _ftRobot = false;                                                // CQ could not be started (status says why)
+            if (_ftPane != null) _ftPane.Refresh2();
+        }
+
+        internal void FtRobotStop(string why)
+        {
+            bool was = _ftRobot;
+            FtHalt();
+            if (was) _ftStatus = why;
+        }
+
+        internal void FtRobotSetMinutes(int minutes)
+        {
+            _ftRobotMinutes = Math.Max(1, Math.Min(1440, minutes));
+            if (_ftRobot) _ftRobotEnd = DateTime.UtcNow.AddMinutes(_ftRobotMinutes);
+            digiSaveSettings();
+        }
+
+        // called about ten times a second on the UI thread
+        internal void ftRobotTick()
+        {
+            if (!_ftRobot) return;
+            DateTime now = DateTime.UtcNow;
+            string p = FtStartProblem;
+            if (!_ftRun || p != null) { FtRobotStop("Auto CQ stopped: " + (p ?? "the window was closed")); return; }
+            bool busy = _ftTxActive || _ftTxState != 0;
+            bool inQso = _ftTxEnable && _ftDx.Length > 0;
+            if (now >= _ftRobotEnd)
+            {
+                if (busy) return;                                                              // never cut a message off
+                if (inQso && now < _ftRobotEnd.AddMinutes(2)) return;                          // let the QSO in progress finish
+                FtRobotStop("Auto CQ finished (timer)");
+                return;
+            }
+            if (_ftTxEnable || busy || now < _ftRobotNext) return;
+            // TX went off by itself (QSO done, the partner stopped answering, or nobody answered the CQ): first a station that called
+            // while we were busy (the farthest one), else the next CQ
+            _ftRobotNext = now.AddSeconds(2);
+            if (ftRobotAnswerNext()) { _ftCqCount = 0; return; }
+            if (_ftCallMode || _ftCqCount >= 5)
+            {
+                _ftCqCount = 0;
+                if (ftRobotCallFarthest()) return;                                          // the next farthest station (also after one that did not answer)
+                _ftCallMode = false;                                                        // nobody left to call: our own CQ again
+            }
+            bool keepEven = _ftTxEven;                                                      // keep the slot parity: every other slot stays free for listening
+            FtSetMessage(6);
+            FtCallCq();
+            _ftTxEven = keepEven;
+            if (!_ftTxEnable) FtRobotStop("Auto CQ stopped: " + (_ftStatus.Length > 0 ? _ftStatus : "transmit not possible"));
+        }
+
+        // ---- Auto CQ: stations that called while a QSO was going on, and the choice among them ----
+
+        private sealed class FtCaller { public string Call, Grid = "", Text; public float Snr, Hz; public bool Even; public int Rx; public DateTime At; }
+        private readonly Dictionary<string, FtCaller> _ftCallers = new Dictionary<string, FtCaller>();   // callers waiting for an answer (Auto CQ only)
+        private readonly Dictionary<string, string> _ftGrids = new Dictionary<string, string>();         // locators seen in decoded messages, by call sign
+        private readonly HashSet<string> _ftWorkedNow = new HashSet<string>();                          // logged in this Auto CQ run
+
+        // the locator of a message "CQ K1ABC FN42" / "DL1ABC K1ABC FN42" is remembered for the distance
+        private void ftLearnGrid(string text)
+        {
+            string[] t = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (t.Length < 3) return;
+            string g = t[t.Length - 1];
+            if (!GridRe.IsMatch(g) || g == "RR73") return;
+            string from = t[0] == "CQ" ? (t.Length > 3 && t[1].Length <= 4 && !t[1].Any(char.IsDigit) ? t[2] : t[1]) : t[1];
+            from = ftBase(from);
+            if (from.Length > 0) _ftGrids[from] = g;
+        }
+
+        private void ftNoteCaller(string from, string text, float snr, bool even, float hz, int rx, string what)
+        {
+            if (_ftWorkedNow.Contains(from)) return;
+            if (!GridRe.IsMatch(what) && !RptRe.IsMatch(what) && !RRptRe.IsMatch(what)) return;           // a call, not a 73 / RR73
+            string g = GridRe.IsMatch(what) && what != "RR73" ? what : null;
+            FtCaller c;
+            if (!_ftCallers.TryGetValue(from, out c)) { c = new FtCaller { Call = from }; _ftCallers[from] = c; }
+            c.Text = text; c.Snr = snr; c.Even = even; c.Hz = hz; c.Rx = rx; c.At = DateTime.UtcNow;
+            if (g != null) c.Grid = g;
+        }
+
+        // ---- Auto CQ: 5 CQs without an answer, then the farthest station that is calling CQ is called ----
+
+        private readonly Dictionary<string, FtCaller> _ftCqSeen = new Dictionary<string, FtCaller>();    // stations heard calling CQ (Auto CQ only)
+        private int _ftCqCount;                                                                           // CQs sent in a row without any answer
+        private bool _ftCallMode;                                                                         // we are calling stations (after 5 CQs), not calling CQ
+        private readonly HashSet<string> _ftFailedCalls = new HashSet<string>();                          // called twice without an answer in this run
+
+        private void ftNoteCq(string text, float snr, bool even, float hz, int rx)
+        {
+            if (!_ftRobot) return;
+            string[] t = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (t.Length < 2 || t[0] != "CQ") return;
+            string from = ftBase(t.Length > 3 && t[1].Length <= 4 && !t[1].Any(char.IsDigit) ? t[2] : t[1]);
+            if (from.Length == 0 || from == _digiMyCall || _ftWorkedNow.Contains(from) || _ftFailedCalls.Contains(from)) return;
+            string g = t[t.Length - 1];
+            FtCaller c = new FtCaller { Call = from, Grid = GridRe.IsMatch(g) && g != "RR73" ? g : "", Text = text, Snr = snr, Hz = hz, Even = even, Rx = rx, At = DateTime.UtcNow };
+            if (c.Grid.Length == 0 && _ftGrids.ContainsKey(from)) c.Grid = _ftGrids[from];
+            _ftCqSeen[from] = c;
+        }
+
+        private bool ftRobotCallFarthest()
+        {
+            DateTime now = DateTime.UtcNow;
+            double maxAge = FtSlotLength * 6;
+            FtCaller best = null; double bestKm = -2;
+            foreach (FtCaller c in new List<FtCaller>(_ftCqSeen.Values))
+            {
+                if ((now - c.At).TotalSeconds > maxAge || _ftWorkedNow.Contains(c.Call) || _ftFailedCalls.Contains(c.Call) || FtIsBlockedCall(c.Call)) { _ftCqSeen.Remove(c.Call); continue; }
+                double km = ftDistanceKm(c.Grid);
+                if (best == null || km > bestKm || (km == bestKm && c.At > best.At)) { best = c; bestKm = km; }
+            }
+            if (best == null) return false;
+            _ftCqSeen.Remove(best.Call);
+            _ftCustom = ""; _ftLogged = false;
+            _ftDx = best.Call; _ftDxGrid = best.Grid; _ftRptSent = ""; _ftRptRcvd = "";
+            _ftMsgNo = 1;
+            _ftQsoStart = DateTime.UtcNow;
+            _ftTxEven = !best.Even;                                                          // answer in the other slot
+            _ftRxHz = (int)Math.Round(best.Hz);
+            _ftTxHz = Math.Max(200, Math.Min(3000, _ftRxHz));
+            if (_ftDual && best.Rx >= 0) ftSelectTxRx(best.Rx);
+            FtEnableTx(true);
+            if (!_ftTxEnable) return false;
+            _ftCallMode = true;
+            _ftStatus = "Auto CQ: calling " + best.Call + " (no answer to CQ)" + (bestKm >= 0 ? ", " + ((int)Math.Round(bestKm)) + " km" : "");
+            if (_ftPane != null) _ftPane.Refresh2();
+            return true;
+        }
+
+        private static bool ftGridPos(string g, out double lat, out double lon)
+        {
+            lat = lon = 0;
+            if (g == null || g.Length < 4) return false;
+            g = g.ToUpperInvariant();
+            if (g[0] < 'A' || g[0] > 'R' || g[1] < 'A' || g[1] > 'R' || !char.IsDigit(g[2]) || !char.IsDigit(g[3])) return false;
+            lon = (g[0] - 'A') * 20 - 180 + (g[2] - '0') * 2;
+            lat = (g[1] - 'A') * 10 - 90 + (g[3] - '0');
+            if (g.Length >= 6 && g[4] >= 'A' && g[4] <= 'X' && g[5] >= 'A' && g[5] <= 'X') { lon += (g[4] - 'A') / 12.0 + 1 / 24.0; lat += (g[5] - 'A') / 24.0 + 1 / 48.0; }
+            else { lon += 1; lat += 0.5; }
+            return true;
+        }
+
+        // great circle distance in km between my locator and a station's; -1 when it is not known
+        private double ftDistanceKm(string grid)
+        {
+            double la1, lo1, la2, lo2;
+            if (!ftGridPos(_ftGrid, out la1, out lo1) || !ftGridPos(grid, out la2, out lo2)) return -1;
+            double r = Math.PI / 180, dla = (la2 - la1) * r, dlo = (lo2 - lo1) * r;
+            double a = Math.Sin(dla / 2) * Math.Sin(dla / 2) + Math.Cos(la1 * r) * Math.Cos(la2 * r) * Math.Sin(dlo / 2) * Math.Sin(dlo / 2);
+            return 6371.0 * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        }
+
+        // answers the caller that is farthest away (a caller without a known locator comes last, the newest first among equals); false when none is waiting
+        private bool ftRobotAnswerNext()
+        {
+            DateTime now = DateTime.UtcNow;
+            double maxAge = FtSlotLength * 8;
+            FtCaller best = null; double bestKm = -2;
+            foreach (FtCaller c in new List<FtCaller>(_ftCallers.Values))
+            {
+                if ((now - c.At).TotalSeconds > maxAge || _ftWorkedNow.Contains(c.Call) || FtIsBlockedCall(c.Call)) { _ftCallers.Remove(c.Call); continue; }
+                string g = c.Grid.Length > 0 ? c.Grid : (_ftGrids.ContainsKey(c.Call) ? _ftGrids[c.Call] : "");
+                double km = ftDistanceKm(g);
+                if (best == null || km > bestKm || (km == bestKm && c.At > best.At)) { best = c; bestKm = km; }
+            }
+            if (best == null) return false;
+            _ftCallers.Remove(best.Call);
+            _ftDx = ""; _ftLogged = false; _ftCustom = "";
+            ftAutoSequence(best.Text, best.Snr, best.Even, best.Hz, true, best.Rx);
+            if (_ftDx.Length == 0) return false;
+            if (best.Grid.Length == 0 && _ftGrids.ContainsKey(best.Call) && _ftDxGrid.Length == 0) _ftDxGrid = _ftGrids[best.Call];
+            FtEnableTx(true);
+            if (!_ftTxEnable) return false;
+            _ftStatus = "Auto CQ: answering " + best.Call + (bestKm >= 0 ? " (" + ((int)Math.Round(bestKm)) + " km)" : "");
+            if (_ftPane != null) _ftPane.Refresh2();
+            return true;
+        }
 
         internal void FtEnableTx(bool on)
         {
@@ -775,7 +980,13 @@ namespace BrickSDR
             if (!_ftAuto) return;
             if (_ftCustom.Length > 0) { _ftCustom = ""; _ftTxEnable = false; return; }
             if (_ftMsgNo == 5) { _ftTxEnable = false; ftLogQso(); return; }                  // 73 sent: done
-            if (_ftMsgNo == 4) { ftLogQso(); }                                              // RR73 sent: logged, wait for 73 once
+            if (_ftMsgNo == 4) { ftLogQso(); if (_ftRobot) { _ftTxEnable = false; return; } }   // RR73 sent: logged, wait for 73 once (Auto CQ goes on with the next CQ)
+            // Auto CQ: the 5th CQ in a row without any answer: stop calling CQ, the tick calls the farthest station that is calling CQ
+            if (_ftRobot && _ftMsgNo == 6 && ++_ftCqCount >= 5) { _ftTxEnable = false; _ftStatus = "No answer to 5 CQs"; return; }
+            // Auto CQ: a station we called (Tx1) did not answer twice: forget it, the next one or our own CQ
+            if (_ftRobot && _ftMsgNo == 1 && _ftTries + 1 >= 2) { _ftFailedCalls.Add(_ftDx); _ftTries = 0; _ftTxEnable = false; _ftStatus = "No reply from " + _ftDx; return; }
+            // Auto CQ: our report (Tx2 / Tx3) went out twice and the station did not answer: on to the next one
+            if (_ftRobot && (_ftMsgNo == 2 || _ftMsgNo == 3) && _ftTries + 1 >= 2) { _ftTries = 0; _ftTxEnable = false; _ftStatus = "No reply from " + _ftDx; return; }
             if (++_ftTries > (_ftMsgNo == 6 ? 40 : 6)) { _ftTxEnable = false; _ftStatus = "No answer, transmit stopped"; }
         }
 
@@ -797,6 +1008,7 @@ namespace BrickSDR
             if (t.Length < 3 || ftBase(t[0]) != _digiMyCall) return;
             string from = ftBase(t[1]), what = t[2];
             if (FtIsBlockedCall(from)) return;                                              // a country that is not answered
+            if (_ftRobot && _ftDx.Length > 0 && from != _ftDx) ftNoteCaller(from, text, snr, even, hz, rx, what);   // Auto CQ: busy with someone else, answered later
             if (_ftDx.Length > 0 && from != _ftDx) return;                                   // someone else while we're busy
             if (_ftDx.Length == 0 && !_ftTxEnable && !force) return;
             if (_ftDx.Length == 0 || _ftLogged) { _ftQsoStart = DateTime.UtcNow; _ftLogged = false; }
@@ -836,6 +1048,8 @@ namespace BrickSDR
             if (changed)
             {
                 _ftTries = 0;
+                _ftCqCount = 0;                                                              // someone answered
+                _ftCallMode = false;
                 _ftCustom = "";
                 _ftTxEven = !even;                                                           // answer in the other slot
                 if (_ftDual && rx >= 0) ftSelectTxRx(rx);                                    // Dual RX: the answer goes out on the band of that station
@@ -1083,6 +1297,7 @@ namespace BrickSDR
         {
             if (_ftLogged || _ftDx.Length == 0) return;
             _ftLogged = true;
+            _ftWorkedNow.Add(_ftDx); _ftCallers.Remove(_ftDx);
             try
             {
                 double mhz = _digiRx == 1 ? VFOBFreq : VFOAFreq;

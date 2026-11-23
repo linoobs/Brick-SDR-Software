@@ -158,7 +158,8 @@ namespace BrickSDR
         {
             private readonly Console c;
             private readonly BrickBtn bFt8, bFt4, bAuto, bTx, bHalt, bCq, bClear, bLog;
-            private readonly BrickBtn bDual, bRx1, bRx2;
+            private readonly BrickBtn bDual, bRx1, bRx2, bRobot;
+            private readonly BrickNum robotMin;
             private readonly BrickBtn[] bMsg = new BrickBtn[5];
             private readonly BrickField my, grid, dx, msg;
             private readonly Label lblMy, lblGrid, lblDx, lblRxHz, lblTxHz, status, clock;
@@ -207,13 +208,18 @@ namespace BrickSDR
                 };
 
                 lblRxHz = lbl("Rx"); lblTxHz = lbl("Tx");
-                rxHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftRxHz };
-                txHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 104, Height = 24, Value = c._ftTxHz };
+                rxHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 92, Height = 24, Value = c._ftRxHz };
+                txHz = new BrickNum { Minimum = 200, Maximum = 3000, Increment = 10, Suffix = " Hz", Width = 92, Height = 24, Value = c._ftTxHz };
                 rxHz.ValueChanged += (s, e) => { if (setting) return; c._ftRxHz = (int)rxHz.Value; c.digiSaveSettings(); };
                 txHz.ValueChanged += (s, e) => { if (setting) return; c._ftTxHz = (int)txHz.Value; c.digiSaveSettings(); };
-                bAuto = mk("Auto-sequence", 112, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
+                bAuto = mk("Auto-sequence", 104, 24, null); bAuto.Toggle = true; bAuto.Checked = c._ftAuto;
                 bAuto.CheckedChanged += (s, e) => { c._ftAuto = bAuto.Checked; c.digiSaveSettings(); };
-                bDual = mk("Dual RX", 74, 24, null); bDual.Toggle = true; bDual.Checked = c._ftDual;
+                // Auto CQ: CQ, answers, log, next CQ, no operator; the box is the time it works
+                robotMin = new BrickNum { Minimum = 1, Maximum = 1440, Increment = 5, Suffix = " min", Width = 84, Height = 24, Value = c._ftRobotMinutes };
+                robotMin.ValueChanged += (s, e) => { if (setting) return; c.FtRobotSetMinutes((int)robotMin.Value); };
+                bRobot = mk("Auto CQ", 96, 24, () => { if (c.FtRobotOn) c.FtRobotStop("Auto CQ stopped"); else c.FtRobotStart(); sync(); });
+                bRobot.OnColor = cTx;
+                bDual = mk("Dual RX", 70, 24, null); bDual.Toggle = true; bDual.Checked = c._ftDual;
                 bDual.CheckedChanged += (s, e) => { if (setting) return; c.FtDual = bDual.Checked; };
                 bRx1 = mk("RX1", 46, 24, null); bRx1.Toggle = true; bRx1.Checked = c.FtWaterfallOn(0);
                 bRx2 = mk("RX2", 46, 24, null); bRx2.Toggle = true; bRx2.Checked = c.FtWaterfallOn(1);
@@ -265,7 +271,7 @@ namespace BrickSDR
                 bHalt.OnColor = cTx; bHalt.ForeColor = cTx;
 
                 Controls.AddRange(new Control[] { bFt8, bFt4, lblMy, my, lblGrid, grid, lblDx, dx, bLog, bClear, wf,
-                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, bDual, bRx1, bRx2, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
+                    lblRxHz, rxHz, lblTxHz, txHz, bAuto, bDual, bRx1, bRx2, robotMin, bRobot, activity, qso, slotBar, inBar, status, clock, bCq, msg, bTx, bHalt });
                 foreach (BrickBtn b in bMsg) Controls.Add(b);
                 Resize += (s, e) => layout();
                 timer.Tick += (s, e) => tick();
@@ -316,6 +322,15 @@ namespace BrickSDR
                 activity.ShowBand = qso.ShowBand = c._ftDual;
                 bTx.On = c._ftTxEnable;
                 bTx.Text = c._ftTxEnable ? "TX enabled" : "Enable TX";
+                if (bAuto.Checked != c._ftAuto) bAuto.Checked = c._ftAuto;                // Auto CQ switches the auto-sequence on
+                { bool was = setting; setting = true; if (!robotMin.ContainsFocus && robotMin.Value != c._ftRobotMinutes) robotMin.Value = c._ftRobotMinutes; setting = was; }
+                bRobot.On = c.FtRobotOn;
+                if (c.FtRobotOn)
+                {
+                    TimeSpan left = c.FtRobotLeft;
+                    bRobot.Text = "Auto " + ((int)left.TotalHours).ToString() + ":" + left.Minutes.ToString("00") + ":" + left.Seconds.ToString("00");
+                }
+                else bRobot.Text = "Auto CQ";
                 bCq.On = c._ftMsgNo == 6 && c._ftCustom.Length == 0;
                 for (int i = 0; i < 5; i++) bMsg[i].On = c._ftMsgNo == i + 1 && c._ftCustom.Length == 0;
                 if (!msg.Box.Focused) msg.Text = c.FtNextMessage;
@@ -341,6 +356,8 @@ namespace BrickSDR
                 bDual.Location = new Point(bAuto.Right + 8, 37);
                 bRx1.Location = new Point(bDual.Right + 14, 37);
                 bRx2.Location = new Point(bRx1.Right + 4, 37);
+                bRobot.Location = new Point(Math.Max(bRx2.Right + 14 + robotMin.Width + 6, w - 8 - bRobot.Width), 37);
+                robotMin.Location = new Point(bRobot.Left - 6 - robotMin.Width, 37);
                 // bottom: messages and TX
                 int rowY = h - 34;
                 bCq.Location = new Point(8, rowY);
@@ -366,6 +383,7 @@ namespace BrickSDR
 
             private void tick()
             {
+                c.ftRobotTick();
                 sync();
                 FtRow r;
                 int guard = 0;
@@ -402,7 +420,7 @@ namespace BrickSDR
                 }
                 if (status.Text != text) status.Text = text;
                 DateTime u = DateTime.UtcNow;
-                u = u.AddSeconds(-c.FtClock);
+                u = u.AddSeconds(-c.FtClock + BrickNtp.Offset);
                 clock.Text = (c.FtDecodeMs > 0 ? "decode " + c.FtDecodeMs + " ms   " : "") + u.ToString("HH:mm:ss") + " UTC" + (c._digiRx == 1 ? "  RX2" : "") + (Math.Abs(c.FtClock) >= 0.1 ? "  (PC clock " + (c.FtClock > 0 ? "+" : "") + c.FtClock.ToString("0.0", CultureInfo.InvariantCulture) + " s)" : "");
                 bTx.On = c._ftTxEnable || tx;
                 if (!msg.Box.Focused && msg.Text != c.FtNextMessage) msg.Text = c.FtNextMessage;

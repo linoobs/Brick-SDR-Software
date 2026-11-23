@@ -17,7 +17,12 @@ namespace BrickSDR
         internal sealed class BrickBtn : Control
         {
             public bool Toggle;
-            public Color OnColor = cAccent;
+            private Color? onColor;      // null = the accent colour of Setup > Appearance
+            public Color OnColor
+            {
+                get { return onColor.HasValue ? onColor.Value : cAccent; }
+                set { onColor = value == cAccent ? (Color?)null : value; }
+            }
             public event EventHandler CheckedChanged;
             private bool on, hover, down;
 

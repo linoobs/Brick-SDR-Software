@@ -498,6 +498,8 @@
     <Compile Include="BrickDeepCw.cs" />
     <Compile Include="BrickGgMorse.cs" />
     <Compile Include="BrickUi.cs" />
+    <Compile Include="BrickAppearance.cs" />
+    <Compile Include="BrickNtp.cs" />
     <Compile Include="BrickModeStep.cs" />
     <Compile Include="BrickDigiPane.cs" />
     <Compile Include="BrickUpdate.cs" />

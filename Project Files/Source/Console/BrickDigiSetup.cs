@@ -170,7 +170,7 @@ namespace BrickSDR
             ft.Controls.Add(grp);
 
             // FT8 / FT4: stations that are not answered
-            GroupBox gb = new GroupBox { Text = "Stations that are not answered", Location = new Point(10, 146), Size = new Size(680, 214) };
+            GroupBox gb = new GroupBox { Text = "Stations that are not answered", Location = new Point(10, 146), Size = new Size(680, 260) };
             ComboBox cb = new ComboBox { Location = new Point(16, 54), Width = 250, DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems };
             try { cb.Items.AddRange(CountryData.AllCountries().ToArray()); } catch { }
             Button add = new Button { Text = "Add", Location = new Point(274, 52), Size = new Size(70, 25) };
@@ -183,10 +183,10 @@ namespace BrickSDR
             };
             Label gnote = new Label
             {
-                AutoSize = false, Location = new Point(354, 120), Size = new Size(312, 76), ForeColor = SystemColors.GrayText,
+                AutoSize = false, Location = new Point(354, 120), Size = new Size(312, 92), ForeColor = SystemColors.GrayText,
                 Text = "A call sign entry works too: \"3Y0K\" is that call only, \"UA*\" is every call starting with UA. Use it for expedition calls and new prefixes: the country table inside the program is from March 2026 and doesn't know them. A call the table doesn't know is never blocked."
             };
-            CheckBox unk = new CheckBox { Text = "Do not answer stations whose country is unknown to the table (hashed calls, new prefixes, expeditions)", AutoSize = true, Location = new Point(16, 188) };
+            CheckBox unk = new CheckBox { Text = "Do not answer stations whose country is unknown to the table (hashed calls, new prefixes, expeditions)", AutoSize = false, Size = new Size(650, 34), Location = new Point(16, 216), TextAlign = ContentAlignment.TopLeft, CheckAlign = ContentAlignment.TopLeft };
             unk.Checked = console.FtBlockUnknown;
             unk.CheckedChanged += (s, e) => console.FtBlockUnknown = unk.Checked;
             Button upd = new Button { Text = "Update prefix table", Location = new Point(354, 52), Size = new Size(140, 25) };
@@ -225,6 +225,30 @@ namespace BrickSDR
             fill();
             gb.Controls.AddRange(new Control[] { ghelp, cb, add, lb, rem, gnote, unk, upd, updInfo });
             ft.Controls.Add(gb);
+
+            // FT8 / FT4: time from an NTP server (the PC clock is not changed, the slot timing is corrected by the measured offset)
+            GroupBox gt = new GroupBox { Text = "Time (NTP)", Location = new Point(10, 414), Size = new Size(680, 130) };
+            Label tinfo = new Label
+            {
+                AutoSize = false, Location = new Point(16, 20), Size = new Size(650, 30),
+                Text = "FT8 / FT4 need the time to within about a second. The offset of this PC clock to an NTP server is measured and used for the slots; the Windows clock itself is not changed."
+            };
+            Label tsrv = new Label { AutoSize = true, Location = new Point(16, 59), Text = "NTP server" };
+            TextBox tbox = new TextBox { Location = new Point(92, 56), Width = 220, Text = BrickNtp.Server };
+            Button tsync = new Button { Text = "Sync now", Location = new Point(322, 54), Size = new Size(90, 25) };
+            CheckBox tauto = new CheckBox { Text = "Measure at start and every 30 minutes", AutoSize = true, Location = new Point(430, 58), Checked = BrickNtp.Auto };
+            Label tstat = new Label { AutoSize = false, Location = new Point(16, 92), Size = new Size(650, 30), Text = BrickNtp.Status };
+            tbox.Leave += (s, e) => { string v = tbox.Text.Trim(); if (v.Length > 0) { BrickNtp.Server = v; BrickNtp.Save(); } };
+            tauto.CheckedChanged += (s, e) => { BrickNtp.Auto = tauto.Checked; BrickNtp.Save(); };
+            tsync.Click += (s, e) =>
+            {
+                string v = tbox.Text.Trim();
+                if (v.Length > 0) { BrickNtp.Server = v; BrickNtp.Save(); }
+                tsync.Enabled = false; tstat.Text = "Asking " + BrickNtp.Server + "...";
+                BrickNtp.SyncAsync(msg => { try { BeginInvoke(new Action(() => { tstat.Text = msg; tsync.Enabled = true; })); } catch { } });
+            };
+            gt.Controls.AddRange(new Control[] { tinfo, tsrv, tbox, tsync, tauto, tstat });
+            ft.Controls.Add(gt);
 
             rtty.Controls.Add(new Label { AutoSize = false, Location = new Point(12, 14), Size = new Size(680, 40), Text = "The RTTY settings (shift, baud, reverse, AFC, squelch, TX level) are in the RTTY window: DIGI menu - RTTY." });
             fdv.Controls.Add(new Label { AutoSize = false, Location = new Point(12, 14), Size = new Size(680, 40), Text = "The FreeDV settings (call sign, version, noise reduction, AGC, equalizer, Reporter) are in the FreeDV window: the Settings button of the FreeDV strip." });

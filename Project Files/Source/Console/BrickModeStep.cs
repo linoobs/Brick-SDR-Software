@@ -1,9 +1,10 @@
-/*  BrickModeStep.cs
+﻿/*  BrickModeStep.cs
 
     The tuning step follows the mode: 500 Hz for LSB / USB, 10 Hz for CW and the digital modes, 1 kHz for AM / SAM / FM / DRM.
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 
@@ -146,9 +147,79 @@ namespace BrickSDR
             }
         }
 
+        // With "Keep my tuning step" every mode remembers the step the user last chose in it (file tune_step_modes.txt, lines Mode=StepName);
+        // a mode / band change brings back the step of the new mode, a mode never used before keeps the current step.
+        private Dictionary<string, string> _stepByMode;
+        private bool _stepRestoring;
+        private string StepModesFile { get { return Path.Combine(AppDataPath, "tune_step_modes.txt"); } }
+
+        private void stepModesLoad()
+        {
+            if (_stepByMode != null) return;
+            _stepByMode = new Dictionary<string, string>();
+            try
+            {
+                if (!File.Exists(StepModesFile)) return;
+                foreach (string l in File.ReadAllLines(StepModesFile))
+                {
+                    int i = l.IndexOf('=');
+                    if (i > 0) _stepByMode[l.Substring(0, i)] = l.Substring(i + 1).Trim();
+                }
+            }
+            catch { }
+        }
+
+        private void stepModesSave()
+        {
+            try
+            {
+                var lines = new List<string>();
+                foreach (var kv in _stepByMode) lines.Add(kv.Key + "=" + kv.Value);
+                File.WriteAllLines(StepModesFile, lines.ToArray());
+            }
+            catch { }
+        }
+
+        // called by the TuneStepIndex setter: the step the user (or a button / wheel) set belongs to the mode of the receiver he works with
+        internal void brickNoteStep()
+        {
+            try
+            {
+                if (initializing || _stepRestoring || !BrickKeepStep || !brickActive) return;
+                DSPMode m = (RX2Enabled && Display.BrickActiveRX == 2) ? RX2DSPMode : RX1DSPMode;
+                if (!isDSPModeValid(m)) return;
+                stepModesLoad();
+                string name = tune_step_list[tune_step_index].Name;
+                string old;
+                if (_stepByMode.TryGetValue(m.ToString(), out old) && old == name) return;
+                _stepByMode[m.ToString()] = name;
+                stepModesSave();
+            }
+            catch { }
+        }
+
         private void brickApplyModeStep(DSPMode mode)
         {
-            if (BrickKeepStep) return;
+            if (BrickKeepStep)
+            {
+                stepModesLoad();
+                string saved;
+                if (_stepByMode.TryGetValue(mode.ToString(), out saved))
+                {
+                    int k = TuneStepLookup(saved);
+                    if (k >= 0 && k != tune_step_index)
+                    {
+                        _stepRestoring = true;
+                        try { TuneStepIndex = k; } finally { _stepRestoring = false; }
+                    }
+                }
+                else
+                {
+                    _stepByMode[mode.ToString()] = tune_step_list[tune_step_index].Name;   // first visit: the current step becomes this mode's
+                    stepModesSave();
+                }
+                return;
+            }
             string name;
             switch (mode)
             {
